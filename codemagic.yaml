@@ -1,0 +1,15 @@
+workflows:
+  android-apk:
+    name: Future Youth Forum Android APK
+    max_build_duration: 60
+    environment:
+      flutter: stable
+    scripts:
+      - name: Generate Android platform files
+        script: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Get dependencies
+        script: flutter pub get
+      - name: Build release APK
+        script: flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
