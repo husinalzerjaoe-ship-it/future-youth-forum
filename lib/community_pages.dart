@@ -140,10 +140,7 @@ class _RegionChatPageState extends State<RegionChatPage>{
   final data=snap.data()??{};
   if(data['permanent']==true)return true;
   final until=data['expiresAt'] as Timestamp?;
-  if(until==null || !until.toDate().isAfter(DateTime.now())) {
-   if(snap.exists) await snap.reference.delete();
-   return false;
-  }
+  if(until==null || !until.toDate().isAfter(DateTime.now())) return false;
   return true;
  }
  Future<void> moderate(String uid,String name) async {
