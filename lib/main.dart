@@ -527,11 +527,17 @@ class MyProfilePage extends StatelessWidget {
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
-          if (d['membershipTier'] is String && (d['membershipTier'] as String).isNotEmpty)
-            Center(child: Padding(padding: const EdgeInsets.only(top: 10), child: _MembershipCard(
-              tier: d['membershipTier'] as String,
-              expiresAt: d['membershipExpiresAt'],
-            ))),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: db.collection('memberships').doc(uid).snapshots(),
+            builder: (context, membership) {
+              final m = membership.data?.data() ?? {};
+              final tier = (m['tier'] ?? d['membershipTier'] ?? '').toString();
+              final expiry = m['expiresAt'] ?? d['membershipExpiresAt'];
+              if (tier.isEmpty) return const SizedBox.shrink();
+              return Center(child: Padding(padding: const EdgeInsets.only(top: 10),
+                child: _MembershipCard(tier: tier, expiresAt: expiry)));
+            },
+          ),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Text('تطوير التطبيق: Alfredo', style: TextStyle(color: brand, fontWeight: FontWeight.bold))),
           const SizedBox(height: 10),
@@ -559,6 +565,7 @@ class _MembershipCard extends StatelessWidget {
       'gold' || 'ذهبية' => 'عضوية ذهبية',
       'silver' || 'فضية' => 'عضوية فضية',
       'legendary' || 'أسطورية' => 'عضوية أسطورية',
+      'premium' || 'مميزة' => 'عضوية مميزة',
       _ => 'عضوية مشتركة',
     };
     final color = tier.toLowerCase() == 'gold' || tier == 'ذهبية' ? const Color(0xFFFFB52E)
