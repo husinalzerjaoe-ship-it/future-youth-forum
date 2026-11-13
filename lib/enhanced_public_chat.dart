@@ -90,7 +90,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     if(a=='pin'&&staff)await doc.reference.update({'isPinned':d['isPinned']!=true,'pinnedBy':_uid});
     if(a=='delete'&&(mine||staff))await doc.reference.delete();
     if(a=='edit'&&mounted){
-      final t=TextEditingController(text:d['text'] as String???'');
+      final t=TextEditingController(text:d['text'] as String? ?? '');
       final v=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('تعديل الرسالة'),content:TextField(controller:t,maxLength:1000,maxLines:3),actions:[
         TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,t.text.trim()),child:const Text('حفظ'))
       ])));
@@ -163,7 +163,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
 
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
-    final d=doc.data()??{};final mine=d['senderId']==_uid;final founder=d['senderRole']=='founder';final type=d['type'] as String???'text';final body=d['text'] as String???'';
+    final d=doc.data()??{};final mine=d['senderId']==_uid;final founder=d['senderRole']=='founder';final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onLongPress:()=>_menu(doc),child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.82),margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
@@ -171,7 +171,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
-          Flexible(child:Text(d['senderName'] as String???'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:founder?const Color(0xFFB77900):_chatBrand))),
+          Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:founder?const Color(0xFFB77900):_chatBrand))),
           if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:16),
           if(d['edited']==true)const Text(' • معدّلة',style:TextStyle(fontSize:10,color:Colors.black45)),
         ]),
@@ -182,7 +182,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         Row(mainAxisSize:MainAxisSize.min,children:[
           ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
-            final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String???'';counts[e]=(counts[e]??0)+1;}
+            final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
             return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:10));
           }),
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
@@ -201,7 +201,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ])),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
-      return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String???'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String???'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
+      return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
     Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),builder:(c,s){
       if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
