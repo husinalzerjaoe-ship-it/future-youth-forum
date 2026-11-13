@@ -146,7 +146,28 @@ class _DirectChatPageState extends State<DirectChatPage> {
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
                 decoration: BoxDecoration(color: mine ? const Color(0xFFE9E5FF) : Colors.white, borderRadius: BorderRadius.circular(14)),
-                child: Text(d['text'] as String? ?? ''),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  if (!mine && (d['senderId'] as String? ?? '').isNotEmpty)
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: _db.collection('publicProfiles').doc(d['senderId'] as String).snapshots(),
+                      builder: (context, profile) {
+                        final p = profile.data?.data() ?? {};
+                        final senderId = d['senderId'] as String;
+                        final name = p['name'] as String? ?? d['senderName'] as String? ?? 'عضو';
+                        final photo = p['photoUrl'] as String?;
+                        return InkWell(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _MemberMiniProfilePage(uid: senderId, fallbackName: name))),
+                          child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            CircleAvatar(radius: 13, backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+                              child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 15) : null),
+                            const SizedBox(width: 6),
+                            Text(name, style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)),
+                          ])),
+                        );
+                      },
+                    ),
+                  Text(d['text'] as String? ?? ''),
+                ]),
               ));
             }).toList());
           },
@@ -157,6 +178,36 @@ class _DirectChatPageState extends State<DirectChatPage> {
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
         ]))),
       ]),
+    ),
+  );
+}
+
+class _MemberMiniProfilePage extends StatelessWidget {
+  final String uid, fallbackName;
+  const _MemberMiniProfilePage({required this.uid, required this.fallbackName});
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('الملف الشخصي')),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _db.collection('publicProfiles').doc(uid).snapshots(),
+        builder: (context, s) {
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          final d = s.data!.data() ?? {};
+          final photo = d['photoUrl'] as String?;
+          return ListView(padding: const EdgeInsets.all(20), children: [
+            Center(child: CircleAvatar(radius: 48,
+              backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+              child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 48) : null)),
+            const SizedBox(height: 12),
+            Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            const SizedBox(height: 8),
+            const Text('السيرة الذاتية', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text((d['bio'] as String?)?.trim().isNotEmpty == true ? d['bio'] as String : 'لم يضف العضو سيرة ذاتية بعد'),
+          ]);
+        },
+      ),
     ),
   );
 }
