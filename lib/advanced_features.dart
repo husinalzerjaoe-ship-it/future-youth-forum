@@ -154,7 +154,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'text': value, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'createdAt': FieldValue.serverTimestamp()});
       batch.set(convo, {'lastMessage': value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       // Commit the message first. A notification failure must never cancel delivery.
       await batch.commit();
@@ -249,6 +249,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
                               child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 15) : null),
                             const SizedBox(width: 6),
                             Text(name, style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)),
+                            if (d['senderRole'] == 'founder') ...[
+                              const SizedBox(width: 5),
+                              const Icon(Icons.workspace_premium, size: 15, color: Color(0xFFFFB52E)),
+                              const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold)),
+                            ],
                           ])),
                         );
                       },
