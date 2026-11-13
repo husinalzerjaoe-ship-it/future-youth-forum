@@ -138,16 +138,16 @@ class _StoriesPageState extends State<StoriesPage>{
   try{
    final u=FirebaseAuth.instance.currentUser!;final ext=file.path.split('.').last;
    final objectPath='stories/'+u.uid+'/'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+ext;
-   final contentType=type=='video'?'video/mp4':'image/jpeg';
+   final contentType=type=='video' ? (ext.toLowerCase()=='mov' ? 'video/quicktime' : 'video/mp4') : (ext.toLowerCase()=='png' ? 'image/png' : ext.toLowerCase()=='webp' ? 'image/webp' : 'image/jpeg');
    await Supabase.instance.client.storage.from('forum-media').uploadBinary(
     objectPath, await file.readAsBytes(),
-    fileOptions: FileOptions(contentType:contentType,upsert:true),
+    fileOptions: FileOptions(contentType:contentType,upsert:false),
    );
    final url=Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
    await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(hours:24)))});
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الستوري لمدة 24 ساعة')));
-  }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر رفع الستوري. تأكد من سياسة الرفع في Supabase Storage والإنترنت.')));}
+  }on StorageException catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل تخزين الستوري: ${e.message}')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الستوري: $e')));}
   finally{if(mounted)setState(()=>busy=false);}
  }
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
