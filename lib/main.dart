@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'community_pages.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -156,13 +157,14 @@ class _HomePageState extends State<HomePage> {
         actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
           icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج')],
       ),
-      body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage(), MyProfilePage()]),
+      body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage(), CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dynamic_feed_outlined), selectedIcon: Icon(Icons.dynamic_feed), label: 'المنشورات'),
           NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'المحادثة العامة'),
+          NavigationDestination(icon: Icon(Icons.grid_view_rounded), selectedIcon: Icon(Icons.grid_view), label: 'الأقسام'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'ملفي'),
         ],
       ),
