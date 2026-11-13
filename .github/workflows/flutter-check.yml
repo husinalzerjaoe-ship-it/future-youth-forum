@@ -28,6 +28,8 @@ jobs:
         run: flutter analyze --no-pub --no-fatal-infos
       - name: Generate Android platform files
         run: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Configure Android background audio
+        run: python scripts/configure_android_audio.py
       - name: Set Android app display name
         run: sed -i 's/android:label="forum"/android:label="ملتقى الأنمي"/' android/app/src/main/AndroidManifest.xml
       - name: Build release APK
