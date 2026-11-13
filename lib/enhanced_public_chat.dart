@@ -92,7 +92,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } catch (_) { if(mounted)setState(()=>_error='تعذر رفع الصورة أو GIF. راجع صلاحيات bucket forum-media.'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
-  Future<void> _stickers() async {
+  Future<void> _showStickers() async {
     final v=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('الملصقات',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
       GridView.count(shrinkWrap:true,crossAxisCount:5,physics:const NeverScrollableScrollPhysics(),children:_stickers.map((e)=>InkWell(onTap:()=>Navigator.pop(c,e),child:Center(child:Text(e,style:const TextStyle(fontSize:32))))).toList())
@@ -265,7 +265,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
     Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
       IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
-      IconButton(onPressed:_sending?null:_stickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
+      IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
         onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
         onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
