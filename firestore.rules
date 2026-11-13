@@ -5,7 +5,11 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email == 'husinalzerjaoe@gmail.com';
     }
-    function usersNotBlocked(a, b) {\n      return !exists(/databases/$(database)/documents/userBlocks/$(a)_$(b))\n        && !exists(/databases/$(database)/documents/userBlocks/$(b)_$(a));\n    }\n    function roomNotBanned(roomId) {
+    function usersNotBlocked(a, b) {
+      return !exists(/databases/$(database)/documents/userBlocks/$(a)_$(b))
+        && !exists(/databases/$(database)/documents/userBlocks/$(b)_$(a));
+    }
+    function roomNotBanned(roomId) {
       return !exists(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid))
         || (get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.permanent != true
           && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt < request.time);
