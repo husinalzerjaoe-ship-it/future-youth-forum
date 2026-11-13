@@ -10,6 +10,8 @@ import 'local_bot.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
+const founderEmail='husinalzerjaoe@gmail.com';
+bool get isForumFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase()==founderEmail;
 
 class CommunityHubPage extends StatelessWidget {
  const CommunityHubPage({super.key});
@@ -129,14 +131,52 @@ class RegionChatRoomsPage extends StatelessWidget{
 }
 class RegionChatPage extends StatefulWidget{final String id,title;const RegionChatPage({super.key,required this.id,required this.title});@override State<RegionChatPage> createState()=>_RegionChatPageState();}
 class _RegionChatPageState extends State<RegionChatPage>{
+
  final t=TextEditingController();bool busy=false;
+ bool get founder => isForumFounder;
+ Future<bool> blocked(String uid) async {
+  final snap=await db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid).get();
+  if(!snap.exists)return false;
+  final data=snap.data()??{};
+  if(data['permanent']==true)return true;
+  final until=data['expiresAt'] as Timestamp?;
+  if(until==null || !until.toDate().isAfter(DateTime.now())) {
+   if(snap.exists) await snap.reference.delete();
+   return false;
+  }
+  return true;
+ }
+ Future<void> moderate(String uid,String name) async {
+  if(!founder || uid==FirebaseAuth.instance.currentUser!.uid)return;
+  final choice=await showDialog<String>(context:context,builder:(c)=>Directionality(
+   textDirection:TextDirection.rtl,child:AlertDialog(
+    title:Text('إدارة العضو: $name'),
+    content:const Text('اختار مدة المنع من دخول هذه الغرفة.'),
+    actions:[
+     TextButton(onPressed:()=>Navigator.pop(c,'cancel'),child:const Text('إلغاء')),
+     TextButton(onPressed:()=>Navigator.pop(c,'kick'),child:const Text('طرد مؤقت')),
+     TextButton(onPressed:()=>Navigator.pop(c,'1h'),child:const Text('ساعة')),
+     TextButton(onPressed:()=>Navigator.pop(c,'2h'),child:const Text('ساعتين')),
+     TextButton(onPressed:()=>Navigator.pop(c,'1d'),child:const Text('يوم')),
+     TextButton(onPressed:()=>Navigator.pop(c,'forever'),child:const Text('للأبد')),
+     TextButton(onPressed:()=>Navigator.pop(c,'unban'),child:const Text('رفع الحظر')),
+    ])));
+  if(choice==null || choice=='cancel')return;
+  final ref=db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid);
+  if(choice=='unban') { await ref.delete(); }
+  else {
+   final duration=choice=='kick'?const Duration(minutes:1):choice=='1h'?const Duration(hours:1):choice=='2h'?const Duration(hours:2):choice=='1d'?const Duration(days:1):null;
+   await ref.set({'permanent':duration==null,'expiresAt':duration==null?null:Timestamp.fromDate(DateTime.now().add(duration)),'by':FirebaseAuth.instance.currentUser!.uid,'updatedAt':FieldValue.serverTimestamp()});
+  }
+  if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(choice=='unban'?'تم رفع الحظر':choice=='kick'?'تم الطرد المؤقت':'تم تطبيق الحظر')));
+ }
  @override void dispose(){t.dispose();super.dispose();}
- Future<void> send()async{final value=t.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
+ Future<void> send()async{final value=t.text.trim();if(value.isEmpty||busy)return;final me=FirebaseAuth.instance.currentUser!;if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}setState(()=>busy=true);
  try{final u=FirebaseAuth.instance.currentUser!;final profile=await db2.collection('publicProfiles').doc(u.uid).get();
  await db2.collection('regionalChats').doc(widget.id).collection('messages').add({'text':value,'senderId':u.uid,'senderName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});t.clear();}
  catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('انشر قواعد Firestore الجديدة أولاً')));}
  finally{if(mounted)setState(()=>busy=false);}}
- @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage()))) ]),body:Column(children:[
+ @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[if(founder)const Padding(padding:EdgeInsets.symmetric(horizontal:8),child:Center(child:Text('👑 المؤسس',style:TextStyle(fontWeight:FontWeight.bold)))),IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage()))) ]),body:Column(children:[
  Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection('regionalChats').doc(widget.id).collection('messages').orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
  if(s.hasError)return const Center(child:Text('الدردشة تحتاج قواعد Firestore الجديدة'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
  if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة 👋'));
