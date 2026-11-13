@@ -102,7 +102,7 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   final value=text.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
   try{
    await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'text':value,'createdAt':FieldValue.serverTimestamp()});
-   await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':value,'updatedAt':FieldValue.serverTimestamp()});text.clear();
+   await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':value.length>200?value.substring(0,200):value,'updatedAt':FieldValue.serverTimestamp()});text.clear();
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الإرسال: '+e.toString())));}
   finally{if(mounted)setState(()=>busy=false);}
  }
