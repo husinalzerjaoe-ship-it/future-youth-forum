@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'community_pages.dart';
 import 'enhanced_public_chat.dart';
 import 'advanced_features.dart';
@@ -30,7 +31,20 @@ class FutureYouthApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'ملتقى شباب المستقبل',
-    theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: brand)),
+    themeMode: ThemeMode.system,
+    theme: ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
+      textTheme: GoogleFonts.notoSansArabicTextTheme(),
+      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+      cardTheme: const CardThemeData(elevation: 1, margin: EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
+    ),
+    darkTheme: ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark),
+      textTheme: GoogleFonts.notoSansArabicTextTheme(ThemeData.dark().textTheme),
+      scaffoldBackgroundColor: const Color(0xFF111321),
+    ),
     home: const AuthGate(),
   );
 }
