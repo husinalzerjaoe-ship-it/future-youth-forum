@@ -518,17 +518,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
             if (picked == null) return;
             setState(() => uploadingPhoto = true);
             final uid = FirebaseAuth.instance.currentUser!.uid;
-            const path = 'profiles/';
-            final objectPath = '$path$uid/avatar.jpg';
+            // Use a fresh object name so replacing an avatar needs INSERT only,
+            // avoiding Storage upsert/update-policy failures on some projects.
+            final objectPath = 'profiles/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
             await Supabase.instance.client.storage.from('forum-media').uploadBinary(
               objectPath,
               await picked.readAsBytes(),
-              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
             );
             photo.text = Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
           } catch (_) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة. تأكد من إعداد سياسات Supabase Storage والإنترنت.')));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة إلى التخزين. تأكد من اتصال الإنترنت وسياسة INSERT في bucket forum-media.')));
           } finally { if (mounted) setState(() => uploadingPhoto = false); }
         },
         icon: uploadingPhoto ? const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.photo_library_outlined),
