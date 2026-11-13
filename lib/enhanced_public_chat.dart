@@ -23,6 +23,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   bool _sending = false;
   DateTime? _lastSuccessfulSend;
   String? _error;
+  String? _pulseMessageId;
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
     final normalized = value.toLowerCase().replaceAll(RegExp(r'[\sـ]+'), '');
@@ -342,7 +343,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
-    return GestureDetector(onLongPress:()=>_menu(doc),child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
+    return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
       decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(mine?const Color(0xFFE8E2FF):Colors.white),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):_chatBrand.withValues(alpha:.42),width:founder?2.6:1),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -377,7 +378,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
         ]),
       ]),
-    )));
+    ))));
   }
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
