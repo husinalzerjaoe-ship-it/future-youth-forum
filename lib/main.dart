@@ -588,7 +588,18 @@ class PostSocialActions extends StatelessWidget {
               return TextButton.icon(
                 onPressed: () async {
                   if (liked) { await likes.doc(me).delete(); }
-                  else { await likes.doc(me).set({'userId': me, 'createdAt': FieldValue.serverTimestamp()}); }
+                  else {
+                    await likes.doc(me).set({'userId': me, 'createdAt': FieldValue.serverTimestamp()});
+                    if (authorId.isNotEmpty && authorId != me) {
+                      final profile = await db.collection('publicProfiles').doc(me).get();
+                      await db.collection('notifications').add({
+                        'recipientId': authorId, 'actorId': me,
+                        'actorName': profile.data()?['name'] ?? 'عضو',
+                        'type': 'like', 'text': 'أعجب بمنشورك',
+                        'read': false, 'createdAt': FieldValue.serverTimestamp(),
+                      });
+                    }
+                  }
                 },
                 icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : brand),
                 label: Text('إعجاب ${all.data?.docs.length ?? 0}'),
@@ -671,6 +682,13 @@ class FollowControl extends StatelessWidget {
               } else {
                 batch.set(followerRef, {'userId':me,'createdAt':FieldValue.serverTimestamp()});
                 batch.set(followingRef, {'userId':uid,'createdAt':FieldValue.serverTimestamp()});
+                final myProfile = await db.collection('publicProfiles').doc(me).get();
+                batch.set(db.collection('notifications').doc(), {
+                  'recipientId': uid, 'actorId': me,
+                  'actorName': myProfile.data()?['name'] ?? 'عضو',
+                  'type': 'follow', 'text': 'بدأ بمتابعتك',
+                  'read': false, 'createdAt': FieldValue.serverTimestamp(),
+                });
               }
               await batch.commit();
             },
