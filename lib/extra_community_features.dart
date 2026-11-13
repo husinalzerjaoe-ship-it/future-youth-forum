@@ -1,8 +1,4 @@
-import 'dart:convert';
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -31,13 +27,12 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
  final db=FirebaseFirestore.instance;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
  Future<void> createRoom() async {
-  final name=TextEditingController(),code=TextEditingController();
+  final name=TextEditingController();
   final selected=<String>{uid};
   final result=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,setD)=>AlertDialog(
-   title:const Text('إنشاء غرفة بالدعوة والرمز'),
+   title:const Text('إنشاء غرفة بالدعوات'),
    content:SizedBox(width:420,height:460,child:Column(children:[
     TextField(controller:name,decoration:const InputDecoration(labelText:'اسم الغرفة')),
-    TextField(controller:code,obscureText:true,decoration:const InputDecoration(labelText:'رمز الدخول (4 أحرف على الأقل)')),
     const SizedBox(height:12),const Align(alignment:Alignment.centerRight,child:Text('اختر الأعضاء المدعوين')),
     Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('publicProfiles').limit(200).snapshots(),builder:(ctx,s){
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
@@ -50,24 +45,16 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
    actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('إنشاء'))]
   )));
   if(result!=true)return;
-  if(name.text.trim().length<3||code.text.trim().length<4||selected.length>30){
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اكتب اسماً من 3 أحرف ورمزاً من 4 واختر حتى 30 عضواً')));
+  if(name.text.trim().length<3||selected.length>30){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اكتب اسماً من 3 أحرف واختر حتى 30 عضواً')));
    return;
   }
-  final salt=List<int>.generate(16,(_)=>Random.secure().nextInt(256));
-  final saltHex=salt.map((b)=>b.toRadixString(16).padLeft(2,'0')).join();
-  final hash=sha256.convert(utf8.encode(saltHex+'|'+code.text.trim())).toString();
-  final room=await db.collection('privateRooms').add({
+  await db.collection('privateRooms').add({
    'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
-   'passcodeSalt':saltHex,'passcodeHash':hash,'createdAt':FieldValue.serverTimestamp(),'lastMessage':'الغرفة جاهزة'
+   'createdAt':FieldValue.serverTimestamp(),'lastMessage':'الغرفة جاهزة'
   });
-  try{
-   await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':room.id,'passcode':code.text.trim()});
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
-  }catch(e){
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ الغرفة؛ انشر Cloud Functions حتى يتم تفعيل رمز الدخول: '+e.toString())));
-  }
-  name.dispose();code.dispose();
+  if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
+  name.dispose();
  }
  @override Widget build(BuildContext context)=>Scaffold(
   floatingActionButton:FloatingActionButton.extended(onPressed:createRoom,icon:const Icon(Icons.add),label:const Text('غرفة جديدة')),
@@ -94,18 +81,8 @@ class PrivateRoomChatPage extends StatefulWidget {
  @override State<PrivateRoomChatPage> createState()=>_PrivateRoomChatPageState();
 }
 class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
- final db=FirebaseFirestore.instance;final text=TextEditingController();bool unlocked=false,busy=false;
+ final db=FirebaseFirestore.instance;final text=TextEditingController();bool busy=false;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
- Future<void> unlock() async {
-  final code=TextEditingController();
-  final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('رمز الغرفة'),content:TextField(controller:code,obscureText:true,decoration:const InputDecoration(hintText:'اكتب الرمز')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('رجوع')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('دخول'))]));
-  if(ok!=true)return;
-  try{
-   await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':widget.roomId,'passcode':code.text.trim()});
-   if(mounted)setState(()=>unlocked=true);
-  }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الرمز غير صحيح أو أنك لست ضمن المدعوين')));}
-  code.dispose();
- }
  Future<void> send() async {
   final value=text.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
   try{
@@ -115,7 +92,7 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   finally{if(mounted)setState(()=>busy=false);}
  }
  @override void dispose(){text.dispose();super.dispose();}
- @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName)),body:!unlocked?Center(child:FilledButton.icon(onPressed:unlock,icon:const Icon(Icons.lock_open),label:const Text('إدخال رمز الغرفة'))):Column(children:[
+ @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName)),body:Column(children:[
   Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
    if(s.hasError)return const Center(child:Text('تعذر تحميل الرسائل'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
    return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Text(x['text'] as String? ?? '',style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))));}).toList());
