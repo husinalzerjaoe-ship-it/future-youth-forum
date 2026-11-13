@@ -429,3 +429,60 @@ class MemberPosts extends StatelessWidget {
         leading: const Icon(Icons.article_outlined), title: Text(d.data()['text'] as String? ?? 'منشور')))).toList());
     });
 }
+
+
+class MemberProfilePage extends StatelessWidget {
+  final String uid, fallbackName;
+  const MemberProfilePage({super.key, required this.uid, required this.fallbackName});
+  @override
+  Widget build(BuildContext context) {
+    if (uid.isEmpty) return const Scaffold(body: Center(child: Text('الملف غير متوفر')));
+    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+      appBar: AppBar(title: const Text('صفحة العضو')),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: db.collection('users').doc(uid).snapshots(),
+        builder: (context, s) {
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          final d = s.data!.data() ?? {};
+          return ListView(padding: const EdgeInsets.all(18), children: [
+            Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+            const SizedBox(height: 8),
+            Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            Center(child: Text(d['bio'] as String? ?? '')),
+            const SizedBox(height: 12),
+            StarRateControl(uid: uid),
+            Center(child: RatingSummary(uid: uid)),
+            const Divider(height: 28),
+            const Text('منشوراته', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            MemberPosts(uid: uid),
+          ]);
+        },
+      ),
+    ));
+  }
+}
+
+class StarRateControl extends StatelessWidget {
+  final String uid;
+  const StarRateControl({super.key, required this.uid});
+  @override
+  Widget build(BuildContext context) {
+    final me = FirebaseAuth.instance.currentUser!.uid;
+    if (uid == me) return const SizedBox.shrink();
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: db.collection('users').doc(uid).collection('ratings').doc(me).snapshots(),
+      builder: (context, s) {
+        final current = (s.data?.data()?['stars'] as num?)?.toInt() ?? 0;
+        return Column(children: [
+          const Text('قيّم هذا العضو'),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(
+            onPressed: () => db.collection('users').doc(uid).collection('ratings').doc(me).set({
+              'stars': i + 1, 'from': me, 'createdAt': FieldValue.serverTimestamp(),
+            }),
+            icon: Icon(Icons.star, color: i < current ? Colors.amber : Colors.grey, size: 30),
+          ))),
+        ]);
+      },
+    );
+  }
+}
