@@ -371,7 +371,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
       final bytes = await file.readAsBytes();
       final ext = file.name.toLowerCase().split('.').last;
       final safeExt = ['jpg','jpeg','png','webp','gif'].contains(ext) ? ext : 'jpg';
-      final path = 'public-chat/\${FirebaseAuth.instance.currentUser!.uid}/\${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      final path = 'public-chat/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
       await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, bytes,
         fileOptions: FileOptions(contentType: safeExt == 'gif' ? 'image/gif' : 'image/$safeExt', upsert: false));
       final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
