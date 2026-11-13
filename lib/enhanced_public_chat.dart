@@ -39,8 +39,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
     return p.data()?['name'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
   }
-  Future<void> _send({String body='',String? mediaUrl,String type='text'}) async {
-    if(_sending || (body.trim().isEmpty && mediaUrl==null)) return;
+  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
+    if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
       await _chatDb.collection('messages').add({
@@ -63,7 +63,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final path='public-chat/'+_uid+'/'+DateTime.now().microsecondsSinceEpoch.toString()+'.'+safe;
       await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await f.readAsBytes(),
         fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/'+safe,upsert:false));
-      await _send(mediaUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
+      await _send(mediaUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image',uploadInProgress:true);
     } catch (_) { if(mounted)setState(()=>_error='تعذر رفع الصورة أو GIF. راجع صلاحيات bucket forum-media.'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
