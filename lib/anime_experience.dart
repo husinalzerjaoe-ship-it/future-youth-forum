@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'media_upload_service.dart';
 
 const _violet = Color(0xFF6554D9);
 const _ink = Color(0xFF171936);
@@ -68,20 +69,14 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
     }
     setState(() => busy = true);
     try {
-      final ext = file.name.toLowerCase().split('.').last;
-      final safe = ['jpg','jpeg','png','webp'].contains(ext) ? ext : 'jpg';
-      final mime = safe == 'jpg' || safe == 'jpeg' ? 'image/jpeg' : 'image/$safe';
-      final path = 'anime-wallpapers/' + _uid + '/' + DateTime.now().microsecondsSinceEpoch.toString() + '.' + safe;
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, await file.readAsBytes(),
-        fileOptions: FileOptions(contentType: mime, upsert: false));
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(file, folder: 'anime-wallpapers');
       await _db.collection('animeWallpapers').add({
         'title': title.text.trim(), 'anime': anime.text.trim(), 'artist': artist.text.trim(),
         'sourceUrl': source.text.trim(), 'rights': rights, 'imageUrl': url, 'uploaderId': _uid,
         'status': 'pending', 'createdAt': FieldValue.serverTimestamp(),
       });
       _snack('وصلتنا الخلفية، وتظهر بعد موافقة المشرف والتحقق من الحقوق.');
-    } catch (_) { _snack('تعذر الرفع. تحقق من نشر سياسة مجلد anime-wallpapers في Supabase.'); }
+    } on StorageException catch (e) { _snack('فشل رفع الخلفية: ${e.message}'); } catch (e) { _snack('تعذر رفع الخلفية: $e'); }
     finally {
       title.dispose(); anime.dispose(); artist.dispose(); source.dispose();
       if (mounted) setState(() => busy = false);
