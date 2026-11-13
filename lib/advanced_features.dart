@@ -370,6 +370,72 @@ class MemberSafetyPage extends StatelessWidget {
 class MemberSafetyActions extends StatelessWidget {
   final String uid, name;
   const MemberSafetyActions({super.key, required this.uid, required this.name});
+
+  bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
+
+  Future<bool> _isModerator() async => (await _db.collection('chatModerators').doc(_uid).get()).exists;
+
+  Future<void> _report(BuildContext context) async {
+    final reason = await showDialog<String>(context: context, builder: (c) => SimpleDialog(
+      title: const Text('سبب الإبلاغ'),
+      children: ['تنمّر أو إساءة', 'انتحال شخصية', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة', 'احتيال أو تهديد']
+        .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList(),
+    ));
+    if (reason == null) return;
+    final me = await _db.collection('publicProfiles').doc(_uid).get();
+    await _db.collection('reports').add({
+      'type': 'user', 'targetId': uid, 'reportedUserId': uid,
+      'reporterId': _uid, 'reporterName': me.data()?['name'] ?? 'عضو',
+      'reportedName': name, 'reason': reason, 'status': 'new',
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال البلاغ للإدارة')));
+  }
+
+  Future<void> _moderate(BuildContext context) async {
+    final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true, builder: (c) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ListTile(title: Text('إجراءات الإدارة', style: TextStyle(fontWeight: FontWeight.bold))),
+        ListTile(leading: const Icon(Icons.volume_off), title: const Text('كتم دقيقة'), onTap: () => Navigator.pop(c, 'mute_1m')),
+        ListTile(leading: const Icon(Icons.volume_off), title: const Text('كتم ساعة'), onTap: () => Navigator.pop(c, 'mute_1h')),
+        ListTile(leading: const Icon(Icons.volume_off), title: const Text('كتم يوم'), onTap: () => Navigator.pop(c, 'mute_1d')),
+        ListTile(leading: const Icon(Icons.volume_off), title: const Text('كتم دائم'), onTap: () => Navigator.pop(c, 'mute_forever')),
+        ListTile(leading: const Icon(Icons.logout), title: const Text('طرد مؤقت 24 ساعة'), onTap: () => Navigator.pop(c, 'kick_1d')),
+        ListTile(leading: const Icon(Icons.block, color: Colors.red), title: const Text('حظر نهائي', style: TextStyle(color: Colors.red)), onTap: () => Navigator.pop(c, 'ban')),
+        ListTile(leading: const Icon(Icons.lock_open), title: const Text('رفع جميع العقوبات'), onTap: () => Navigator.pop(c, 'clear')),
+      ])),
+    ));
+    if (choice == null) return;
+    final now = DateTime.now();
+    final mute = choice.startsWith('mute');
+    final duration = switch (choice) {
+      'mute_1m' => const Duration(minutes: 1),
+      'mute_1h' => const Duration(hours: 1),
+      'mute_1d' || 'kick_1d' => const Duration(days: 1),
+      _ => Duration.zero,
+    };
+    final data = <String, dynamic>{
+      'uid': uid, 'updatedAt': FieldValue.serverTimestamp(), 'updatedBy': _uid,
+      'reason': 'إجراء إداري من صفحة العضو',
+      if (choice == 'clear') 'muteUntil': FieldValue.delete(),
+      if (choice == 'clear') 'permanentMute': false,
+      if (choice == 'clear') 'banUntil': FieldValue.delete(),
+      if (choice == 'clear') 'permanentBan': false,
+      if (mute && duration != Duration.zero) 'muteUntil': Timestamp.fromDate(now.add(duration)),
+      if (choice == 'mute_forever') 'permanentMute': true,
+      if (choice == 'kick_1d') 'banUntil': Timestamp.fromDate(now.add(duration)),
+      if (choice == 'ban') 'permanentBan': true,
+    };
+    await _db.collection('userSanctions').doc(uid).set(data, SetOptions(merge: true));
+    await _db.collection('adminLogs').add({
+      'actorId': _uid, 'targetId': uid, 'targetName': name,
+      'action': choice, 'createdAt': FieldValue.serverTimestamp(),
+      'source': 'member_profile',
+    });
+    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تسجيل الإجراء الإداري')));
+  }
+
   @override
   Widget build(BuildContext context) {
     if (uid == _uid) return const SizedBox.shrink();
@@ -383,37 +449,61 @@ class MemberSafetyActions extends StatelessWidget {
             icon: Icon(blocked ? Icons.check_circle_outline : Icons.block),
             label: Text(blocked ? 'إلغاء حظر الرسائل الخاصة' : 'حظر الرسائل الخاصة لهذا العضو'),
             onPressed: () async {
-              if (blocked) {
-                await ref.delete();
-              } else {
-                await ref.set({'blockerId': _uid, 'blockedId': uid, 'blockedName': name, 'createdAt': FieldValue.serverTimestamp()});
-              }
+              if (blocked) { await ref.delete(); }
+              else { await ref.set({'blockerId': _uid, 'blockedId': uid, 'blockedName': name, 'createdAt': FieldValue.serverTimestamp()}); }
               if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked ? 'تم إلغاء الحظر' : 'تم حظر العضو')));
             },
           ),
           TextButton.icon(
             icon: const Icon(Icons.flag_outlined),
             label: const Text('الإبلاغ عن العضو'),
-            onPressed: () async {
-              final reason = await showDialog<String>(context: context, builder: (c) => SimpleDialog(
-                title: const Text('سبب الإبلاغ'),
-                children: ['تنمّر أو إساءة', 'انتحال شخصية', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة']
-                  .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList(),
-              ));
-              if (reason == null) return;
-              await _db.collection('reports').add({
-                'type': 'user', 'targetId': uid, 'reportedUserId': uid,
-                'reporterId': _uid, 'reason': reason, 'status': 'new',
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال البلاغ للإدارة')));
-            },
+            onPressed: () => _report(context),
+          ),
+          if (_isFounder) FilledButton.tonalIcon(
+            icon: const Icon(Icons.gavel), label: const Text('إدارة العضو: كتم / طرد / حظر'),
+            onPressed: () => _moderate(context),
+          ) else FutureBuilder<bool>(
+            future: _isModerator(),
+            builder: (context, role) => role.data == true ? FilledButton.tonalIcon(
+              icon: const Icon(Icons.gavel), label: const Text('إدارة العضو: كتم / طرد / حظر'),
+              onPressed: () => _moderate(context),
+            ) : const SizedBox.shrink(),
           ),
         ]);
       },
     );
   }
 }
+
+class ModerationLogPage extends StatelessWidget {
+  const ModerationLogPage({super.key});
+  bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('سجل المشرفين')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _db.collection('adminLogs').orderBy('createdAt', descending: true).limit(200).snapshots(),
+        builder: (context, s) {
+          if (s.hasError) return const Center(child: Text('تعذر تحميل السجل. تحقق من صلاحيات الإدارة.'));
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          if (s.data!.docs.isEmpty) return const Center(child: Text('لا توجد إجراءات مسجلة بعد'));
+          return ListView(children: s.data!.docs.map((doc) {
+            final d = doc.data();
+            return ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.history)),
+              title: Text('${d['action'] ?? 'إجراء إداري'} • ${d['targetName'] ?? d['targetId'] ?? ''}'),
+              subtitle: Text('المشرف: ${d['actorId'] ?? '-'} • العضو: ${d['targetId'] ?? '-'}'),
+              isThreeLine: true,
+            );
+          }).toList());
+        },
+      ),
+    ),
+  );
+}
+
 
 class FounderReportsPage extends StatelessWidget {
   const FounderReportsPage({super.key});
