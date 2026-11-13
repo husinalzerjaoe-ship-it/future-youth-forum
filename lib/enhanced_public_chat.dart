@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'advanced_features.dart';
@@ -126,11 +127,40 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final d=doc.data()??{}; final mine=d['senderId']==_uid; final staff=_isFounder || (await _chatDb.collection('chatModerators').doc(_uid).get()).exists;
     final a=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Column(mainAxisSize:MainAxisSize.min,children:[
       ListTile(leading:const Icon(Icons.reply),title:const Text('رد'),onTap:()=>Navigator.pop(c,'reply')),
+      if((d['text'] as String? ?? '').trim().isNotEmpty)ListTile(leading:const Icon(Icons.copy),title:const Text('نسخ الرسالة'),onTap:()=>Navigator.pop(c,'copy')),
+      if(!mine)ListTile(leading:const Icon(Icons.flag_outlined,color:Colors.deepOrange),title:const Text('إبلاغ عن الرسالة'),onTap:()=>Navigator.pop(c,'report')),
       if(mine&&d['type']=='text')ListTile(leading:const Icon(Icons.edit),title:const Text('تعديل'),onTap:()=>Navigator.pop(c,'edit')),
       if(staff)ListTile(leading:const Icon(Icons.push_pin),title:Text(d['isPinned']==true?'إلغاء التثبيت':'تثبيت'),onTap:()=>Navigator.pop(c,'pin')),
       if(mine||staff)ListTile(leading:const Icon(Icons.delete,color:Colors.red),title:const Text('حذف'),onTap:()=>Navigator.pop(c,'delete')),
     ])));
     if(a=='reply'&&mounted)setState(()=>_reply=doc);
+    if(a=='copy'){
+      await Clipboard.setData(ClipboardData(text:(d['text'] as String? ?? '').trim()));
+      _snack('تم نسخ الرسالة');
+    }
+    if(a=='report'&&!mine&&mounted){
+      final reason=TextEditingController();
+      final selected=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+        title:const Text('الإبلاغ عن رسالة'),
+        content:Column(mainAxisSize:MainAxisSize.min,children:[
+          const Text('اختر سبب الإبلاغ أو اكتب تفاصيل إضافية'),
+          const SizedBox(height:8),
+          Wrap(spacing:6,children:['إساءة أو تنمّر','محتوى غير لائق','إزعاج أو رسائل متكررة','انتحال شخصية'].map((v)=>ActionChip(label:Text(v),onPressed:()=>Navigator.pop(c,v))).toList()),
+          TextField(controller:reason,maxLength:180,maxLines:2,decoration:const InputDecoration(labelText:'تفاصيل إضافية (اختياري)')),
+        ]),
+        actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,reason.text.trim()),child:const Text('إرسال البلاغ'))],
+      )));
+      if(selected!=null){
+        final reportReason='رسالة ${doc.id}: ${selected.isEmpty?'مراجعة الرسالة':selected}';
+        await _chatDb.collection('reports').add({
+          'reporterId':_uid,'targetId':(d['senderId']??'').toString(),
+          'reason':reportReason.substring(0,reportReason.length.clamp(0,300)),
+          'status':'new','createdAt':FieldValue.serverTimestamp(),
+        });
+        _snack('وصل بلاغك للإدارة، شكراً لتنبيهنا');
+      }
+      reason.dispose();
+    }
     if(a=='pin'&&staff)await doc.reference.update({'isPinned':d['isPinned']!=true,'pinnedBy':_uid});
     if(a=='delete'&&(mine||staff))await doc.reference.delete();
     if(a=='edit'&&mounted){
