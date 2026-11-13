@@ -5,7 +5,7 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   final AudioPlayer _player = AudioPlayer();
 
   LocalAudioHandler() {
-    _player.playbackEventStream.listen((event) {
+    _player.playbackEventStream.listen((_) {
       playbackState.add(PlaybackState(
         controls: [
           MediaControl.skipToPrevious,
