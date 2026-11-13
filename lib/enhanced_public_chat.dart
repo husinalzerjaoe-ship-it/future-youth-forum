@@ -251,7 +251,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
               padding:EdgeInsets.all(founder?2:1),decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:founder?const Color(0xFFFFC94A):_chatBrand,width:founder?2:1)),
               child:CircleAvatar(radius:19,backgroundColor:_chatBrand.withValues(alpha:.12),backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?Text((d['senderName'] as String? ?? 'ع').characters.first):null));
             }),
-          )),
+          ),
           const SizedBox(width:8),
           Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:13,color:founder?const Color(0xFFB77900):_chatBrand)),
