@@ -292,150 +292,177 @@ class PublicChatPage extends StatefulWidget {
 
 class _PublicChatPageState extends State<PublicChatPage> {
   final messageController = TextEditingController();
+  final picker = ImagePicker();
   bool sending = false;
   String? sendError;
+  int backgroundIndex = 0;
+  static const chatBackgrounds = [Color(0xFFF5F3FF), Color(0xFFEAF6FF), Color(0xFFFFF3E8), Color(0xFFF0F7F1), Color(0xFF171936)];
+  static const stickers = ['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍'];
 
   @override
   void dispose() { messageController.dispose(); super.dispose(); }
 
-  Future<void> sendMessage() async {
-    final text = messageController.text.trim();
-    if (text.isEmpty || sending) return;
+  Future<String> _senderName() async {
+    final user = FirebaseAuth.instance.currentUser!;
+    final profile = await db.collection('publicProfiles').doc(user.uid).get();
+    return profile.data()?['name'] as String? ?? user.displayName ?? 'عضو';
+  }
+
+  Future<void> _send({String text = '', String? imageUrl, String type = 'text'}) async {
+    if (sending || (text.trim().isEmpty && imageUrl == null)) return;
     final user = FirebaseAuth.instance.currentUser!;
     setState(() { sending = true; sendError = null; });
     try {
       await FirebaseFirestore.instance.collection('messages').add({
-        'text': text,
+        'text': text.trim(), 'type': type, if (imageUrl != null) 'imageUrl': imageUrl,
         'senderId': user.uid,
         'senderRole': user.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member',
-        'senderName': (await db.collection('publicProfiles').doc(user.uid).get()).data()?['name'] ?? user.displayName ?? 'عضو',
-        'createdAt': FieldValue.serverTimestamp(),
+        'senderName': await _senderName(), 'createdAt': FieldValue.serverTimestamp(),
       });
-      messageController.clear();
+      if (text.isNotEmpty) messageController.clear();
     } catch (_) {
-      setState(() => sendError = 'ما انرسلت الرسالة. تأكد من نشر قواعد المحادثة العامة في Firebase.');
-    } finally {
-      if (mounted) setState(() => sending = false);
-    }
+      if (mounted) setState(() => sendError = 'ما انرسلت. تأكد من اتصالك وقواعد Firebase.');
+    } finally { if (mounted) setState(() => sending = false); }
+  }
+
+  Future<void> sendMessage() => _send(text: messageController.text);
+
+  Future<void> sendImage() async {
+    try {
+      final XFile? file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 1800);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      final ext = file.name.toLowerCase().split('.').last;
+      final safeExt = ['jpg','jpeg','png','webp','gif'].contains(ext) ? ext : 'jpg';
+      final path = 'public-chat/\${FirebaseAuth.instance.currentUser!.uid}/\${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, bytes,
+        fileOptions: FileOptions(contentType: safeExt == 'gif' ? 'image/gif' : 'image/$safeExt', upsert: false));
+      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      await _send(imageUrl: url, type: 'image');
+    } catch (_) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة. تحقق من صلاحيات مخزن الصور.'); }
+  }
+
+  void showStickers() {
+    showModalBottomSheet<void>(context: context, showDragHandle: true, backgroundColor: Colors.white,
+      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Row(children: [Icon(Icons.emoji_emotions_outlined, color: brand), SizedBox(width: 8), Text('ملصقات سريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17))]),
+          const SizedBox(height: 12),
+          GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 4, childAspectRatio: 1.35,
+            children: stickers.map((sticker) => InkWell(borderRadius: BorderRadius.circular(16),
+              onTap: () { Navigator.pop(sheet); _send(text: sticker, type: 'sticker'); },
+              child: Center(child: Text(sticker, style: const TextStyle(fontSize: 34))))).toList()),
+        ]),
+      )));
+  }
+
+  void showChatOptions() {
+    showModalBottomSheet<void>(context: context, showDragHandle: true,
+      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(child: Padding(
+        padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('تخصيص المحادثة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 14), const Text('اختار خلفية الدردشة'), const SizedBox(height: 10),
+          Wrap(spacing: 12, children: List.generate(chatBackgrounds.length, (i) => InkWell(
+            onTap: () { setState(() => backgroundIndex = i); Navigator.pop(sheet); },
+            child: Container(width: 42, height: 42, decoration: BoxDecoration(color: chatBackgrounds[i], shape: BoxShape.circle,
+              border: Border.all(color: backgroundIndex == i ? brand : Colors.black12, width: backgroundIndex == i ? 3 : 1)),
+              child: backgroundIndex == i ? const Icon(Icons.check, size: 18) : null)))),
+          const SizedBox(height: 14), const Text('الخلفية محفوظة لهذه الجلسة فقط حالياً.', style: TextStyle(color: Colors.black54, fontSize: 12)),
+        ]),
+      ))));
+  }
+
+  Widget _founderName(String name) => ShaderMask(
+    shaderCallback: (bounds) => const LinearGradient(colors: [Color(0xFFFFB52E), Color(0xFFFF6B6B), Color(0xFF9B59D0)]).createShader(bounds),
+    child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)));
+
+  Widget _messageBubble(Map<String, dynamic> data, bool mine) {
+    final founder = data['senderRole'] == 'founder';
+    final type = data['type'] as String? ?? 'text';
+    final imageUrl = data['imageUrl'] as String?;
+    final text = data['text'] as String? ?? '';
+    return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
+      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .80),
+      margin: const EdgeInsets.symmetric(vertical: 5), padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        gradient: mine ? const LinearGradient(colors: [Color(0xFFEDE8FF), Color(0xFFDCD5FF)]) : null,
+        color: mine ? null : Colors.white.withValues(alpha: .96),
+        borderRadius: BorderRadius.only(topLeft: const Radius.circular(18), topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(mine ? 18 : 5), bottomRight: Radius.circular(mine ? 5 : 18)),
+        border: Border.all(color: founder ? const Color(0xFFFFD77A) : const Color(0x1A6554D9)),
+        boxShadow: const [BoxShadow(color: Color(0x0D171936), blurRadius: 8, offset: Offset(0, 3))]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (!mine && (data['senderId'] as String? ?? '').isNotEmpty)
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(stream: db.collection('publicProfiles').doc(data['senderId'] as String).snapshots(),
+            builder: (context, profile) {
+              final p = profile.data?.data() ?? {};
+              final senderId = data['senderId'] as String;
+              final name = p['name'] as String? ?? data['senderName'] as String? ?? 'عضو';
+              final photo = p['photoUrl'] as String?;
+              return InkWell(borderRadius: BorderRadius.circular(22),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: senderId, fallbackName: name))),
+                child: Padding(padding: const EdgeInsets.only(bottom: 7), child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  CircleAvatar(radius: 15, backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+                    child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 16) : null),
+                  const SizedBox(width: 7), Flexible(child: founder ? _founderName(name) : Text(name, style: const TextStyle(color: brand, fontWeight: FontWeight.bold, fontSize: 12))),
+                  if (founder) ...[const SizedBox(width: 5), const Icon(Icons.workspace_premium, size: 16, color: Color(0xFFFFB52E)),
+                    const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold))],
+                ])));
+            }),
+        if (type == 'image' && imageUrl != null)
+          ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.network(imageUrl, width: 230, fit: BoxFit.cover,
+            loadingBuilder: (c, child, progress) => progress == null ? child : const SizedBox(width: 230, height: 150, child: Center(child: CircularProgressIndicator())),
+            errorBuilder: (c, e, st) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر عرض الصورة')))),
+        if (type == 'sticker') Center(child: Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text(text, style: const TextStyle(fontSize: 48)))),
+        if (type != 'sticker' && text.isNotEmpty) Text(text, style: const TextStyle(fontSize: 15, color: Color(0xFF24233A))),
+      ])));
   }
 
   @override
-  Widget build(BuildContext context) => Column(children: [
-    Container(
-      width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: const Color(0xFFF0EEFF),
-      child: const Row(children: [
-        Icon(Icons.public, color: brand),
-        SizedBox(width: 9),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('المحادثة العامة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          Text('احچي ويا جميع أعضاء الملتقى', style: TextStyle(color: Colors.black54, fontSize: 12)),
-        ])),
-        Icon(Icons.circle, color: Colors.green, size: 9),
-        SizedBox(width: 5),
-        Text('مباشر', style: TextStyle(fontSize: 12, color: Colors.green)),
-      ]),
-    ),
-    Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Column(children: [
+    Container(width: double.infinity, padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+      decoration: const BoxDecoration(gradient: LinearGradient(colors: [darkBrand, Color(0xFF5144B8), Color(0xFF8C7CF0)])),
+      child: Row(children: [
+        Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(14)),
+          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 24)),
+        const SizedBox(width: 10),
+        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17)),
+          Text('دردشة الأصدقاء • شارك صورة وملصق', style: TextStyle(color: Colors.white70, fontSize: 11))])),
+        IconButton(onPressed: showChatOptions, tooltip: 'تخصيص الدردشة', icon: const Icon(Icons.palette_outlined, color: Colors.white)),
+        const Icon(Icons.circle, color: Color(0xFF6CF0A5), size: 9), const SizedBox(width: 5),
+        const Text('مباشر', style: TextStyle(fontSize: 11, color: Colors.white)),
+      ])),
+    Expanded(child: Container(color: chatBackgrounds[backgroundIndex], child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).limit(100).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Padding(
-          padding: EdgeInsets.all(22),
-          child: Text('المحادثة تحتاج تفعيل قواعد الرسائل في Firebase.'),
-        ));
+        if (snapshot.hasError) return const Center(child: Padding(padding: EdgeInsets.all(22), child: Text('تعذر تحميل المحادثة. تأكد من قواعد Firebase.')));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final messages = snapshot.data!.docs;
-        if (messages.isEmpty) return const Center(child: Text('ماكو رسائل بعد. اكتب أول رسالة 👋'));
+        if (messages.isEmpty) return const Center(child: Text('الساحة هادئة حالياً… كن أول من يبدأ الحديث ✨'));
         final myId = FirebaseAuth.instance.currentUser!.uid;
-        return ListView.builder(
-          reverse: true, padding: const EdgeInsets.all(12), itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final data = messages[index].data();
-            final mine = data['senderId'] == myId;
-            return Align(
-              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                margin: const EdgeInsets.symmetric(vertical: 5),
-                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-                decoration: BoxDecoration(
-                  color: mine ? const Color(0xFFE8E3FF) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: mine ? const Color(0xFFD5CCFF) : const Color(0xFFEAEAEA)),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  if (!mine && (data['senderId'] as String? ?? '').isNotEmpty)
-                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                      stream: db.collection('publicProfiles').doc(data['senderId'] as String).snapshots(),
-                      builder: (context, profile) {
-                        final p = profile.data?.data() ?? {};
-                        final senderId = data['senderId'] as String;
-                        final senderName = p['name'] as String? ?? data['senderName'] as String? ?? 'عضو';
-                        final photoUrl = p['photoUrl'] as String?;
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => MemberProfilePage(uid: senderId, fallbackName: senderName),
-                          )),
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 7),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              CircleAvatar(radius: 14,
-                                backgroundImage: photoUrl != null && photoUrl.startsWith('https://') ? NetworkImage(photoUrl) : null,
-                                child: photoUrl == null || !photoUrl.startsWith('https://') ? const Icon(Icons.person, size: 16) : null,
-                              ),
-                              const SizedBox(width: 7),
-                              Flexible(child: Text(senderName,
-                                style: const TextStyle(color: brand, fontWeight: FontWeight.bold, fontSize: 12))),
-                              if (data['senderRole'] == 'founder') ...[
-                                const SizedBox(width: 5),
-                                const Icon(Icons.workspace_premium, size: 15, color: Color(0xFFFFB52E)),
-                                const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold)),
-                              ],
-                              const SizedBox(width: 4),
-                              const Icon(Icons.open_in_new, size: 12, color: brand),
-                            ]),
-                          ),
-                        );
-                      },
-                    ),
-                  Text(data['text'] as String? ?? '', style: const TextStyle(fontSize: 15)),
-                ]),
-              ),
-            );
-          },
-        );
-      },
-    )),
-    if (sendError != null) Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Text(sendError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-    ),
-    SafeArea(top: false, child: Padding(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
-      child: Row(children: [
-        Expanded(child: TextField(
-          controller: messageController, minLines: 1, maxLines: 4, maxLength: 1000,
+        return ListView.builder(reverse: true, padding: const EdgeInsets.fromLTRB(12, 14, 12, 14), itemCount: messages.length,
+          itemBuilder: (context, index) { final data = messages[index].data(); return _messageBubble(data, data['senderId'] == myId); });
+      })),
+    if (sendError != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Text(sendError!, style: const TextStyle(color: Colors.red, fontSize: 12))),
+    Container(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .06), blurRadius: 12, offset: const Offset(0, -3))]),
+      child: SafeArea(top: false, child: Row(children: [
+        IconButton(onPressed: sending ? null : sendImage, tooltip: 'إرسال صورة أو GIF', icon: const Icon(Icons.image_rounded, color: brand, size: 25)),
+        IconButton(onPressed: sending ? null : showStickers, tooltip: 'ملصقات', icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFE6A52C), size: 25)),
+        Expanded(child: TextField(controller: messageController, minLines: 1, maxLines: 4, maxLength: 1000,
           textInputAction: TextInputAction.send, onSubmitted: (_) => sendMessage(),
-          decoration: InputDecoration(
-            hintText: 'اكتب رسالة للجميع...',
-            counterText: '',
-            filled: true, fillColor: Colors.white,
+          decoration: InputDecoration(hintText: 'اكتب رسالتك…', counterText: '', filled: true, fillColor: const Color(0xFFF4F2FA),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-          ),
-        )),
-        const SizedBox(width: 8),
-        CircleAvatar(backgroundColor: brand, child: IconButton(
-          onPressed: sending ? null : sendMessage,
-          icon: sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.send_rounded, color: Colors.white),
-        )),
-      ]),
-    )),
-  ]);
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))),
+        const SizedBox(width: 7),
+        CircleAvatar(radius: 23, backgroundColor: brand, child: IconButton(onPressed: sending ? null : sendMessage,
+          icon: sending ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.send_rounded, color: Colors.white, size: 20))),
+      ]))),
+  ]));
 }
-
 
 class MyProfilePage extends StatelessWidget {
   const MyProfilePage({super.key});
