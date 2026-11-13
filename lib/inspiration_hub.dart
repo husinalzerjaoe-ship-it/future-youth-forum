@@ -10,7 +10,7 @@ class InspirationHubPage extends StatefulWidget {
 }
 class _InspirationHubPageState extends State<InspirationHubPage> {
   String category = 'قصائد فصحى';
-  final tabs = const ['قصائد فصحى','شعر شعبي','اقتباسات','معايدات','أدعية'];
+  final tabs = const ['قصائد فصحى','شعر شعبي','اقتباسات','معايدات','أدعية','صباحيات','مسائيات'];
   static const themes = ['الأمل','الوطن','الصداقة','الأم','العلم','الكرامة','الحنين','الصبر','النجاح','الوفاء'];
   static const open = ['إذا أقبل الصبح استفاقت عزائمٌ','وفي القلب نورٌ لا تطفئه عاصفٌ','على درب أحلامي أسيرُ مؤمّلاً','ومن رحم الآلام يولدُ فرحُنا','أيا صاحِ إن المجد ليس هديةً','تعلّمْ فكم بالعلم تسمو نفوسُنا','إذا ضاق دربٌ فالأماني رحابةٌ','وما خاب قلبٌ باليقين تسلّحا','لأمي دعاءٌ في الفؤاد مردّدٌ','بلادي وإن طال المسير أحبّها'];
   static const close = ['ويزهر في درب المنى كلُّ غارسِ','ويشرق في ليل الشدائد كوكبُ','ونبلغُ بالإصرار أعلى المراتبِ','ويصبح بعد العسر يسرٌ قريبُ','فصُنْ عهدَ قلبٍ بالوفاء تزيّنا','فكن طالباً للعلم طول حياتِنا','فبعد ظلام الليل فجرٌ يلوحُ','ومن صبر الأيام نال المطالبا','فيا رب احفظها بكل تلطّفِ','ويحيا بها في القلب معنى المفاخرِ'];
@@ -31,14 +31,38 @@ class _InspirationHubPageState extends State<InspirationHubPage> {
   late final List<String> quotes = List.generate(400, (i) => qa[i%20] + '، ' + qb[((i~/20)+i%20)%20]);
   static const greetings = ['كل عام وأنت بخير، جعل الله أيامك فرحاً وطمأنينة، وكتب لك عاماً أجمل من كل ما مضى.','عيد ميلاد سعيد! أتمنى لك صحة لا تزول، وقلباً مطمئناً، وأحلاماً تتحقق واحدة تلو الأخرى.','مبارك عليك العيد، أعاده الله عليك وعلى أحبابك بالخير واليمن والبركات.','ألف مبروك النجاح، تستحق كل خير، ومنها إلى أعلى المراتب والإنجازات.','مبارك التخرج، جعل الله علمك نافعاً ومستقبلك مشرقاً وخطواتك موفقة.','بارك الله لكما وبارك عليكما وجمع بينكما في خير، وأدام المودة والرحمة.','سلامتك، أسأل الله أن يلبسك ثوب الصحة والعافية وأن يطمئن قلبك.','مبارك المولود، جعله الله من مواليد السعادة ومن الصالحين البارين.'];
   static const prayers = ['اللهم إني أسألك راحةً تسكن بها القلوب، وفرجاً تمحو به الهموم، ورزقاً يملأ الحياة بركة.','اللهم اغفر لنا ولوالدينا، وارحمهما كما ربيانا صغاراً، واجزهما عنا خير الجزاء.','يا رب اشرح صدورنا، ويسّر أمورنا، واكتب لنا الخير حيث كان ثم أرضنا به.','اللهم احفظ أهلنا وأحبتنا، وأدم عليهم الصحة والعافية والأمان.','اللهم ارزقنا قلباً شاكراً ولساناً ذاكراً وعملاً صالحاً متقبلاً.','ربنا آتنا في الدنيا حسنة وفي الآخرة حسنة وقنا عذاب النار.','اللهم اجعل القادم أجمل، وافتح لنا أبواب رحمتك وفضلك.','اللهم اشفِ كل مريض، وارحم كل ميت، وفرّج هم كل مهموم.'];
-  List<String> get items => switch(category) {'قصائد فصحى'=>classical,'شعر شعبي'=>folk,'اقتباسات'=>quotes,'معايدات'=>greetings,_=>prayers};
+  static const mornings = [
+    'صباح الخير، جعل الله هذا الصباح بداية خير وراحة بال وأخبار تسرّ القلب.',
+    'اللهم مع إشراقة هذا اليوم ارزقنا توفيقاً يرافق خطواتنا وطمأنينة تسكن قلوبنا.',
+    'صباح الأمل؛ لا تؤجل ابتسامتك، فقد يحمل هذا اليوم ما انتظرته طويلاً.',
+    'اللهم افتح لنا أبواب رزقك ورحمتك، وبارك لنا في أهلنا وأوقاتنا وأعمالنا.',
+    'صباح الورد للقلوب الطيبة التي تجعل الحياة ألطف بحضورها.',
+    'ابدأ يومك بنية طيبة، وكلمة جميلة، وخطوة تقرّبك من حلمك.',
+    'اللهم اجعل هذا اليوم شاهداً لنا بالخير، لا علينا، واكتب لنا فيه أجمل الأقدار.',
+    'صباح التفاؤل؛ مهما تأخر الفرج، يبقى لطف الله أوسع من كل انتظار.',
+    'أسعد الله صباحكم بنور الإيمان وراحة النفس وبركة العمر.',
+    'كل صباح فرصة جديدة لنكون أفضل مما كنا عليه بالأمس.'
+  ];
+  static const evenings = [
+    'مساء الخير، جعل الله مساءكم سكينة ورضا وأحاديث تبهج القلب.',
+    'اللهم في هذا المساء أرح قلوباً لا يعلم تعبها إلا أنت، واكتب لها فرجاً قريباً.',
+    'مساء الهدوء لكل من أنهكه النهار، غداً بإذن الله يحمل فرصة جديدة.',
+    'أمسية طيبة مليئة بالمحبة، وقلوب لا تعرف إلا الوفاء.',
+    'اللهم احفظ أحبتنا أينما كانوا، وأبعد عنهم الهم والحزن وسوء الأقدار.',
+    'في نهاية اليوم، تذكّر أن المحاولة بحد ذاتها خطوة تستحق التقدير.',
+    'مساؤكم دعاء مستجاب، ورزق واسع، وخبر جميل يطرق أبوابكم.',
+    'اتركوا تعب اليوم خلفكم، وناموا بقلوب مطمئنة بحسن تدبير الله.',
+    'مساء المحبة لمن يزرعون الفرح بكلمة ولا ينتظرون مقابلاً.',
+    'اللهم اختم يومنا بعفوك ورضاك، واجعل غدنا أجمل مما نرجو.'
+  ];
+  List<String> get items => switch(category) {'قصائد فصحى'=>classical,'شعر شعبي'=>folk,'اقتباسات'=>quotes,'معايدات'=>greetings,'أدعية'=>prayers,'صباحيات'=>mornings,_=>evenings};
   @override Widget build(BuildContext context) { final cs=Theme.of(context).colorScheme; return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
     appBar:AppBar(title:const Text('مكتبة الملتقى')),
     body:Container(color:cs.surface,child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(18),decoration:const BoxDecoration(gradient:LinearGradient(colors:[_ink,_violet,Color(0xFF168E9B)]),borderRadius:BorderRadius.vertical(bottom:Radius.circular(26))),child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('مساحة للكلمة الجميلة ✨',style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.bold)),SizedBox(height:5),Text('قصائد وعبارات ومعايدات وأدعية تجمعنا على الخير',style:TextStyle(color:Colors.white70))])),
       SizedBox(height:62,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10,vertical:10),children:tabs.map((t)=>Padding(padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(t),selected:category==t,onSelected:(_)=>setState(()=>category=t),selectedColor:cs.primary,labelStyle:TextStyle(color:category==t?cs.onPrimary:cs.onSurface,fontWeight:FontWeight.bold)))).toList())),
       Expanded(child:ListView.separated(padding:const EdgeInsets.all(14),itemCount:items.length,separatorBuilder:(_,__)=>const SizedBox(height:9),itemBuilder:(context,i)=>Card(color:cs.surfaceContainerLow,elevation:1,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(17)),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Row(children:[Icon(category=='اقتباسات'?Icons.format_quote:category=='أدعية'?Icons.volunteer_activism:category=='معايدات'?Icons.card_giftcard:Icons.auto_awesome,color:cs.primary),const SizedBox(width:8),Text(category,style:TextStyle(color:cs.primary,fontWeight:FontWeight.bold)),const Spacer(),Text((i+1).toString()+' / '+items.length.toString(),style:const TextStyle(color:Colors.grey,fontSize:12))]),
+        Row(children:[Icon(category=='اقتباسات'?Icons.format_quote:category=='أدعية'?Icons.volunteer_activism:category=='معايدات'?Icons.card_giftcard:category=='صباحيات'?Icons.wb_sunny:category=='مسائيات'?Icons.nights_stay:Icons.auto_awesome,color:cs.primary),const SizedBox(width:8),Text(category,style:TextStyle(color:cs.primary,fontWeight:FontWeight.bold)),const Spacer(),Text((i+1).toString()+' / '+items.length.toString(),style:const TextStyle(color:Colors.grey,fontSize:12))]),
         const SizedBox(height:9),SelectableText(items[i],style:TextStyle(fontSize:18,height:1.9,color:cs.onSurface,fontWeight:FontWeight.w500)),
         Align(alignment:Alignment.centerLeft,child:IconButton(tooltip:'نسخ',onPressed:()=>Clipboard.setData(ClipboardData(text:items[i])).then((_)=>ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نسخ النص')))),icon:Icon(Icons.copy_rounded,color:cs.primary)))
       ]))))),
