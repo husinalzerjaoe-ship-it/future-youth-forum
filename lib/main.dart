@@ -193,6 +193,8 @@ class _HomePageState extends State<HomePage> {
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             IconButton(tooltip: 'مراجعة البلاغات', icon: const Icon(Icons.admin_panel_settings),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderReportsPage()))),
+            IconButton(tooltip: 'سجل المشرفين', icon: const Icon(Icons.history),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationLogPage()))),
           IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
             icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج'),
         ],
