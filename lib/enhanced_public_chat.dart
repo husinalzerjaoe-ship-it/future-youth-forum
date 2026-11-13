@@ -61,7 +61,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
       if (type == 'text') {
-        final tags = RegExp(r'@([^\\s@]+)').allMatches(body).map((m)=>m.group(1)!).toSet().take(10).toList();
+        final tags = RegExp(r'@([^\s@]+)').allMatches(body).map((m)=>m.group(1)!).toSet().take(10).toList();
         if (tags.isNotEmpty) {
           final matches = await _chatDb.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
           for (final profile in matches.docs) {
