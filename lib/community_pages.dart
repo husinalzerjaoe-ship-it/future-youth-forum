@@ -59,13 +59,13 @@ class _TextShelfState extends State<TextShelf> {
  static const _quoteOpen=['لا تؤجل فرحتك','القوة ليست في ألا تسقط','الأصدقاء الحقيقيون','كل بداية صغيرة','لا تقارن رحلتك','الكلمة الطيبة','احفظ قلبك','النجاح يحتاج','من يعرف قيمة وقته','الأمل لا يطرق','كن لطيفاً','الهدوء أحياناً','لا تجعل رأي الناس','التجارب تعلمنا','الوفاء موقف','أجمل الانتصارات','حين تتعب','لا تخف من التغيير','العقل الهادئ','ازرع خيراً','الطموح','الكرامة','الاعتذار','القراءة','الإنسان الجميل','الصبر','لا تبحث عن الكمال','الذكريات','من يزرع المعروف','الحياة'];
  static const _quoteEnds=['فالحياة لا تنتظر اكتمال الظروف.','بل في قدرتك على النهوض من جديد.','يظهرون وقت الحاجة لا وقت المصلحة.','قد تفتح باباً واسعاً للمستقبل.','فلكل إنسان توقيته وطريقه.','قد تغيّر يوماً كاملاً في حياة أحدهم.','ولا تمنح ثقتك إلا لمن يصونها.','صبر وعمل واستمرار لا ضجيج.','يصنع من الدقائق إنجازاً.','إلا لقلب قرر أن يثق بالله.','فلا تعرف ما الذي يمر به الآخرون.','يكون أبلغ من ألف جواب.','مقياساً لقيمتك أو نجاحك.','ما لا تعلمه الكتب وحدها.','لا يحتاج إلى جمهور كي يثبت نفسه.','أن تنتصر على ضعف الأمس.','تذكر كم مرة تجاوزت ما ظننته مستحيلاً.','فقد يكون خلفها باب أجمل.','يرى الحل قبل أن يرى المشكلة.','فقد تحصد خيراً لم تتوقعه.','يبدأ بخطوة صادقة كل يوم.','لا تعني القسوة بل معرفة حدودك.','شجاعة حين يكون الخطأ واضحاً.','تمنحك عالماً أوسع من مكانك.','يترك أثراً طيباً دون أن يتكلم.','ليس انتظاراً بل ثبات مع السعي.','فالجمال في الصدق والبساطة.','تسكن التفاصيل الصغيرة أكثر من الصور.','يجد الخير في طريقه يوماً.','تستحق أن تعاش بقلب حاضر.'];
  List<Map<String,String>> get _builtIns {
-  if(widget.collection=='poems') return List.generate(200,(i)=>{'text':'\${_poemOpen[i%_poemOpen.length]}، \${_poemEnds[(i~/_poemOpen.length+i)%_poemEnds.length]}','category':i.isEven?'فصحى':'شعبي','authorName':'مكتبة الملتقى','id':'builtin-poem-\$i'});
-  return List.generate(300,(i)=>{'text':'\${_quoteOpen[i%_quoteOpen.length]}، \${_quoteEnds[(i~/_quoteOpen.length+i)%_quoteEnds.length]}','category':'اقتباسات','authorName':'مكتبة الملتقى','id':'builtin-quote-\$i'});
+  if(widget.collection=='poems') return List.generate(200,(i)=>{'text':'${_poemOpen[i%_poemOpen.length]}، ${_poemEnds[(i ~/ _poemOpen.length + i)%_poemEnds.length]}','category':i.isEven?'فصحى':'شعبي','authorName':'مكتبة الملتقى','id':'builtin-poem-$i'});
+  return List.generate(300,(i)=>{'text':'${_quoteOpen[i%_quoteOpen.length]}، ${_quoteEnds[(i ~/ _quoteOpen.length + i)%_quoteEnds.length]}','category':'اقتباسات','authorName':'مكتبة الملتقى','id':'builtin-quote-$i'});
  }
  Future<void> add(BuildContext c) async {
   final t=TextEditingController(); String selected=widget.collection=='poems'?'فصحى':'اقتباسات';
   final ok=await showDialog<bool>(context:c,builder:(x)=>StatefulBuilder(builder:(x,setDialog)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
-   title:Text('إضافة \${widget.title}'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+   title:Text('إضافة ${widget.title}'),content:Column(mainAxisSize:MainAxisSize.min,children:[
     if(widget.collection=='poems') DropdownButtonFormField<String>(value:selected,items:const [DropdownMenuItem(value:'شعبي',child:Text('شعر شعبي')),DropdownMenuItem(value:'فصحى',child:Text('شعر فصحى'))],onChanged:(v)=>setDialog(()=>selected=v??'فصحى')),
     TextField(controller:t,minLines:4,maxLines:10,maxLength:3000,decoration:InputDecoration(hintText:widget.hint,border:const OutlineInputBorder()))
    ]),actions:[TextButton(onPressed:()=>Navigator.pop(x,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(x,true),child:const Text('نشر'))]))));
@@ -75,13 +75,13 @@ class _TextShelfState extends State<TextShelf> {
  }
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
   appBar:AppBar(title:Text(widget.title)),body:Column(children:[
-   if(widget.collection=='poems') Padding(padding:const EdgeInsets.fromLTRB(12,8,12,2),child:Wrap(spacing:8,children:['الكل','شعبي','فصحى'].map((v)=>ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v)).toList())),
+   if(widget.collection=='poems') Padding(padding:const EdgeInsets.fromLTRB(12,8,12,2),child:Wrap(spacing:8,children:['الكل','شعبي','فصحى'].map((v)=>ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v))).toList())),
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection(widget.collection).orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
     if(s.hasError)return const Center(child:Text('تعذر تحميل المشاركات. تأكد من قواعد Firestore.'));
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final userItems=s.data!.docs.map((doc)=>{'text':doc.data()['text'] as String? ??'','category':doc.data()['category'] as String? ??(widget.collection=='poems'?'فصحى':'اقتباسات'),'authorName':doc.data()['authorName'] as String? ??'عضو','id':doc.id}).where((d)=>category=='الكل'||d['category']==category).toList();
     final built=_builtIns.where((d)=>category=='الكل'||d['category']==category).toList(); final items=[...userItems,...built];
-    if(items.isEmpty)return Center(child:Text('لا توجد \${widget.title} بهذا التصنيف بعد.'));
+    if(items.isEmpty)return Center(child:Text('لا توجد ${widget.title} بهذا التصنيف بعد.'));
     return ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(c,i){final d=items[i];final value=d['text']!;
      return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Row(children:[const Icon(Icons.auto_awesome,color:p),const SizedBox(width:8),Expanded(child:Text(d['authorName']!,style:const TextStyle(fontWeight:FontWeight.bold))),Chip(label:Text(d['category']!))]),
@@ -93,7 +93,7 @@ class _TextShelfState extends State<TextShelf> {
      ])));
     });
    }))
-  ]),floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:()=>add(context),icon:const Icon(Icons.add),label:Text('أضف \${widget.title}')),
+  ]),floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:()=>add(context),icon:const Icon(Icons.add),label:Text('أضف ${widget.title}')),
  ));
 }
 class PoetryPage extends StatelessWidget {const PoetryPage({super.key});@override Widget build(BuildContext c)=>const TextShelf(collection:'poems',title:'مكتبة الشعر',hint:'اكتب قصيدتك هنا...');}
