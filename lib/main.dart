@@ -648,7 +648,7 @@ class FollowControl extends StatelessWidget {
           ),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
             stream: db.collection('publicProfiles').doc(uid).collection('followers').snapshots(),
-            builder: (c, count) => Text('المتابعون: \${count.data?.docs.length ?? 0}'),
+            builder: (c, count) => Text('المتابعون: ${count.data?.docs.length ?? 0}'),
           ),
         ]);
       },
