@@ -5,7 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:audio_service/audio_service.dart';
+import 'local_audio_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'media_upload_service.dart';
@@ -166,23 +167,23 @@ class LocalMusicPage extends StatefulWidget {
  @override State<LocalMusicPage> createState()=>_LocalMusicPageState();
 }
 class _LocalMusicPageState extends State<LocalMusicPage> {
- final player=AudioPlayer();final tracks=<PlatformFile>[];int current=-1;bool loading=false;
+ final tracks=<PlatformFile>[];int current=-1;bool loading=false;
  Future<void> addTracks() async {
   final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true);
   if(result==null)return;setState(()=>tracks.addAll(result.files.where((f)=>f.path!=null)));
  }
  Future<void> play(int index) async {
   if(index<0||index>=tracks.length)return;setState(()=>loading=true);
-  try{await player.setFilePath(tracks[index].path!);await player.play();setState(()=>current=index);}
+  try{await appAudioHandler.loadLocalQueue(tracks.map((f)=>MediaItem(id:f.path!,title:f.name,album:'مكتبتي المحلية')).toList());await appAudioHandler.skipToQueueItem(index);await appAudioHandler.play();setState(()=>current=index);}
   catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الملف: '+e.toString())));}
   finally{if(mounted)setState(()=>loading=false);}
  }
- @override void dispose(){player.dispose();super.dispose();}
+
  @override Widget build(BuildContext context)=>Scaffold(
   floatingActionButton:FloatingActionButton.extended(onPressed:addTracks,icon:const Icon(Icons.library_music),label:const Text('إضافة أغاني من جهازي')),
   body:Column(children:[
-   Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(context,s){final playing=s.data?.playing??false;return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى المحلي'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية من قائمتك'),trailing:IconButton(onPressed:current<0?null:()=>playing?player.pause():player.play(),icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));})),
-   Expanded(child:tracks.isEmpty?const Center(child:Text('أضف ملفات MP3 أو صوتية من جهازك')):ListView.builder(itemCount:tracks.length,itemBuilder:(context,i)=>ListTile(leading:Icon(current==i?Icons.equalizer:Icons.audiotrack),title:Text(tracks[i].name),onTap:()=>play(i),trailing:IconButton(icon:const Icon(Icons.close),onPressed:()=>setState(()=>tracks.removeAt(i)))))),
+   Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlayerState>(stream:appAudioHandler.playbackState,builder:(context,s){final playing=s.data?.playing??false;return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى المحلي'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية من قائمتك'),trailing:IconButton(onPressed:current<0?null:()=>playing?appAudioHandler.pause():appAudioHandler.play(),icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));})),
+   Expanded(child:tracks.isEmpty?const Center(child:Text('أضف ملفات MP3 أو صوتية من جهازك')):ListView.builder(itemCount:tracks.length,itemBuilder:(context,i)=>ListTile(leading:Icon(current==i?Icons.equalizer:Icons.audiotrack),title:Text(tracks[i].name),onTap:()=>play(i),trailing:IconButton(icon:const Icon(Icons.close),onPressed:() async {setState(()=>tracks.removeAt(i));if(tracks.isEmpty){await appAudioHandler.stop();current=-1;}})))),
    const Padding(padding:EdgeInsets.all(12),child:Text('الموسيقى محلية ولا تُرفع إلى الخادم. التشغيل بالخلفية يعتمد على استمرار التطبيق ونظام Android وإعدادات توفير الطاقة.',style:TextStyle(fontSize:12)))
   ])
  );
