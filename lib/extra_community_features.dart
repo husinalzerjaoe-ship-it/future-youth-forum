@@ -139,12 +139,12 @@ class _SharedFilesPageState extends State<SharedFilesPage> {
   if(picked==null||picked.files.isEmpty)return;final f=picked.files.first;
   if(f.path==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة مسار الملف من الجهاز')));return;}
   final ext=f.extension?.toLowerCase()??'';
-  if(!['apk','zip','pdf','xapk'].contains(ext)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('المسموح APK أو ZIP أو PDF أو XAPK فقط')));return;}
+  if(!['apk','zip','pdf','xapk','mp3','m4a','aac','wav','ogg','flac'].contains(ext)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('المسموح APK أو ZIP أو PDF أو XAPK أو صوت MP3/M4A/AAC/WAV/OGG/FLAC')));return;}
   if(f.size>100*1024*1024){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الحد الأقصى 100 ميغابايت')));return;}
   setState(()=>uploading=true);
   try{
    final url=await uploadForumMedia(XFile(f.path!,name:f.name),folder:'shared-files');
-   await db.collection('sharedFiles').add({'uploaderId':uid,'title':f.name,'fileName':f.name,'extension':ext,'size':f.size,'fileUrl':url,'status':'pending','createdAt':FieldValue.serverTimestamp(),'safetyNote':'بانتظار مراجعة المشرف'});
+   await db.collection('sharedFiles').add({'uploaderId':uid,'title':f.name,'fileName':f.name,'extension':ext,'size':f.size,'fileUrl':url,'status':'pending','createdAt':FieldValue.serverTimestamp(),'safetyNote':'بانتظار مراجعة المشرف. ارفع فقط ملفات تملك حق توزيعها.'});
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم رفع الملف وهو بانتظار مراجعة المشرف')));
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل الرفع: '+e.toString())));}
   finally{if(mounted)setState(()=>uploading=false);}
@@ -152,7 +152,7 @@ class _SharedFilesPageState extends State<SharedFilesPage> {
  @override Widget build(BuildContext context)=>Scaffold(
   floatingActionButton:FloatingActionButton.extended(onPressed:uploading?null:upload,icon:uploading?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.upload_file),label:Text(uploading?'جاري الرفع':'مشاركة ملف')),
   body:Column(children:[
-   const Padding(padding:EdgeInsets.all(12),child:Text('شارك التطبيقات والملفات التي تملك حق توزيعها. الملفات الجديدة لا تظهر للناس إلا بعد مراجعة المشرف. لا تثبّت ملفات APK من مصدر غير موثوق.',style:TextStyle(height:1.5))),
+   const Padding(padding:EdgeInsets.all(12),child:Text('شارك التطبيقات والملفات والمقاطع الصوتية التي تملك حق توزيعها. الملفات الجديدة لا تظهر للناس إلا بعد مراجعة المشرف. لا تثبّت ملفات APK من مصدر غير موثوق.',style:TextStyle(height:1.5))),
    if(FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com')
     SizedBox(height:180,child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'pending').limit(50).snapshots(),builder:(context,s){
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
