@@ -46,9 +46,9 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       await _player.stop();
       return;
     }
-    await _player.setAudioSources(items.map((item) =>
+    await _player.setAudioSource(ConcatenatingAudioSource(children: items.map((item) =>
       AudioSource.uri(Uri.file(item.id), tag: item)
-    ).toList());
+    ).toList()));
   }
 
   @override Future<void> play() => _player.play();
