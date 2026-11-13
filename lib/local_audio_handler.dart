@@ -51,6 +51,18 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     ).toList()));
   }
 
+  Future<void> loadRemoteTrack(String url, String title) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https') {
+      throw ArgumentError('رابط الأغنية غير صالح.');
+    }
+    final item = MediaItem(id: url, title: title, album: 'مكتبة المجتمع');
+    queue.add([item]);
+    mediaItem.add(item);
+    await _player.setAudioSource(AudioSource.uri(uri, tag: item));
+    await _player.play();
+  }
+
   @override Future<void> play() => _player.play();
   @override Future<void> pause() => _player.pause();
   @override Future<void> stop() async {
