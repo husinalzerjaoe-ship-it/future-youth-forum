@@ -5,6 +5,10 @@ on:
     branches: [main, fix/media-private-chat-reactions]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: flutter-apk-${{ github.event.pull_request.head.ref || github.ref }}
+  cancel-in-progress: true
 jobs:
   analyze-and-build:
     runs-on: ubuntu-latest
