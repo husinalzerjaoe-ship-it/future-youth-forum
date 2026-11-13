@@ -130,6 +130,22 @@ class _AuthPageState extends State<AuthPage> {
                 style: FilledButton.styleFrom(backgroundColor: brand, padding: const EdgeInsets.all(15)),
                 child: busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : Text(registering ? 'إنشاء حساب' : 'تسجيل الدخول')),
+              if (!registering) TextButton(
+                onPressed: busy ? null : () async {
+                  final address = email.text.trim();
+                  if (!address.contains('@')) {
+                    setState(() => error = 'اكتب بريدك الإلكتروني أولاً حتى نرسل رابط الاستعادة.');
+                    return;
+                  }
+                  try {
+                    await FirebaseAuth.instance.sendPasswordResetEmail(email: address);
+                    if (mounted) setState(() => error = 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك.');
+                  } on FirebaseAuthException catch (e) {
+                    if (mounted) setState(() => error = e.code == 'user-not-found' ? 'هذا البريد غير مسجل.' : 'تعذر إرسال رابط الاستعادة. حاول لاحقاً.');
+                  }
+                },
+                child: const Text('نسيت كلمة المرور؟'),
+              ),
               TextButton(onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
                 child: Text(registering ? 'عندك حساب؟ سجّل دخولك' : 'ما عندك حساب؟ أنشئ حساب')),
             ])),
