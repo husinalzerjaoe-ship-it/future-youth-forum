@@ -148,6 +148,32 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } catch (_) {}
   }
   Future<void> _chooseBackground() async {
+    final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
+      builder: (c) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ListTile(title: Text('اختر خلفية المحادثة')),
+        ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('صورة من جهازي'), onTap: () => Navigator.pop(c, 'device')),
+        ListTile(leading: const Icon(Icons.nightlight_round), title: const Text('ليل بنفسجي'), onTap: () => Navigator.pop(c, 'preset:violet')),
+        ListTile(leading: const Icon(Icons.landscape_outlined), title: const Text('سماء الأنمي'), onTap: () => Navigator.pop(c, 'preset:sky')),
+        ListTile(leading: const Icon(Icons.brightness_4_outlined), title: const Text('قمر ساكورا'), onTap: () => Navigator.pop(c, 'preset:sakura')),
+        ListTile(leading: const Icon(Icons.restart_alt), title: const Text('إزالة الخلفية'), onTap: () => Navigator.pop(c, 'clear')),
+      ]))));
+    if (choice == null || !mounted) return;
+    if (choice == 'clear') {
+      await _db.collection('conversations').doc(widget.conversationId).set({'backgrounds': {_uid: FieldValue.delete()}}, SetOptions(merge: true));
+      if (mounted) setState(() => backgroundUrl = null);
+      return;
+    }
+    if (choice.startsWith('preset:')) {
+      const presets = {
+        'preset:violet': 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=1200',
+        'preset:sky': 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200',
+        'preset:sakura': 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=1200',
+      };
+      final url = presets[choice]!;
+      await _db.collection('conversations').doc(widget.conversationId).set({'backgrounds': {_uid: url}}, SetOptions(merge: true));
+      if (mounted) setState(() => backgroundUrl = url);
+      return;
+    }
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
     if (picked == null || !mounted) return;
     setState(() => changingBackground = true);
