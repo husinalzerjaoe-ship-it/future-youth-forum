@@ -316,6 +316,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
 class ChatMemberProfilePage extends StatelessWidget {
   final String uid, fallbackName;
   const ChatMemberProfilePage({super.key, required this.uid, required this.fallbackName});
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
   @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
     appBar: AppBar(title: const Text('الملف الشخصي')),
     body: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('publicProfiles').doc(uid).snapshots(),builder:(context,s){
