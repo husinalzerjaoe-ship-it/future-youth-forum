@@ -32,7 +32,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
   DocumentSnapshot<Map<String, dynamic>>? _reply;
   int _background = 0xFFF5F3FF;
-  static const _backgrounds = [0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5];
+  static const _backgrounds = [0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5,0xFFEDE7F6,0xFFE0F2F1,0xFFFFF8E1,0xFFE3F2FD,0xFF263238,0xFFFCE4EC];
   static const _stickers = ['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍','🌟','💯','🥳','🤝'];
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   DocumentReference<Map<String,dynamic>> get _presence => _chatDb.collection('chatPresence').doc(_uid);
