@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'community_pages.dart';
+import 'advanced_features.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -157,6 +158,10 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
+          IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesPage()))),
+          IconButton(tooltip: 'الإشعارات', icon: const Icon(Icons.notifications_none),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
           IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
             icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج'),
         ],
