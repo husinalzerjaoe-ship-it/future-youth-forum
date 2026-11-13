@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'community_pages.dart';
+import 'enhanced_public_chat.dart';
 import 'advanced_features.dart';
 import 'firebase_options.dart';
 
@@ -196,7 +197,7 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج'),
         ],
       ),
-      body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage(), CommunityHubPage(), MyProfilePage()]),
+      body: IndexedStack(index: selected, children: const [PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
