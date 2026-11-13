@@ -49,7 +49,7 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
         TextField(controller: title, decoration: const InputDecoration(labelText: 'عنوان الخلفية')),
         TextField(controller: anime, decoration: const InputDecoration(labelText: 'اسم الأنمي')),
         TextField(controller: artist, decoration: const InputDecoration(labelText: 'اسم الفنان أو صاحب العمل')),
-        TextField(controller: source, decoration: const InputDecoration(labelText: 'رابط المصدر أو الترخيص'), keyboardType: TextInputType.url),
+        TextField(controller: source, decoration: const InputDecoration(labelText: 'رابط المصدر أو الترخيص (اختياري)', hintText: 'اتركه فارغاً إذا كان العمل من إنجازك'), keyboardType: TextInputType.url),
         DropdownButtonFormField<String>(value: rights, isExpanded: true, decoration: const InputDecoration(labelText: 'أساس حق النشر'),
           items: const [
             DropdownMenuItem(value: 'أنا صاحب العمل وأسمح بنشره', child: Text('أنا صاحب العمل')),
@@ -63,8 +63,8 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
         FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('إرسال للمراجعة'))],
     )));
     if (ok != true) { title.dispose(); anime.dispose(); artist.dispose(); source.dispose(); return; }
-    if ([title.text, anime.text, artist.text].any((v) => v.trim().isEmpty) || !source.text.trim().startsWith('https://')) {
-      _snack('أكمل العنوان والفنان ورابط مصدر صحيح يبدأ بـ https://');
+    if ([title.text, anime.text, artist.text].any((v) => v.trim().isEmpty) || (source.text.trim().isNotEmpty && !source.text.trim().startsWith('https://'))) {
+      _snack('أكمل العنوان واسم الأنمي والفنان. رابط المصدر اختياري، وإذا أضفته لازم يبدأ بـ https://');
       title.dispose(); anime.dispose(); artist.dispose(); source.dispose(); return;
     }
     setState(() => busy = true);
@@ -223,7 +223,7 @@ class WallpaperDetailPage extends StatelessWidget {
       ListTile(leading: const Icon(Icons.movie), title: const Text('الأنمي'), subtitle: Text(data['anime'] ?? '')),
       ListTile(leading: const Icon(Icons.brush), title: const Text('الفنان'), subtitle: Text(data['artist'] ?? '')),
       ListTile(leading: const Icon(Icons.copyright), title: const Text('الحقوق'), subtitle: Text(data['rights'] ?? '')),
-      ListTile(leading: const Icon(Icons.link), title: const Text('المصدر'), subtitle: SelectableText(data['sourceUrl'] ?? '')),
+      if ((data['sourceUrl'] as String? ?? '').isNotEmpty) ListTile(leading: const Icon(Icons.link), title: const Text('المصدر'), subtitle: SelectableText(data['sourceUrl'] as String)),
       FilledButton.icon(onPressed: () => download(context), icon: const Icon(Icons.download), label: const Text('تنزيل الخلفية')),
     ]),
   ));
