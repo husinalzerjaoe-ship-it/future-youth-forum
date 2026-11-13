@@ -13,6 +13,7 @@ class CreativeLibraryPage extends StatefulWidget {
 
 class _CreativeLibraryPageState extends State<CreativeLibraryPage> {
   final search=TextEditingController();
+  final GlobalKey _exportKey = GlobalKey();
   String category='الكل';
   static const categories=[
     'الكل','شعر فصيح','شعر شعبي','اقتباسات','أقوال مفكرين وعلماء','حكم','أدعية','أذكار','آيات قرآنية',
@@ -229,7 +230,7 @@ class _CreativeLibraryPageState extends State<CreativeLibraryPage> {
   }
   Future<void> saveCard(String text) async {
     try {
-      final bytes=await showDialog<Uint8List>(context:context,builder:(ctx)=>_CardExportDialog(text:text,exportKey:key));
+      final bytes=await showDialog<Uint8List>(context:context,builder:(ctx)=>_CardExportDialog(text:text,exportKey:_exportKey));
       if(bytes==null)return;
       await Gal.putImageBytes(bytes,album:'ملتقى الأنمي');
       if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الصورة في المعرض')));
