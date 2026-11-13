@@ -176,7 +176,9 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
-          IconButton(tooltip: 'المحفوظات', icon: const Icon(Icons.bookmarks_outlined),\n            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsPage()))),\n          IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
+          IconButton(tooltip: 'المحفوظات', icon: const Icon(Icons.bookmarks_outlined),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsPage()))),
+          IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesPage()))),
           IconButton(tooltip: 'الإشعارات', icon: const Icon(Icons.notifications_none),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
@@ -248,7 +250,8 @@ class PostsPage extends StatelessWidget {
           body: ListView(padding: const EdgeInsets.all(14), children: [
             Container(padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(gradient: const LinearGradient(colors: [darkBrand, brand, Color(0xFF35BCEB)]), borderRadius: BorderRadius.circular(20)),
-              child: Text('أهلاً بك ${user.displayName ?? 'صديقنا'} 👋\nشارك أفكارك وتعرّف على أعضاء الملتقى.',
+              child: Text('أهلاً بك ${user.displayName ?? 'صديقنا'} 👋
+شارك أفكارك وتعرّف على أعضاء الملتقى.',
                 style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -633,6 +636,7 @@ class PostSocialActions extends StatelessWidget {
             icon: const Icon(Icons.mode_comment_outlined),
             label: Text('تعليقات ${snap.data?.docs.length ?? 0}')),
         ),
+        SavePostControl(postId: postId),
         const Spacer(),
         IconButton(icon: const Icon(Icons.flag_outlined), tooltip: 'إبلاغ',
           onPressed: () async {
