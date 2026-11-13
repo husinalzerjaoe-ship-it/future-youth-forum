@@ -45,6 +45,20 @@ jobs:
           else:
               raise SystemExit('Android app Gradle file not found')
           PY
+      - name: Force Android library plugins to compile with SDK 36
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/force-android-compile-sdk.gradle" <<'GRADLE'
+          allprojects {
+              afterEvaluate { project ->
+                  def androidExtension = project.extensions.findByName("android")
+                  if (androidExtension != null) {
+                      androidExtension.compileSdkVersion(36)
+                      println("Forced compileSdk 36 for ${project.path}")
+                  }
+              }
+          }
+          GRADLE
       - name: Configure Android background audio
         run: python scripts/configure_android_audio.py
       - name: Set Android app display name
