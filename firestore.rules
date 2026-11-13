@@ -49,8 +49,6 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 1000;
       allow update, delete: if request.auth != null
         && resource.data.authorId == request.auth.uid;
-    }
-
 
       match /likes/{userId} {
         allow read: if request.auth != null;
@@ -71,6 +69,7 @@ service cloud.firestore {
         allow update, delete: if request.auth != null
           && resource.data.authorId == request.auth.uid;
       }
+    }
 
     match /reports/{reportId} {
       allow create: if request.auth != null
