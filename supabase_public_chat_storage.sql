@@ -43,6 +43,9 @@ with check (
     or
     ((storage.foldername(name))[1] = 'regional-chat'
       and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'anime-wallpapers'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
   )
 );
 
