@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'community_pages.dart';
@@ -575,8 +576,24 @@ class MemberPosts extends StatelessWidget {
     builder: (context, s) {
       if (!s.hasData) return const Center(child: CircularProgressIndicator());
       if (s.data!.docs.isEmpty) return const Text('ماكو منشورات بعد.');
-      return Column(children: s.data!.docs.map((d) => Card(child: ListTile(
-        leading: const Icon(Icons.article_outlined), title: Text(d.data()['text'] as String? ?? 'منشور')))).toList());
+      final posts = [...s.data!.docs]..sort((a,b) {
+        final at = a.data()['createdAt'] as Timestamp?;
+        final bt = b.data()['createdAt'] as Timestamp?;
+        return (bt?.millisecondsSinceEpoch ?? 0).compareTo(at?.millisecondsSinceEpoch ?? 0);
+      });
+      return Column(children: posts.map((post) {
+        final data = post.data();
+        final videoUrl = data['videoUrl'] as String? ?? '';
+        return Card(clipBehavior: Clip.antiAlias, margin: const EdgeInsets.symmetric(vertical: 7),
+          child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if ((data['text'] as String? ?? '').isNotEmpty) Text(data['text'] as String, style: const TextStyle(fontSize: 16)),
+            if (videoUrl.startsWith('https://'))
+              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.play_circle_fill, color: brand, size: 34),
+                title: const Text('فيديو منشور'), subtitle: const Text('افتح رابط الفيديو'),
+                onTap: () async { final uri = Uri.tryParse(videoUrl); if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication); }),
+            PostSocialActions(postId: post.id, authorId: data['authorId'] as String? ?? ''),
+          ])));
+      }).toList());
     });
 }
 
