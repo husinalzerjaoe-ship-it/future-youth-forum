@@ -192,46 +192,84 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Future<void> _showMemberActions(Map<String, dynamic> data) async {
     final memberUid = (data['senderId'] ?? '').toString();
     final memberName = (data['senderName'] ?? 'عضو').toString();
-    if (memberUid.isEmpty) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (c) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: SafeArea(child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(memberName), subtitle: const Text('إجراءات الحساب')),
-            MemberSafetyActions(uid: memberUid, name: memberName),
-          ]),
-        )),
+    if (memberUid.isEmpty || memberUid == _uid) return;
+    final action = await showModalBottomSheet<String>(
+      context: context, showDragHandle: true,
+      builder: (c) => Directionality(textDirection: TextDirection.rtl,
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(memberName), subtitle: const Text('اختر الإجراء')),
+          ListTile(leading: const Icon(Icons.account_circle_outlined), title: const Text('عرض الملف الشخصي'), onTap: () => Navigator.pop(c, 'profile')),
+          ListTile(leading: const Icon(Icons.chat_bubble_outline), title: const Text('مراسلة خاصة'), onTap: () => Navigator.pop(c, 'message')),
+          ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('إبلاغ عن العضو'), onTap: () => Navigator.pop(c, 'report')),
+          ListTile(leading: const Icon(Icons.block_outlined), title: const Text('حظر العضو'), onTap: () => Navigator.pop(c, 'block')),
+        ])),
       ),
     );
+    if (!mounted || action == null) return;
+    if (action == 'profile') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatMemberProfilePage(uid: memberUid, fallbackName: memberName)));
+    } else if (action == 'message') {
+      final id = _uid.compareTo(memberUid) < 0 ? '${_uid}_${memberUid}' : '${memberUid}_${_uid}';
+      final ref = _chatDb.collection('conversations').doc(id);
+      final existing = await ref.get();
+      if (!existing.exists) {
+        final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
+        await ref.set({'members': [_uid, memberUid], 'memberNames': {
+          _uid: me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+          memberUid: memberName,
+        }, 'updatedAt': FieldValue.serverTimestamp()});
+      }
+      if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: memberUid, otherName: memberName)));
+    } else if (action == 'report') {
+      final reason = await showDialog<String>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl,
+        child: SimpleDialog(title: const Text('سبب الإبلاغ'), children: ['إساءة أو تنمّر', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة', 'سبب آخر']
+          .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList())));
+      if (reason != null) {
+        await _chatDb.collection('reports').add({'type': 'user', 'reportedUserId': memberUid, 'reporterId': _uid, 'reason': reason, 'status': 'new', 'createdAt': FieldValue.serverTimestamp()});
+        _snack('وصل بلاغك للإدارة');
+      }
+    } else if (action == 'block') {
+      await _chatDb.collection('users').doc(_uid).collection('blockedUsers').doc(memberUid).set({'uid': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
+      _snack('تم حظر العضو');
+    }
   }
 
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
-    final d=doc.data()??{};final mine=d['senderId']==_uid;final founder=d['senderRole']=='founder';final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
+    final d=doc.data()??{};final mine=d['senderId']==_uid;final sender=(d['senderId']??'').toString();
+    final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
+    final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onLongPress:()=>_menu(doc),child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
-      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.82),margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
-      decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,color:mine?null:Colors.white,borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFD77A):const Color(0x1A6554D9))),
+      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
+      decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,color:mine?null:Theme.of(context).colorScheme.surface,borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFC94A):_chatBrand.withValues(alpha:.35),width:founder?2:1)),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
-        GestureDetector(onTap:()=>_showMemberActions(d),child:Row(mainAxisSize:MainAxisSize.min,children:[
-          Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:founder?const Color(0xFFB77900):_chatBrand))),
-          if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:16),
-          if(d['edited']==true)const Text(' • معدّلة',style:TextStyle(fontSize:10,color:Colors.black45)),
-        ])),
+        Row(mainAxisSize:MainAxisSize.min,children:[
+          GestureDetector(onTap:()=>_showMemberActions(d),child:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+            stream:_chatDb.collection('publicProfiles').doc(sender).snapshots(),
+            builder:(context,profile){final photo=profile.data?.data()?['photoUrl'] as String? ?? d['senderPhoto'] as String?;return Container(
+              padding:EdgeInsets.all(founder?2:1),decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:founder?const Color(0xFFFFC94A):_chatBrand,width:founder?2:1)),
+              child:CircleAvatar(radius:19,backgroundColor:_chatBrand.withValues(alpha:.12),backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?Text((d['senderName'] as String? ?? 'ع').characters.first):null));
+            }),
+          )),
+          const SizedBox(width:8),
+          Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:13,color:founder?const Color(0xFFB77900):_chatBrand)),
+            if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
+            if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
+          ]))),
+          if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:19),
+        ]),
+        const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
-        if(type=='text'&&body.isNotEmpty)Text(body,style:const TextStyle(fontSize:15)),
+        if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:15,height:1.55,color:Theme.of(context).colorScheme.onSurface)),
         Row(mainAxisSize:MainAxisSize.min,children:[
           ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
             final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
-            return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:10));
+            return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:11));
           }),
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
         ]),
@@ -272,4 +310,31 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
     ]))),
   ]));
+}
+
+
+class ChatMemberProfilePage extends StatelessWidget {
+  final String uid, fallbackName;
+  const ChatMemberProfilePage({super.key, required this.uid, required this.fallbackName});
+  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+    appBar: AppBar(title: const Text('الملف الشخصي')),
+    body: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('publicProfiles').doc(uid).snapshots(),builder:(context,s){
+      if(!s.hasData)return const Center(child:CircularProgressIndicator());
+      final d=s.data!.data()??{};
+      final name=d['name'] as String? ?? fallbackName;
+      final photo=d['photoUrl'] as String?;
+      return ListView(padding:const EdgeInsets.all(20),children:[
+        Center(child:CircleAvatar(radius:52,backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?const Icon(Icons.person,size:52):null)),
+        const SizedBox(height:12),Center(child:Text(name,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold))),
+        if((d['bio'] as String? ?? '').isNotEmpty)Center(child:Text(d['bio'] as String)),
+        const SizedBox(height:16),
+        FilledButton.icon(onPressed:()async{
+          final id=_uid.compareTo(uid)<0?'${_uid}_${uid}':'${uid}_${_uid}';
+          final ref=_chatDb.collection('conversations').doc(id);final old=await ref.get();
+          if(!old.exists){final me=await _chatDb.collection('publicProfiles').doc(_uid).get();await ref.set({'members':[_uid,uid],'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},'updatedAt':FieldValue.serverTimestamp()});}
+          if(context.mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>DirectChatPage(conversationId:id,otherUid:uid,otherName:name)));
+        },icon:const Icon(Icons.message),label:const Text('مراسلة')),
+      ]);
+    }),
+  ));
 }
