@@ -15,6 +15,8 @@ import 'anime_experience.dart';
 import 'community_polls.dart';
 import 'community_events.dart';
 import 'media_upload_service.dart';
+import 'creative_library.dart';
+import 'extra_community_features.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -37,6 +39,8 @@ class CommunityHubPage extends StatelessWidget {
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
    ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
+   ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
+   ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
