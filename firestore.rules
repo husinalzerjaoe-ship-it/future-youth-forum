@@ -649,7 +649,7 @@ service cloud.firestore {
     match /privateRooms/{roomId}/access/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId
         && request.auth.uid in get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
-      // Access grants are written only by the trusted Cloud Function (Admin SDK).
+      // Legacy access records are retained for compatibility; invited membership is sufficient.
       allow create, update, delete: if false;
     }
 
@@ -667,9 +667,7 @@ service cloud.firestore {
         && request.resource.data.members.size() <= 30
         && request.auth.uid in request.resource.data.members
         && request.resource.data.invitedUids == request.resource.data.members
-        && request.resource.data.passcodeSalt is string
-        && request.resource.data.passcodeHash is string
-        && request.resource.data.passcodeHash.size() == 64;
+        ;
       allow update: if request.auth != null
         && request.auth.uid in resource.data.members
         && (
