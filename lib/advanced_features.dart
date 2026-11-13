@@ -189,3 +189,121 @@ class NotificationsPage extends StatelessWidget {
     ),
   );
 }
+
+
+class MemberSafetyPage extends StatelessWidget {
+  const MemberSafetyPage({super.key});
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('الأمان والحظر')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _db.collection('userBlocks').where('blockerId', isEqualTo: _uid).snapshots(),
+        builder: (context, s) {
+          if (s.hasError) return const Center(child: Text('تعذر تحميل قائمة الحظر'));
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          if (s.data!.docs.isEmpty) return const Center(child: Text('قائمة الحظر فارغة'));
+          return ListView(children: s.data!.docs.map((doc) {
+            final d = doc.data();
+            return ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.block)),
+              title: Text(d['blockedName'] as String? ?? 'عضو'),
+              subtitle: const Text('لن تتمكن من بدء محادثة معه'),
+              trailing: TextButton(
+                onPressed: () => doc.reference.delete(),
+                child: const Text('إلغاء الحظر'),
+              ),
+            );
+          }).toList());
+        },
+      ),
+    ),
+  );
+}
+
+class MemberSafetyActions extends StatelessWidget {
+  final String uid, name;
+  const MemberSafetyActions({super.key, required this.uid, required this.name});
+  @override
+  Widget build(BuildContext context) {
+    if (uid == _uid) return const SizedBox.shrink();
+    final ref = _db.collection('userBlocks').doc('${_uid}_$uid');
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: ref.snapshots(),
+      builder: (context, s) {
+        final blocked = s.data?.exists ?? false;
+        return Column(children: [
+          OutlinedButton.icon(
+            icon: Icon(blocked ? Icons.check_circle_outline : Icons.block),
+            label: Text(blocked ? 'إلغاء حظر العضو' : 'حظر هذا العضو'),
+            onPressed: () async {
+              if (blocked) {
+                await ref.delete();
+              } else {
+                await ref.set({'blockerId': _uid, 'blockedId': uid, 'blockedName': name, 'createdAt': FieldValue.serverTimestamp()});
+              }
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(blocked ? 'تم إلغاء الحظر' : 'تم حظر العضو')));
+            },
+          ),
+          TextButton.icon(
+            icon: const Icon(Icons.flag_outlined),
+            label: const Text('الإبلاغ عن العضو'),
+            onPressed: () async {
+              final reason = await showDialog<String>(context: context, builder: (c) => SimpleDialog(
+                title: const Text('سبب الإبلاغ'),
+                children: ['تنمّر أو إساءة', 'انتحال شخصية', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة']
+                  .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList(),
+              ));
+              if (reason == null) return;
+              await _db.collection('reports').add({
+                'type': 'user', 'targetId': uid, 'reportedUserId': uid,
+                'reporterId': _uid, 'reason': reason, 'status': 'new',
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال البلاغ للإدارة')));
+            },
+          ),
+        ]);
+      },
+    );
+  }
+}
+
+class FounderReportsPage extends StatelessWidget {
+  const FounderReportsPage({super.key});
+  bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
+  @override
+  Widget build(BuildContext context) {
+    if (!_isFounder) return const Scaffold(body: Center(child: Text('هذه الصفحة للمؤسس فقط')));
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('مراجعة البلاغات')),
+        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _db.collection('reports').limit(150).snapshots(),
+          builder: (context, s) {
+            if (s.hasError) return const Center(child: Text('تعذر تحميل البلاغات. انشر قواعد Firestore المحدّثة.'));
+            if (!s.hasData) return const Center(child: CircularProgressIndicator());
+            if (s.data!.docs.isEmpty) return const Center(child: Text('ماكو بلاغات حالياً'));
+            return ListView(children: s.data!.docs.map((doc) {
+              final d = doc.data();
+              final done = d['status'] == 'reviewed';
+              return Card(child: ListTile(
+                leading: Icon(d['type'] == 'user' ? Icons.person : Icons.article, color: _brand),
+                title: Text(d['reason'] as String? ?? 'بلاغ'),
+                subtitle: Text('النوع: ${d['type'] ?? 'محتوى'} • المبلّغ: ${d['reporterId'] ?? '-'}\nالمستهدف: ${d['targetId'] ?? '-'}'),
+                isThreeLine: true,
+                trailing: IconButton(
+                  tooltip: done ? 'تمت المراجعة' : 'تحديد كمراجع',
+                  icon: Icon(done ? Icons.check_circle : Icons.pending_actions, color: done ? Colors.green : _brand),
+                  onPressed: () => doc.reference.update({'status': 'reviewed', 'reviewedAt': FieldValue.serverTimestamp(), 'reviewedBy': _uid}),
+                ),
+              ));
+            }).toList());
+          },
+        ),
+      ),
+    );
+  }
+}
