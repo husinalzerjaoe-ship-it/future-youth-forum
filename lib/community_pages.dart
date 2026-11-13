@@ -128,7 +128,6 @@ class RegionChatRoomsPage extends StatelessWidget{
  static const rooms=[('iraq','دردشة أهل العراق','🇮🇶'),('syria','دردشة أهل سوريا','🇸🇾'),('palestine','دردشة فلسطين','🇵🇸'),('gulf','دردشة الخليج','🌴'),('general','دردشة الأصدقاء','🌍')];
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('دردشات الدول')),body:ListView(padding:const EdgeInsets.all(12),children:rooms.map((r)=>Card(child:ListTile(leading:Text(r.$3,style:const TextStyle(fontSize:28)),title:Text(r.$2,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:const Text('محادثة مباشرة'),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>RegionChatPage(id:r.$1,title:r.$2)))))).toList())));
  }
-}
 class RegionChatPage extends StatefulWidget{final String id,title;const RegionChatPage({super.key,required this.id,required this.title});@override State<RegionChatPage> createState()=>_RegionChatPageState();}
 class _RegionChatPageState extends State<RegionChatPage>{
 
@@ -184,4 +183,3 @@ class _RegionChatPageState extends State<RegionChatPage>{
  SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(),decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ])));
  }
-}
