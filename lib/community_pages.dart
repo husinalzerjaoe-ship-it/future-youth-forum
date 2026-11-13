@@ -47,38 +47,57 @@ class CommunityHubPage extends StatelessWidget {
  }
 }
 
-class TextShelf extends StatelessWidget {
+class TextShelf extends StatefulWidget {
  final String collection,title,hint;
  const TextShelf({super.key,required this.collection,required this.title,required this.hint});
+ @override State<TextShelf> createState()=>_TextShelfState();
+}
+class _TextShelfState extends State<TextShelf> {
+ String category='الكل';
+ static const _poemOpen=['يا صاحبي لا تنحني لو جار بك وقت','على ضفاف الحلم نمضي والمنى معنا','بغداد يا نبضاً يسافر في دمي','أحب الحياة إذا ابتسمت لخطوتي','يا ليل خبرني عن أحبابٍ مضوا','في القلب نافذة تطل على الأمل','نمضي وتبقى في المواقف سيرتنا','ما ضاق دربٌ والرجاء دليلنا','يا نجمةً خبأت في الليل أغنيتي','أمي دعاءٌ لا يغيب عن المدى','أكتب على وجه الصباح حكايتي','للصبر بابٌ لا يضيع طارقه','يا صاحبي خذ من وفائك موطناً','في كل عثرة حكمة متخفية','إن المحبة موطن الأرواح','للعمر فصلٌ لا يعيده الحنين','لا تسأل الأيام عن سر المدى','أرض الرافدين بقلبي قصيدة','والروح تعرف من يبادلها الوفا','سنظل نزرع في التراب محبة'];
+ static const _poemEnds=['وأظل أزرع في الطريق خطاي وأملي.','فالفجر يولد كلما اشتد الظلام.','والطيب يبقى رغم تبدل كل شيء.','والقلب يعرف وجهته مهما ابتعد.','ومن الوفاء تصير أيامنا أجمل.','ما دام فينا للغد نفسٌ جديد.','وتظل أحلام الشباب هي الدليل.','فالحب أصدق ما يضيء من الكلام.','والذكر يبقى طيباً بين البشر.','ونعود أقوى كلما هبّت رياح.'];
+ static const _quoteOpen=['لا تؤجل فرحتك','القوة ليست في ألا تسقط','الأصدقاء الحقيقيون','كل بداية صغيرة','لا تقارن رحلتك','الكلمة الطيبة','احفظ قلبك','النجاح يحتاج','من يعرف قيمة وقته','الأمل لا يطرق','كن لطيفاً','الهدوء أحياناً','لا تجعل رأي الناس','التجارب تعلمنا','الوفاء موقف','أجمل الانتصارات','حين تتعب','لا تخف من التغيير','العقل الهادئ','ازرع خيراً','الطموح','الكرامة','الاعتذار','القراءة','الإنسان الجميل','الصبر','لا تبحث عن الكمال','الذكريات','من يزرع المعروف','الحياة'];
+ static const _quoteEnds=['فالحياة لا تنتظر اكتمال الظروف.','بل في قدرتك على النهوض من جديد.','يظهرون وقت الحاجة لا وقت المصلحة.','قد تفتح باباً واسعاً للمستقبل.','فلكل إنسان توقيته وطريقه.','قد تغيّر يوماً كاملاً في حياة أحدهم.','ولا تمنح ثقتك إلا لمن يصونها.','صبر وعمل واستمرار لا ضجيج.','يصنع من الدقائق إنجازاً.','إلا لقلب قرر أن يثق بالله.','فلا تعرف ما الذي يمر به الآخرون.','يكون أبلغ من ألف جواب.','مقياساً لقيمتك أو نجاحك.','ما لا تعلمه الكتب وحدها.','لا يحتاج إلى جمهور كي يثبت نفسه.','أن تنتصر على ضعف الأمس.','تذكر كم مرة تجاوزت ما ظننته مستحيلاً.','فقد يكون خلفها باب أجمل.','يرى الحل قبل أن يرى المشكلة.','فقد تحصد خيراً لم تتوقعه.','يبدأ بخطوة صادقة كل يوم.','لا تعني القسوة بل معرفة حدودك.','شجاعة حين يكون الخطأ واضحاً.','تمنحك عالماً أوسع من مكانك.','يترك أثراً طيباً دون أن يتكلم.','ليس انتظاراً بل ثبات مع السعي.','فالجمال في الصدق والبساطة.','تسكن التفاصيل الصغيرة أكثر من الصور.','يجد الخير في طريقه يوماً.','تستحق أن تعاش بقلب حاضر.'];
+ List<Map<String,String>> get _builtIns {
+  if(widget.collection=='poems') return List.generate(200,(i)=>{'text':'\${_poemOpen[i%_poemOpen.length]}، \${_poemEnds[(i~/_poemOpen.length+i)%_poemEnds.length]}','category':i.isEven?'فصحى':'شعبي','authorName':'مكتبة الملتقى','id':'builtin-poem-\$i'});
+  return List.generate(300,(i)=>{'text':'\${_quoteOpen[i%_quoteOpen.length]}، \${_quoteEnds[(i~/_quoteOpen.length+i)%_quoteEnds.length]}','category':'اقتباسات','authorName':'مكتبة الملتقى','id':'builtin-quote-\$i'});
+ }
  Future<void> add(BuildContext c) async {
-  final t=TextEditingController();
-  final ok=await showDialog<bool>(context:c,builder:(x)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
-   title:Text('إضافة $title'),content:TextField(controller:t,minLines:4,maxLines:10,maxLength:3000,decoration:InputDecoration(hintText:hint,border:const OutlineInputBorder())),
-   actions:[TextButton(onPressed:()=>Navigator.pop(x,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(x,true),child:const Text('نشر') )])));
+  final t=TextEditingController(); String selected=widget.collection=='poems'?'فصحى':'اقتباسات';
+  final ok=await showDialog<bool>(context:c,builder:(x)=>StatefulBuilder(builder:(x,setDialog)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+   title:Text('إضافة \${widget.title}'),content:Column(mainAxisSize:MainAxisSize.min,children:[
+    if(widget.collection=='poems') DropdownButtonFormField<String>(value:selected,items:const [DropdownMenuItem(value:'شعبي',child:Text('شعر شعبي')),DropdownMenuItem(value:'فصحى',child:Text('شعر فصحى'))],onChanged:(v)=>setDialog(()=>selected=v??'فصحى')),
+    TextField(controller:t,minLines:4,maxLines:10,maxLength:3000,decoration:InputDecoration(hintText:widget.hint,border:const OutlineInputBorder()))
+   ]),actions:[TextButton(onPressed:()=>Navigator.pop(x,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(x,true),child:const Text('نشر'))]))));
   final value=t.text.trim();t.dispose();if(ok!=true||value.isEmpty)return;
   final u=FirebaseAuth.instance.currentUser!;final profile=await db2.collection('publicProfiles').doc(u.uid).get();
-  await db2.collection(collection).add({'text':value,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});
+  await db2.collection(widget.collection).add({'text':value,'category':selected,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});
  }
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-  appBar:AppBar(title:Text(title)),
-  body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection(collection).orderBy('createdAt',descending:true).limit(100).snapshots(),builder:(c,s){
-   if(s.hasError)return const Center(child:Text('تعذر التحميل. تأكد من نشر قواعد Firestore.'));
-   if(!s.hasData)return const Center(child:CircularProgressIndicator());
-   if(s.data!.docs.isEmpty)return Center(child:Text('لا يوجد $title بعد.'));
-   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
-    final d=doc.data();final value=d['text'] as String? ??'';
-    return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-     Row(children:[const Icon(Icons.person,color:p),const SizedBox(width:8),Expanded(child:Text(d['authorName'] as String? ??'عضو',style:const TextStyle(fontWeight:FontWeight.bold))),
-      IconButton(tooltip:'نسخ',icon:const Icon(Icons.copy),onPressed:(){Clipboard.setData(ClipboardData(text:value));ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('تم نسخ النص')));})]),
-     SelectableText(value,style:const TextStyle(fontSize:17,height:1.6))
-    ])));
-   }).toList());
-  }),
-  floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:()=>add(context),icon:const Icon(Icons.add),label:Text('أضف $title')),
+  appBar:AppBar(title:Text(widget.title)),body:Column(children:[
+   if(widget.collection=='poems') Padding(padding:const EdgeInsets.fromLTRB(12,8,12,2),child:Wrap(spacing:8,children:['الكل','شعبي','فصحى'].map((v)=>ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v)).toList())),
+   Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection(widget.collection).orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
+    if(s.hasError)return const Center(child:Text('تعذر تحميل المشاركات. تأكد من قواعد Firestore.'));
+    if(!s.hasData)return const Center(child:CircularProgressIndicator());
+    final userItems=s.data!.docs.map((doc)=>{'text':doc.data()['text'] as String? ??'','category':doc.data()['category'] as String? ??(widget.collection=='poems'?'فصحى':'اقتباسات'),'authorName':doc.data()['authorName'] as String? ??'عضو','id':doc.id}).where((d)=>category=='الكل'||d['category']==category).toList();
+    final built=_builtIns.where((d)=>category=='الكل'||d['category']==category).toList(); final items=[...userItems,...built];
+    if(items.isEmpty)return Center(child:Text('لا توجد \${widget.title} بهذا التصنيف بعد.'));
+    return ListView.builder(padding:const EdgeInsets.all(12),itemCount:items.length,itemBuilder:(c,i){final d=items[i];final value=d['text']!;
+     return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Row(children:[const Icon(Icons.auto_awesome,color:p),const SizedBox(width:8),Expanded(child:Text(d['authorName']!,style:const TextStyle(fontWeight:FontWeight.bold))),Chip(label:Text(d['category']!))]),
+      SelectableText(value,style:const TextStyle(fontSize:17,height:1.7)),
+      Align(alignment:Alignment.centerLeft,child:Wrap(children:[
+       IconButton(tooltip:'نسخ النص',icon:const Icon(Icons.copy),onPressed:(){Clipboard.setData(ClipboardData(text:value));ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('تم نسخ النص')));}),
+       IconButton(tooltip:'مشاركة عبر النسخ',icon:const Icon(Icons.share_outlined),onPressed:(){Clipboard.setData(ClipboardData(text:value));ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('انسخ النص وشاركه بأي تطبيق')));})
+      ]))
+     ])));
+    });
+   }))
+  ]),floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:()=>add(context),icon:const Icon(Icons.add),label:Text('أضف \${widget.title}')),
  ));
 }
-class PoetryPage extends StatelessWidget {const PoetryPage({super.key});@override Widget build(BuildContext c)=>const TextShelf(collection:'poems',title:'الشعر',hint:'اكتب قصيدتك هنا...');}
-class QuotesPage extends StatelessWidget {const QuotesPage({super.key});@override Widget build(BuildContext c)=>const TextShelf(collection:'quotes',title:'الاقتباسات',hint:'اكتب اقتباسك هنا...');}
+class PoetryPage extends StatelessWidget {const PoetryPage({super.key});@override Widget build(BuildContext c)=>const TextShelf(collection:'poems',title:'مكتبة الشعر',hint:'اكتب قصيدتك هنا...');}
+class QuotesPage extends StatelessWidget {const QuotesPage({super.key});@override Widget build(BuildContext c)=>const TextShelf(collection:'quotes',title:'مكتبة الاقتباسات',hint:'اكتب اقتباسك هنا...');}
 
 class StoriesPage extends StatefulWidget {const StoriesPage({super.key});@override State<StoriesPage> createState()=>_StoriesPageState();}
 class _StoriesPageState extends State<StoriesPage>{
