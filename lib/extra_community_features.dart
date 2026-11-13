@@ -81,7 +81,7 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
      leading:const CircleAvatar(child:Icon(Icons.lock_outline)),title:Text(x['name'] as String? ?? 'غرفة خاصة'),
      subtitle:Text('الأعضاء: '+((x['members'] as List? ?? []).length).toString()+' • '+(x['lastMessage'] ?? ''),maxLines:1,overflow:TextOverflow.ellipsis),
      trailing:const Icon(Icons.chevron_left),
-     onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PrivateRoomChatPage(roomId:d.id,roomName:x['name'] as String? ?? 'غرفة خاصة',passcodeSalt:x['passcodeSalt'] as String? ?? '',passcodeHash:x['passcodeHash'] as String? ?? ''))),
+     onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PrivateRoomChatPage(roomId:d.id,roomName:x['name'] as String? ?? 'غرفة خاصة'))),
     ));
    }).toList());
   })
@@ -89,8 +89,8 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
 }
 
 class PrivateRoomChatPage extends StatefulWidget {
- final String roomId,roomName,passcodeSalt,passcodeHash;
- const PrivateRoomChatPage({super.key,required this.roomId,required this.roomName,required this.passcodeSalt,required this.passcodeHash});
+ final String roomId,roomName;
+ const PrivateRoomChatPage({super.key,required this.roomId,required this.roomName});
  @override State<PrivateRoomChatPage> createState()=>_PrivateRoomChatPageState();
 }
 class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
