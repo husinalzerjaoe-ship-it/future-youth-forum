@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -56,10 +57,11 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
   final salt=List<int>.generate(16,(_)=>Random.secure().nextInt(256));
   final saltHex=salt.map((b)=>b.toRadixString(16).padLeft(2,'0')).join();
   final hash=sha256.convert(utf8.encode(saltHex+'|'+code.text.trim())).toString();
-  await db.collection('privateRooms').add({
+  final room=await db.collection('privateRooms').add({
    'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
    'passcodeSalt':saltHex,'passcodeHash':hash,'createdAt':FieldValue.serverTimestamp(),'lastMessage':'الغرفة جاهزة'
   });
+  await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':room.id,'passcode':code.text.trim()});
   name.dispose();code.dispose();
   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
  }
@@ -94,8 +96,10 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   final code=TextEditingController();
   final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('رمز الغرفة'),content:TextField(controller:code,obscureText:true,decoration:const InputDecoration(hintText:'اكتب الرمز')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('رجوع')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('دخول'))]));
   if(ok!=true)return;
-  final hash=sha256.convert(utf8.encode(widget.passcodeSalt+'|'+code.text.trim())).toString();
-  if(hash==widget.passcodeHash){setState(()=>unlocked=true);}else if(mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الرمز غير صحيح')));}
+  try{
+   await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':widget.roomId,'passcode':code.text.trim()});
+   if(mounted)setState(()=>unlocked=true);
+  }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الرمز غير صحيح أو أنك لست ضمن المدعوين')));}
   code.dispose();
  }
  Future<void> send() async {
