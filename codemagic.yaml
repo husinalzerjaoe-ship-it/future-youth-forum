@@ -1,12 +1,36 @@
 workflows:
   android-apk:
-    name: Future Youth Forum Android APK
+    name: ملتقى شباب المستقبل - Android APK
     max_build_duration: 60
     environment:
       flutter: stable
     scripts:
       - name: Generate Android platform files
         script: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Set Arabic app name and new icon
+        script: |
+          mkdir -p android/app/src/main/res/drawable
+          cat > android/app/src/main/res/drawable/ic_launcher_ar.xml <<'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path android:fillColor="#6554D9"
+                  android:pathData="M12,0 H96 Q108,0 108,12 V96 Q108,108 96,108 H12 Q0,108 0,96 V12 Q0,0 12,0 Z"/>
+              <path android:fillColor="#FFFFFF"
+                  android:pathData="M54,22 a10,10 0,1 0,0 20 a10,10 0,1 0,0 -20 M54,46 c-13,0 -22,8 -22,19 v5 h44 v-5 c0,-11 -9,-19 -22,-19 M25,34 a8,8 0,1 0,0 16 a8,8 0,1 0,0 -16 M83,34 a8,8 0,1 0,0 16 a8,8 0,1 0,0 -16 M24,54 c-8,2 -13,8 -13,16 v4 h17 v-9 c0,-4 1,-8 3,-11 z M84,54 c8,2 13,8 13,16 v4 h-17 v-9 c0,-4 -1,-8 -3,-11 z"/>
+          </vector>
+          EOF
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          s = s.replace('android:label="forum"', 'android:label="ملتقى شباب المستقبل"')
+          s = s.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/ic_launcher_ar"')
+          s = s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/ic_launcher_ar"')
+          p.write_text(s)
+          PY
       - name: Get dependencies
         script: flutter pub get
       - name: Build release APK
