@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'community_pages.dart';
 import 'enhanced_public_chat.dart';
 import 'advanced_features.dart';
+import 'inspiration_hub.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -201,6 +202,8 @@ class _HomePageState extends State<HomePage> {
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
           IconButton(tooltip: 'المحفوظات', icon: const Icon(Icons.bookmarks_outlined),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsPage()))),
+          IconButton(tooltip: 'القصائد والاقتباسات والأدعية', icon: const Icon(Icons.auto_awesome),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationHubPage()))),
           IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesPage()))),
           IconButton(tooltip: 'الإشعارات', icon: const Icon(Icons.notifications_none),
