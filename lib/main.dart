@@ -240,7 +240,8 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'), contentPadding: EdgeInsets.zero)),
             ],
-          ),,
+          ),
+        ],
       ),
       body: IndexedStack(index: selected, children: const [PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
