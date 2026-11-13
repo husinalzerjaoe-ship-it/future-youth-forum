@@ -328,8 +328,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
 
  Widget bubble(Map<String,dynamic> d,bool mine) {
   final isFounder=d['senderRole']=='founder';
-  final type=d['type'] as String???'text';
-  final txt=d['text'] as String???'';
+  final type=d['type'] as String? ?? 'text';
+  final txt=d['text'] as String? ?? '';
   final url=d['imageUrl'] as String?;
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
@@ -339,9 +339,9 @@ class _RegionChatPageState extends State<RegionChatPage> {
     border:Border.all(color:isFounder?const Color(0xFFFFD77A):Colors.black12)),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     Flexible(child:Text(d['senderName'] as String???'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:12))),
+     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:12))),
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
-     if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String???'',d['senderName'] as String???'عضو'))
+     if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
     ]),
     if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
     if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
