@@ -68,14 +68,20 @@ Future<String> uploadForumMedia(
     'xapk': 'application/octet-stream',
     'zip': 'application/zip',
     'pdf': 'application/pdf',
+    'mp3': 'audio/mpeg',
+    'm4a': 'audio/mp4',
+    'aac': 'audio/aac',
+    'wav': 'audio/wav',
+    'ogg': 'audio/ogg',
+    'flac': 'audio/flac',
   };
   final contentType = mimeTypes[ext];
   if (contentType == null) {
-    throw ArgumentError('صيغة الملف غير مدعومة. استخدم صور JPG/PNG/WEBP/GIF أو فيديو MP4/MOV أو ملفات APK/ZIP/PDF/XAPK.');
+    throw ArgumentError('صيغة الملف غير مدعومة. استخدم صور JPG/PNG/WEBP/GIF أو فيديو MP4/MOV أو صوت MP3/M4A/AAC/WAV/OGG/FLAC أو APK/ZIP/PDF/XAPK.');
   }
 
   final bytes = await file.readAsBytes();
-  if (bytes.isEmpty) throw StateError('ملف الصورة فارغ.');
+  if (bytes.isEmpty) throw StateError('الملف فارغ ولا يمكن رفعه.');
   final maxBytes = folder == 'shared-files' ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
   if (bytes.length > maxBytes) {
     throw StateError('حجم الملف أكبر من الحد المسموح (' + (folder == 'shared-files' ? '100' : '50') + ' ميغابايت).');
