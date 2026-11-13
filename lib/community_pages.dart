@@ -232,61 +232,151 @@ class RegionChatRoomsPage extends StatelessWidget{
  static const rooms=[('iraq','دردشة أهل العراق','🇮🇶'),('syria','دردشة أهل سوريا','🇸🇾'),('palestine','دردشة فلسطين','🇵🇸'),('gulf','دردشة الخليج','🌴'),('general','دردشة الأصدقاء','🌍')];
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('دردشات الدول')),body:ListView(padding:const EdgeInsets.all(12),children:rooms.map((r)=>Card(child:ListTile(leading:Text(r.$3,style:const TextStyle(fontSize:28)),title:Text(r.$2,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:const Text('محادثة مباشرة'),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>RegionChatPage(id:r.$1,title:r.$2)))))).toList())));
  }
-class RegionChatPage extends StatefulWidget{final String id,title;const RegionChatPage({super.key,required this.id,required this.title});@override State<RegionChatPage> createState()=>_RegionChatPageState();}
-class _RegionChatPageState extends State<RegionChatPage>{
+class RegionChatPage extends StatefulWidget {
+ final String id,title;
+ const RegionChatPage({super.key,required this.id,required this.title});
+ @override State<RegionChatPage> createState()=>_RegionChatPageState();
+}
+class _RegionChatPageState extends State<RegionChatPage> {
+ final t=TextEditingController();
+ final picker=ImagePicker();
+ bool busy=false;
+ String? error;
+ int backgroundIndex=0;
+ bool get founder=>isForumFounder;
+ static const backgrounds=[Color(0xFFF5F3FF),Color(0xFFEAF6FF),Color(0xFFFFF3E8),Color(0xFFF0F7F1),Color(0xFF171936)];
+ static const stickers=['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍'];
 
- final t=TextEditingController();bool busy=false;
- bool get founder => isForumFounder;
  Future<bool> blocked(String uid) async {
   final snap=await db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid).get();
   if(!snap.exists)return false;
   final data=snap.data()??{};
   if(data['permanent']==true)return true;
   final until=data['expiresAt'] as Timestamp?;
-  if(until==null || !until.toDate().isAfter(DateTime.now())) return false;
-  return true;
+  return until!=null && until.toDate().isAfter(DateTime.now());
  }
+
  Future<void> moderate(String uid,String name) async {
   if(!founder || uid==FirebaseAuth.instance.currentUser!.uid)return;
-  final choice=await showDialog<String>(context:context,builder:(c)=>Directionality(
-   textDirection:TextDirection.rtl,child:AlertDialog(
-    title:Text('إدارة العضو: $name'),
-    content:const Text('اختار مدة المنع من دخول هذه الغرفة.'),
-    actions:[
-     TextButton(onPressed:()=>Navigator.pop(c,'cancel'),child:const Text('إلغاء')),
-     TextButton(onPressed:()=>Navigator.pop(c,'kick'),child:const Text('طرد مؤقت')),
-     TextButton(onPressed:()=>Navigator.pop(c,'1h'),child:const Text('ساعة')),
-     TextButton(onPressed:()=>Navigator.pop(c,'2h'),child:const Text('ساعتين')),
-     TextButton(onPressed:()=>Navigator.pop(c,'1d'),child:const Text('يوم')),
-     TextButton(onPressed:()=>Navigator.pop(c,'forever'),child:const Text('للأبد')),
-     TextButton(onPressed:()=>Navigator.pop(c,'unban'),child:const Text('رفع الحظر')),
-    ])));
-  if(choice==null || choice=='cancel')return;
+  final choice=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+   title:Text('إدارة العضو: $name'),content:const Text('اختار مدة المنع من دخول هذه الغرفة.'),
+   actions:[TextButton(onPressed:()=>Navigator.pop(c,'cancel'),child:const Text('إلغاء')),
+    TextButton(onPressed:()=>Navigator.pop(c,'kick'),child:const Text('طرد مؤقت')),
+    TextButton(onPressed:()=>Navigator.pop(c,'1h'),child:const Text('ساعة')),
+    TextButton(onPressed:()=>Navigator.pop(c,'2h'),child:const Text('ساعتين')),
+    TextButton(onPressed:()=>Navigator.pop(c,'1d'),child:const Text('يوم')),
+    TextButton(onPressed:()=>Navigator.pop(c,'forever'),child:const Text('للأبد')),
+    TextButton(onPressed:()=>Navigator.pop(c,'unban'),child:const Text('رفع الحظر'))])));
+  if(choice==null||choice=='cancel')return;
   final ref=db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid);
-  if(choice=='unban') { await ref.delete(); }
-  else {
+  if(choice=='unban'){await ref.delete();}
+  else{
    final duration=choice=='kick'?const Duration(minutes:1):choice=='1h'?const Duration(hours:1):choice=='2h'?const Duration(hours:2):choice=='1d'?const Duration(days:1):null;
    await ref.set({'permanent':duration==null,'expiresAt':duration==null?null:Timestamp.fromDate(DateTime.now().add(duration)),'by':FirebaseAuth.instance.currentUser!.uid,'updatedAt':FieldValue.serverTimestamp()});
   }
   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(choice=='unban'?'تم رفع الحظر':choice=='kick'?'تم الطرد المؤقت':'تم تطبيق الحظر')));
  }
- @override void dispose(){t.dispose();super.dispose();}
- Future<void> send()async{final value=t.text.trim();if(value.isEmpty||busy)return;final me=FirebaseAuth.instance.currentUser!;if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}setState(()=>busy=true);
- try{final u=FirebaseAuth.instance.currentUser!;final profile=await db2.collection('publicProfiles').doc(u.uid).get();
- await db2.collection('regionalChats').doc(widget.id).collection('messages').add({'text':value,'senderId':u.uid,'senderRole':isForumFounder?'founder':'member','senderName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});t.clear();}
- catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('انشر قواعد Firestore الجديدة أولاً')));}
- finally{if(mounted)setState(()=>busy=false);}}
- @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[if(founder)const Padding(padding:EdgeInsets.symmetric(horizontal:8),child:Center(child:Text('👑 المؤسس',style:TextStyle(fontWeight:FontWeight.bold)))),IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage()))) ]),body:Column(children:[
- Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection('regionalChats').doc(widget.id).collection('messages').orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
- if(s.hasError)return const Center(child:Text('الدردشة تحتاج قواعد Firestore الجديدة'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
- if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة 👋'));
- final me=FirebaseAuth.instance.currentUser!.uid;
- return ListView.builder(reverse:true,padding:const EdgeInsets.all(12),itemCount:s.data!.docs.length,itemBuilder:(c,i){final d=s.data!.docs[i].data();final mine=d['senderId']==me;final senderId=d['senderId'] as String? ?? '';final senderName=d['senderName'] as String? ?? 'عضو';
- return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(12),constraints:BoxConstraints(maxWidth:MediaQuery.of(c).size.width*.8),decoration:BoxDecoration(color:mine?const Color(0xFFE8E3FF):Colors.white,borderRadius:BorderRadius.circular(14)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[Flexible(child:Text(senderName,style:const TextStyle(color:p,fontWeight:FontWeight.bold,fontSize:12))),if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(senderId,senderName))]),Text(d['text'] as String? ??'')])));});
- })),
- SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(),decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
- ])));
+
+ Future<void> send({String text='',String? imageUrl,String type='text'}) async {
+  if((text.trim().isEmpty&&imageUrl==null)||busy)return;
+  final me=FirebaseAuth.instance.currentUser!;
+  if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}
+  setState(()=>busy=true);
+  try{
+   final profile=await db2.collection('publicProfiles').doc(me.uid).get();
+   await db2.collection('regionalChats').doc(widget.id).collection('messages').add({
+    'text':text.trim(),'type':type,if(imageUrl!=null)'imageUrl':imageUrl,
+    'senderId':me.uid,'senderRole':founder?'founder':'member',
+    'senderName':profile.data()?['name']??me.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});
+   if(text.isNotEmpty)t.clear();
+  }catch(_){if(mounted)setState(()=>error='تعذر الإرسال. تأكد من نشر قواعد Firestore الجديدة.');}
+  finally{if(mounted)setState(()=>busy=false);}
  }
+
+ Future<void> sendImage() async {
+  try{
+   final file=await picker.pickImage(source:ImageSource.gallery);
+   if(file==null)return;
+   final ext=file.name.toLowerCase().split('.').last;
+   final safe=['jpg','jpeg','png','webp','gif'].contains(ext)?ext:'jpg';
+   final path='regional-chat/\${widget.id}/\${FirebaseAuth.instance.currentUser!.uid}/\${DateTime.now().millisecondsSinceEpoch}.$safe';
+   await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await file.readAsBytes(),
+    fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/$safe',upsert:false));
+   await send(imageUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
+  }catch(_){if(mounted)setState(()=>error='تعذر رفع الصورة. تحقق من صلاحيات مخزن الصور.');}
+ }
+
+ void showStickers()=>showModalBottomSheet<void>(context:context,showDragHandle:true,
+  builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),
+   child:GridView.count(shrinkWrap:true,crossAxisCount:4,childAspectRatio:1.3,children:stickers.map((s)=>InkWell(
+    onTap:(){Navigator.pop(sheet);send(text:s,type:'sticker');},
+    child:Center(child:Text(s,style:const TextStyle(fontSize:34))))).toList()))));
+
+ Future<void> chooseBackground() async {
+  final selected=await showModalBottomSheet<int>(context:context,showDragHandle:true,
+   builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(20),
+    child:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
+     const Text('خلفية هذه الغرفة',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+     const SizedBox(height:16),
+     Wrap(spacing:12,children:List.generate(backgrounds.length,(i)=>InkWell(
+      onTap:()=>Navigator.pop(sheet,i),
+      child:Container(width:46,height:46,decoration:BoxDecoration(color:backgrounds[i],shape:BoxShape.circle,border:Border.all(color:backgroundIndex==i?p:Colors.black12,width:backgroundIndex==i?3:1)))))),
+     const SizedBox(height:8),const Text('التغيير يظهر لك داخل هذه الغرفة.',style:TextStyle(color:Colors.black54,fontSize:12))
+    ]))));
+  if(selected!=null&&mounted)setState(()=>backgroundIndex=selected);
+ }
+
+ Widget bubble(Map<String,dynamic> d,bool mine) {
+  final isFounder=d['senderRole']=='founder';
+  final type=d['type'] as String???'text';
+  final txt=d['text'] as String???'';
+  final url=d['imageUrl'] as String?;
+  return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
+   margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
+   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
+   decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,
+    color:mine?null:Colors.white.withValues(alpha:.96),borderRadius:BorderRadius.circular(16),
+    border:Border.all(color:isFounder?const Color(0xFFFFD77A):Colors.black12)),
+   child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
+     Flexible(child:Text(d['senderName'] as String???'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:12))),
+     if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
+     if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String???'',d['senderName'] as String???'عضو'))
+    ]),
+    if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
+    if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
+    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:15))
+   ])));
+ }
+
+ @override void dispose(){t.dispose();super.dispose();}
+ @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:Text(widget.title),actions:[
+   IconButton(tooltip:'خلفية الغرفة',icon:const Icon(Icons.wallpaper),onPressed:chooseBackground),
+   if(founder)const Padding(padding:EdgeInsets.symmetric(horizontal:8),child:Center(child:Text('👑 المؤسس',style:TextStyle(fontWeight:FontWeight.bold)))),
+   IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage())))
+  ]),
+  body:Column(children:[
+   Expanded(child:Container(color:backgrounds[backgroundIndex],child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    stream:db2.collection('regionalChats').doc(widget.id).collection('messages').orderBy('createdAt',descending:true).limit(150).snapshots(),
+    builder:(c,s){
+     if(s.hasError)return const Center(child:Text('الدردشة تحتاج قواعد Firestore الجديدة'));
+     if(!s.hasData)return const Center(child:CircularProgressIndicator());
+     if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة 👋'));
+     final me=FirebaseAuth.instance.currentUser!.uid;
+     return ListView.builder(reverse:true,padding:const EdgeInsets.all(12),itemCount:s.data!.docs.length,
+      itemBuilder:(c,i){final d=s.data!.docs[i].data();return bubble(d,d['senderId']==me);});
+    }))),
+   if(error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text(error!,style:const TextStyle(color:Colors.red,fontSize:11))),
+   Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:6,vertical:6),child:SafeArea(top:false,child:Row(children:[
+    IconButton(onPressed:busy?null:sendImage,tooltip:'صورة أو GIF',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:showStickers,tooltip:'ملصقات',icon:const Icon(Icons.emoji_emotions,color:Color(0xFFE6A52C))),
+    Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(text:t.text),
+     decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),
+    IconButton.filled(onPressed:busy?null:()=>send(text:t.text),icon:const Icon(Icons.send))
+   ])))
+  ])));
+}
 
 
 class YouTubeShelfPage extends StatefulWidget {
