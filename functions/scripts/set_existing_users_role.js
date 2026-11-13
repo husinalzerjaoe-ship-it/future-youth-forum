@@ -17,10 +17,10 @@ async function main() {
     }
     pageToken = page.pageToken;
   } while (pageToken);
-  process.stdout.write(`Updated ${updated} Firebase users with role=authenticated.\\n`);
+  process.stdout.write(`Updated ${updated} Firebase users with role=authenticated.\n`);
 }
 
 main().catch((error) => {
-  process.stderr.write(`${error.stack || error}\\n`);
+  process.stderr.write(`${error.stack || error}\n`);
   process.exitCode = 1;
 });
