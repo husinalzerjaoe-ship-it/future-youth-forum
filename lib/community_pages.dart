@@ -34,7 +34,7 @@ class CommunityHubPage extends StatelessWidget {
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
     gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),borderRadius:BorderRadius.circular(20)),
-    child:const Text('مساحات ملتقى شباب المستقبل ✨\nشارك إبداعك وتواصل مع الجميع',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
+    child:const Text('مساحات ملتقى الأنمي ✨\nشارك إبداعك وتواصل مع عشّاق الأنمي',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
    const SizedBox(height:14),
    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
     gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
@@ -118,7 +118,7 @@ class _StoriesPageState extends State<StoriesPage>{
    final bytes = await response.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
    file = File('${Directory.systemTemp.path}/forum_story_${DateTime.now().millisecondsSinceEpoch}.mp4');
    await file.writeAsBytes(bytes, flush: true);
-   await Gal.putVideo(file.path, album: 'ملتقى شباب المستقبل');
+   await Gal.putVideo(file.path, album: 'ملتقى الأنمي');
    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الفيديو في معرض الجهاز')));
   } catch (_) {
    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر تنزيل الفيديو. تحقق من الصلاحية ومساحة الجهاز.')));
