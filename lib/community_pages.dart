@@ -22,6 +22,7 @@ bool get isForumFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase
 class CommunityHubPage extends StatelessWidget {
  const CommunityHubPage({super.key});
  @override Widget build(BuildContext context) {
+  final cs=Theme.of(context).colorScheme;
   final items=[
    ('الشعر','قصائد الأعضاء',Icons.auto_awesome,const PoetryPage()),
    ('الاقتباسات','انسخ أجمل العبارات',Icons.format_quote,const QuotesPage()),
@@ -40,12 +41,21 @@ class CommunityHubPage extends StatelessWidget {
    const SizedBox(height:14),
    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
     gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
-    itemBuilder:(c,i)=>Card(child:InkWell(borderRadius:BorderRadius.circular(16),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
-     child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-      Icon(items[i].$3,size:38,color:p),const SizedBox(height:8),
-      Text(items[i].$1,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
-      Padding(padding:const EdgeInsets.all(6),child:Text(items[i].$2,textAlign:TextAlign.center,style:const TextStyle(fontSize:12,color:Colors.black54)))
-     ]))))
+    itemBuilder:(c,i)=>Card(
+     elevation:0,color:cs.surfaceContainerLow,
+     shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.55))),
+     child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
+      child:Padding(padding:const EdgeInsets.all(12),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+       Container(width:58,height:58,decoration:BoxDecoration(
+        gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
+        borderRadius:BorderRadius.circular(18)),
+        child:Icon(items[i].$3,size:30,color:Colors.white)),
+       const SizedBox(height:10),
+       Text(items[i].$1,textAlign:TextAlign.center,style:TextStyle(fontWeight:FontWeight.bold,fontSize:16,color:cs.onSurface)),
+       const SizedBox(height:5),
+       Expanded(child:Center(child:Text(items[i].$2,textAlign:TextAlign.center,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11,color:cs.onSurfaceVariant)))),
+       Align(alignment:Alignment.centerLeft,child:Icon(Icons.arrow_back_rounded,size:18,color:cs.primary)),
+      ]))))
   ]));
  }
 }
