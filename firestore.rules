@@ -282,6 +282,22 @@ service cloud.firestore {
       }
     }
 
+    // Forum announcements are readable by signed-in members and writable only by the founder.
+    match /forumAnnouncements/{announcementId} {
+      allow read: if request.auth != null;
+      allow create: if isFounder()
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 2000
+        && request.resource.data.author == 'Alfredo';
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body']);
+      allow delete: if isFounder();
+    }
+
     match /notifications/{notificationId} {
       allow create: if request.auth != null
         && request.resource.data.actorId == request.auth.uid
