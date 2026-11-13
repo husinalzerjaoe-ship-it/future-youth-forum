@@ -142,6 +142,7 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1000;
@@ -230,6 +231,7 @@ service cloud.firestore {
       allow read: if request.auth != null && roomNotBanned(roomId);
       allow create: if request.auth != null && roomNotBanned(roomId)
         && request.resource.data.senderId == request.auth.uid
+        && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1000;
@@ -281,6 +283,7 @@ service cloud.firestore {
         allow create: if request.auth != null
           && request.auth.uid in members()
           && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
