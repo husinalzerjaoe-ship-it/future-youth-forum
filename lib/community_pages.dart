@@ -225,7 +225,7 @@ class _RegionChatPageState extends State<RegionChatPage>{
  @override void dispose(){t.dispose();super.dispose();}
  Future<void> send()async{final value=t.text.trim();if(value.isEmpty||busy)return;final me=FirebaseAuth.instance.currentUser!;if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}setState(()=>busy=true);
  try{final u=FirebaseAuth.instance.currentUser!;final profile=await db2.collection('publicProfiles').doc(u.uid).get();
- await db2.collection('regionalChats').doc(widget.id).collection('messages').add({'text':value,'senderId':u.uid,'senderName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});t.clear();}
+ await db2.collection('regionalChats').doc(widget.id).collection('messages').add({'text':value,'senderId':u.uid,'senderRole':isForumFounder?'founder':'member','senderName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});t.clear();}
  catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('انشر قواعد Firestore الجديدة أولاً')));}
  finally{if(mounted)setState(()=>busy=false);}}
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[if(founder)const Padding(padding:EdgeInsets.symmetric(horizontal:8),child:Center(child:Text('👑 المؤسس',style:TextStyle(fontWeight:FontWeight.bold)))),IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage()))) ]),body:Column(children:[
