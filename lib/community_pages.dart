@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
@@ -89,12 +89,17 @@ class _StoriesPageState extends State<StoriesPage>{
   if(file==null)return;setState(()=>busy=true);
   try{
    final u=FirebaseAuth.instance.currentUser!;final ext=file.path.split('.').last;
-   final ref=FirebaseStorage.instance.ref().child('stories/'+u.uid+'/'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+ext);
-   await ref.putFile(File(file.path));final url=await ref.getDownloadURL();
+   final objectPath='stories/'+u.uid+'/'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+ext;
+   final contentType=type=='video'?'video/mp4':'image/jpeg';
+   await Supabase.instance.client.storage.from('forum-media').uploadBinary(
+    objectPath, await file.readAsBytes(),
+    fileOptions: FileOptions(contentType:contentType,upsert:true),
+   );
+   final url=Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
    await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(hours:24)))});
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الستوري لمدة 24 ساعة')));
-  }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('فعّل Firebase Storage وانشر قواعد التخزين أولاً.')));}
+  }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر رفع الستوري. تأكد من سياسة الرفع في Supabase Storage والإنترنت.')));}
   finally{if(mounted)setState(()=>busy=false);}
  }
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
