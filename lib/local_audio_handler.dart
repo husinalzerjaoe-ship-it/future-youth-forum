@@ -66,12 +66,12 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 late LocalAudioHandler appAudioHandler;
 
 Future<void> initializeLocalAudioService() async {
-  appAudioHandler = (await AudioService.init(
+  appAudioHandler = await AudioService.init(
     builder: LocalAudioHandler.new,
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.futureyouth.forum.local_audio',
       androidNotificationChannelName: 'موسيقى ملتقى الأنمي',
       androidNotificationOngoing: true,
     ),
-  )) as LocalAudioHandler;
+  );
 }
