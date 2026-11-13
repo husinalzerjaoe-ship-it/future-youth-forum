@@ -203,6 +203,8 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: darkBrand, foregroundColor: Colors.white,
         title: const Text('ملتقى الأنمي'),
         actions: [
+          IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
           IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
           IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
