@@ -68,6 +68,10 @@ class _AuthPageState extends State<AuthPage> {
         await FirebaseFirestore.instance.collection('users').doc(result.user!.uid).set({
           'name': name.text.trim(), 'email': email.text.trim(), 'createdAt': FieldValue.serverTimestamp(),
         });
+        await db.collection('publicProfiles').doc(result.user!.uid).set({
+          'name': name.text.trim(), 'bio': '', 'photoUrl': '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       } else {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: email.text.trim(), password: password.text);
@@ -186,7 +190,7 @@ class PostsPage extends StatelessWidget {
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('نشر'))],
       )));
     if (ok == true && (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
-      final profile = await db.collection('users').doc(user.uid).get();
+      final profile = await db.collection('publicProfiles').doc(user.uid).get();
       await db.collection('posts').add({
         'text': text.text.trim(), 'videoUrl': video.text.trim(), 'authorId': user.uid,
         'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
@@ -261,7 +265,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
       await FirebaseFirestore.instance.collection('messages').add({
         'text': text,
         'senderId': user.uid,
-        'senderName': (await db.collection('users').doc(user.uid).get()).data()?['name'] ?? user.displayName ?? 'عضو',
+        'senderName': (await db.collection('publicProfiles').doc(user.uid).get()).data()?['name'] ?? user.displayName ?? 'عضو',
         'createdAt': FieldValue.serverTimestamp(),
       });
       messageController.clear();
@@ -363,7 +367,7 @@ class MyProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: db.collection('users').doc(uid).snapshots(),
+      stream: db.collection('publicProfiles').doc(uid).snapshots(),
       builder: (context, s) {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final d = s.data!.data() ?? {};
@@ -407,7 +411,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
-    db.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).get().then((s) {
+    db.collection('publicProfiles').doc(FirebaseAuth.instance.currentUser!.uid).get().then((s) {
       final d = s.data() ?? {};
       name.text = d['name'] as String? ?? '';
       bio.text = d['bio'] as String? ?? '';
@@ -433,7 +437,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => saving = true);
         try {
           final u = FirebaseAuth.instance.currentUser!;
-          await db.collection('users').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
           await u.updateDisplayName(name.text.trim());
           if (context.mounted) Navigator.pop(context);
         } catch (_) {
@@ -449,7 +453,7 @@ class RatingSummary extends StatelessWidget {
   const RatingSummary({super.key, required this.uid});
   @override
   Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-    stream: db.collection('users').doc(uid).collection('ratings').snapshots(),
+    stream: db.collection('publicProfiles').doc(uid).collection('ratings').snapshots(),
     builder: (context, s) {
       final docs = s.data?.docs ?? [];
       final total = docs.fold<int>(0, (v, d) => v + ((d.data()['stars'] as num?)?.toInt() ?? 0));
@@ -482,7 +486,7 @@ class MemberProfilePage extends StatelessWidget {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('صفحة العضو')),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: db.collection('users').doc(uid).snapshots(),
+        stream: db.collection('publicProfiles').doc(uid).snapshots(),
         builder: (context, s) {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final d = s.data!.data() ?? {};
@@ -512,13 +516,13 @@ class StarRateControl extends StatelessWidget {
     final me = FirebaseAuth.instance.currentUser!.uid;
     if (uid == me) return const SizedBox.shrink();
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: db.collection('users').doc(uid).collection('ratings').doc(me).snapshots(),
+      stream: db.collection('publicProfiles').doc(uid).collection('ratings').doc(me).snapshots(),
       builder: (context, s) {
         final current = (s.data?.data()?['stars'] as num?)?.toInt() ?? 0;
         return Column(children: [
           const Text('قيّم هذا العضو'),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: List.generate(5, (i) => IconButton(
-            onPressed: () => db.collection('users').doc(uid).collection('ratings').doc(me).set({
+            onPressed: () => db.collection('publicProfiles').doc(uid).collection('ratings').doc(me).set({
               'stars': i + 1, 'from': me, 'createdAt': FieldValue.serverTimestamp(),
             }),
             icon: Icon(Icons.star, color: i < current ? Colors.amber : Colors.grey, size: 30),
