@@ -347,7 +347,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
     boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:14,color:Color(0xFF4532A8)))),
+     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
      if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
     ]),
