@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 
 const p=Color(0xFF6554D9);
@@ -22,6 +23,7 @@ class CommunityHubPage extends StatelessWidget {
    ('الستوريات','صور وفيديوهات لمدة 24 ساعة',Icons.camera_alt,const StoriesPage()),
    ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
    ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
+   ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
@@ -183,3 +185,92 @@ class _RegionChatPageState extends State<RegionChatPage>{
  SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(),decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ])));
  }
+
+
+class YouTubeShelfPage extends StatefulWidget {
+ const YouTubeShelfPage({super.key});
+ @override State<YouTubeShelfPage> createState()=>_YouTubeShelfPageState();
+}
+class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
+ final title=TextEditingController();
+ final url=TextEditingController();
+ String category='أغاني';
+ bool busy=false;
+ static const categories=['أغاني','فيديوهات','أفلام ومقاطع رسمية','تعليم','متنوع'];
+ bool validYoutube(String value) {
+  final uri=Uri.tryParse(value.trim());
+  if(uri==null||uri.scheme!='https') return false;
+  return ['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].contains(uri.host.toLowerCase());
+ }
+ Future<void> add() async {
+  if(title.text.trim().isEmpty||!validYoutube(url.text)) {
+   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اكتب عنواناً ورابط يوتيوب صحيحاً يبدأ بـ https')));
+   return;
+  }
+  setState(()=>busy=true);
+  try {
+   final user=FirebaseAuth.instance.currentUser!;
+   final profile=await db2.collection('publicProfiles').doc(user.uid).get();
+   await db2.collection('mediaLinks').add({
+    'title':title.text.trim(),'url':url.text.trim(),'category':category,
+    'authorId':user.uid,'authorName':profile.data()?['name']??user.displayName??'عضو',
+    'createdAt':FieldValue.serverTimestamp(),
+   });
+   title.clear();url.clear();
+   if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تمت إضافة الرابط')));
+  } catch (_) {
+   if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذرت الإضافة. تأكد من نشر قواعد Firestore')));
+  } finally {if(mounted)setState(()=>busy=false);}
+ }
+ Future<void> openVideo(String value) async {
+  final uri=Uri.tryParse(value);
+  if(uri==null||!validYoutube(value)) return;
+  if(!await launchUrl(uri,mode:LaunchMode.externalApplication) && mounted) {
+   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر فتح يوتيوب')));
+  }
+ }
+ @override void dispose(){title.dispose();url.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>Directionality(
+  textDirection:TextDirection.rtl,
+  child:Scaffold(
+   appBar:AppBar(title:const Text('يوتيوب والترفيه')),
+   floatingActionButton:FloatingActionButton.extended(
+    onPressed:busy?null:()=>showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(c)=>Directionality(
+     textDirection:TextDirection.rtl,
+     child:Padding(padding:EdgeInsets.only(left:18,right:18,top:18,bottom:MediaQuery.of(c).viewInsets.bottom+18),
+      child:Column(mainAxisSize:MainAxisSize.min,children:[
+       const Text('إضافة رابط يوتيوب',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+       const SizedBox(height:12),
+       TextField(controller:title,decoration:const InputDecoration(labelText:'عنوان الأغنية أو الفيديو',border:OutlineInputBorder())),
+       const SizedBox(height:10),
+       TextField(controller:url,keyboardType:TextInputType.url,decoration:const InputDecoration(labelText:'رابط YouTube',hintText:'https://youtu.be/...',border:OutlineInputBorder())),
+       const SizedBox(height:10),
+       DropdownButtonFormField<String>(value:category,decoration:const InputDecoration(labelText:'القسم'),items:categories.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(x){if(x!=null)setState(()=>category=x);}),
+       const SizedBox(height:12),
+       FilledButton(onPressed:busy?null:()async{Navigator.pop(c);await add();},child:const Text('حفظ الرابط')),
+      ]),
+     ),
+    )),
+    icon:const Icon(Icons.add),label:const Text('أضف رابطاً'),
+   ),
+   body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    stream:db2.collection('mediaLinks').orderBy('createdAt',descending:true).limit(100).snapshots(),
+    builder:(c,s){
+     if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
+     if(!s.hasData)return const Center(child:CircularProgressIndicator());
+     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو روابط بعد. أضف أول أغنية أو فيديو'));
+     return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
+      final d=doc.data();
+      return Card(child:ListTile(
+       leading:const CircleAvatar(child:Icon(Icons.play_arrow)),
+       title:Text(d['title'] as String? ??'فيديو'),
+       subtitle:Text('${d['category']??'متنوع'} • ${d['authorName']??'عضو'}'),
+       trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'')),
+       onTap:()=>openVideo(d['url'] as String? ??''),
+      ));
+     }).toList());
+    },
+   ),
+  ),
+ );
+}
