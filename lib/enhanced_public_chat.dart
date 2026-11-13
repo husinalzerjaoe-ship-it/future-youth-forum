@@ -53,12 +53,27 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
+      final senderName = await _name();
       await _chatDb.collection('messages').add({
         'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
-        'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':await _name(),
+        'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
+      if (type == 'text') {
+        final tags = RegExp(r'@([^\\s@]+)').allMatches(body).map((m)=>m.group(1)!).toSet().take(10).toList();
+        if (tags.isNotEmpty) {
+          final matches = await _chatDb.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
+          for (final profile in matches.docs) {
+            if (profile.id == _uid) continue;
+            await _chatDb.collection('notifications').add({
+              'recipientId':profile.id,'actorId':_uid,'actorName':senderName,
+              'type':'mention','text':'أشار إليك في الدردشة العامة','read':false,
+              'createdAt':FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
       _text.clear(); _reply=null;
       await _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_) {});
     } catch (_) { if(mounted)setState(()=>_error='تعذر إرسال الرسالة. تحقق من قواعد Firestore والتخزين.'); }
@@ -253,7 +268,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:_sending?null:_stickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
         onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
-        onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:InputBorder.none))),
+        onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
       IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
     ]))),
   ]));
