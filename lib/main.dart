@@ -233,6 +233,7 @@ class PostsPage extends StatelessWidget {
                 if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(fontSize: 16)),
                 if ((d['videoUrl'] as String? ?? '').startsWith('https://'))
                   Padding(padding: const EdgeInsets.only(top: 8), child: SelectableText('🎬 رابط الفيديو: ${d['videoUrl']}')),
+                PostSocialActions(postId: doc.id, authorId: d['authorId'] as String? ?? ''),
               ])));
             }),
           ]),
@@ -532,5 +533,84 @@ class StarRateControl extends StatelessWidget {
         ]);
       },
     );
+  }
+}
+
+class PostSocialActions extends StatelessWidget {
+  final String postId, authorId;
+  const PostSocialActions({super.key, required this.postId, required this.authorId});
+  @override
+  Widget build(BuildContext context) {
+    final me = FirebaseAuth.instance.currentUser!.uid;
+    final likes = db.collection('posts').doc(postId).collection('likes');
+    final comments = db.collection('posts').doc(postId).collection('comments');
+    return Column(children: [
+      const Divider(),
+      Row(children: [
+        StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: likes.doc(me).snapshots(),
+          builder: (context, mine) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: likes.snapshots(),
+            builder: (context, all) {
+              final liked = mine.data?.exists ?? false;
+              return TextButton.icon(
+                onPressed: () async {
+                  if (liked) { await likes.doc(me).delete(); }
+                  else { await likes.doc(me).set({'userId': me, 'createdAt': FieldValue.serverTimestamp()}); }
+                },
+                icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : brand),
+                label: Text('إعجاب ${all.data?.docs.length ?? 0}'),
+              );
+            }),
+        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: comments.snapshots(),
+          builder: (context, snap) => TextButton.icon(
+            onPressed: () => _openComments(context, comments),
+            icon: const Icon(Icons.mode_comment_outlined),
+            label: Text('تعليقات ${snap.data?.docs.length ?? 0}')),
+        ),
+        const Spacer(),
+        IconButton(icon: const Icon(Icons.flag_outlined), tooltip: 'إبلاغ',
+          onPressed: () async {
+            final reason = await showDialog<String>(context: context, builder: (c) => SimpleDialog(
+              title: const Text('سبب الإبلاغ'),
+              children: ['محتوى مسيء', 'تنمّر أو إزعاج', 'محتوى غير مناسب', 'سبب آخر']
+                .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList()));
+            if (reason == null) return;
+            await db.collection('reports').add({'type':'post','targetId':postId,'reportedUserId':authorId,
+              'reporterId':me,'reason':reason,'createdAt':FieldValue.serverTimestamp(),'status':'new'});
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('وصل بلاغك للإدارة، شكراً.')));
+          }),
+      ]),
+    ]);
+  }
+  Future<void> _openComments(BuildContext context, CollectionReference<Map<String,dynamic>> comments) async {
+    final controller = TextEditingController();
+    await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(sc)=>Directionality(
+      textDirection:TextDirection.rtl,
+      child: Padding(padding:EdgeInsets.only(bottom:MediaQuery.of(sc).viewInsets.bottom),
+        child:SizedBox(height:MediaQuery.of(sc).size.height*.72,child:Column(children:[
+          const Padding(padding:EdgeInsets.all(14),child:Text('التعليقات',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),
+          Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:comments.orderBy('createdAt',descending:true).limit(100).snapshots(),builder:(c,s){
+            if(!s.hasData)return const Center(child:CircularProgressIndicator());
+            if(s.data!.docs.isEmpty)return const Center(child:Text('كن أول من يعلّق'));
+            return ListView(children:s.data!.docs.map((doc){final d=doc.data();return ListTile(
+              leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ?? 'عضو'),
+              subtitle:Text(d['text'] as String? ?? ''));}).toList());
+          })),
+          SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
+            Expanded(child:TextField(controller:controller,maxLength:500,decoration:const InputDecoration(hintText:'اكتب تعليقك...',counterText:'',border:OutlineInputBorder()))),
+            IconButton.filled(onPressed:() async {
+              final value=controller.text.trim();if(value.isEmpty)return;
+              final user=FirebaseAuth.instance.currentUser!;
+              final profile=await db.collection('publicProfiles').doc(user.uid).get();
+              await comments.add({'text':value,'authorId':user.uid,'authorName':profile.data()?['name'] ?? user.displayName ?? 'عضو','createdAt':FieldValue.serverTimestamp()});
+              controller.clear();
+            },icon:const Icon(Icons.send)),
+          ]))),
+        ]))),
+    ));
+    controller.dispose();
   }
 }
