@@ -60,8 +60,10 @@ service cloud.firestore {
         && request.resource.data.artist is string
         && request.resource.data.artist.size() > 0
         && request.resource.data.artist.size() <= 100
-        && request.resource.data.sourceUrl is string
-        && request.resource.data.sourceUrl.matches('https://.*')
+        && (!('sourceUrl' in request.resource.data)
+          || request.resource.data.sourceUrl == ''
+          || (request.resource.data.sourceUrl is string
+            && request.resource.data.sourceUrl.matches('https://.*')))
         && request.resource.data.rights in [
           'أنا صاحب العمل وأسمح بنشره',
           'ترخيص Creative Commons يسمح بإعادة الاستخدام',
@@ -718,7 +720,7 @@ service cloud.firestore {
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 160
-        && request.resource.data.extension in ['apk','xapk','zip','pdf']
+        && request.resource.data.extension in ['apk','xapk','zip','pdf','mp3','m4a','aac','wav','ogg','flac']
         && request.resource.data.fileUrl is string
         && request.resource.data.fileUrl.matches('https://.*')
         && request.resource.data.size is int
