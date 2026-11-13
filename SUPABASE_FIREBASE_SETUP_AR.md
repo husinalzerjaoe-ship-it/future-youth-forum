@@ -37,6 +37,24 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json node scripts/set_ex
 
 بعد منح claim للحساب، سجّل خروج/دخول أو جدّد Firebase ID token حتى يصل claim الجديد إلى التطبيق.
 
+## نظام نقاط التفاعل والترتيب الأسبوعي
+أُضيفت Cloud Functions لاحتساب النقاط من الخادم حتى لا يستطيع العضو منح نفسه نقاطاً من التطبيق:
+- الرسالة العامة: نقطتان مع زيادة عدّاد الرسائل.
+- المنشور الجديد: 5 نقاط.
+- الإعجاب الذي يصل إلى منشور العضو: نقطة واحدة (لا تُحتسب إعجابات العضو لنفسه).
+- تُحفظ نقاط الأسبوع بمفتاح تاريخ يوم الاثنين UTC، ويعرض التطبيق ترتيب الأسبوع.
+
+هذه الوظائف لا تعمل بمجرد رفع الكود إلى GitHub. بعد مراجعة المشروع وتسجيل الدخول إلى Firebase CLI، نفّذ من مجلد المشروع:
+
+```bash
+cd functions
+npm install
+cd ..
+firebase deploy --only functions
+```
+
+قد تتطلب Cloud Functions خطة Blaze والفوترة. لا تمنح نقاطاً يدوياً من واجهة العميل؛ المصدر الموثوق هو أحداث Firestore التي تعالجها الوظائف.
+
 ## بناء APK
 كل push إلى main يشغّل GitHub Actions لتحليل Flutter وبناء APK. ويمكن تشغيله يدوياً من **Actions → Flutter quality check and Android APK → Run workflow**. بعد نجاحه، افتح workflow run ونزّل artifact باسم `future-youth-forum-release-apk`.
 
