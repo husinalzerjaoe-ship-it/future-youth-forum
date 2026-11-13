@@ -144,10 +144,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
 
   Future<void> _grant({String? presetUid}) async {
     final profiles=await _chatDb.collection('publicProfiles').limit(100).get();
-    final uid=TextEditingController(text:presetUid??''); final days=TextEditingController(text:'7'); final reason=TextEditingController(text:'هدية من المؤسس');
+    final uid=TextEditingController(text:presetUid??''); final days=TextEditingController(text:'7'); final reason=TextEditingController(text:'هدية من المؤسس'); final tier=TextEditingController(text:'gold');
     final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('منح عضوية مجانية'),content:Column(mainAxisSize:MainAxisSize.min,children:[
       DropdownButtonFormField<String>(isExpanded:true,decoration:const InputDecoration(labelText:'اختيار عضو'),items:profiles.docs.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.data()['name'] as String? ?? p.id,overflow:TextOverflow.ellipsis))).toList(),onChanged:(v){if(v!=null)uid.text=v;}),
       TextField(controller:uid,decoration:const InputDecoration(labelText:'UID العضو (يُملأ عند الاختيار)')),
+      DropdownButtonFormField<String>(value:'gold',decoration:const InputDecoration(labelText:'نوع العضوية'),items:const [DropdownMenuItem(value:'silver',child:Text('فضية')),DropdownMenuItem(value:'gold',child:Text('ذهبية')),DropdownMenuItem(value:'diamond',child:Text('ماسية'))],onChanged:(v){if(v!=null)tier.text=v;}),
       TextField(controller:days,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'المدة بالأيام')),
       TextField(controller:reason,decoration:const InputDecoration(labelText:'السبب')),
     ]),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('منح'))])));
@@ -156,14 +157,21 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(uid.text.trim().isEmpty||n<1||n>365){_snack('UID مطلوب والمدة من 1 إلى 365 يوماً');}
       else{
         await _chatDb.collection('memberships').doc(uid.text.trim()).set({
-          'uid':uid.text.trim(),'tier':'premium','source':'founder_gift','reason':reason.text.trim(),'grantedBy':_uid,
+          'uid':uid.text.trim(),'tier':tier.text,'source':'founder_gift','reason':reason.text.trim(),'grantedBy':_uid,
           'startedAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(Duration(days:n))),
           'updatedAt':FieldValue.serverTimestamp(),
         });
-        _snack('تم منح العضوية لمدة '+n.toString()+' يوم');
+        final target=uid.text.trim();
+        final profile=(await _chatDb.collection('publicProfiles').doc(target).get()).data()??{};
+        final targetName=(profile['name']??'عضو').toString();
+        final tierName={'silver':'الفضية','gold':'الذهبية','diamond':'الماسية'}[tier.text]??'المميزة';
+        final founderName=await _name();
+        await _chatDb.collection('messages').add({'text':'🎉 أعلنوا معنا! قام $founderName بمنح $targetName العضوية $tierName لمدة $n يوم. مبارك له!','type':'text','senderId':_uid,'senderRole':'founder','senderName':founderName,'createdAt':FieldValue.serverTimestamp()});
+        await _chatDb.collection('adminLogs').add({'actorId':_uid,'targetId':target,'action':'grant_membership_${tier.text}','durationDays':n,'createdAt':FieldValue.serverTimestamp()});
+        _snack('تم منح العضوية $tierName لمدة '+n.toString()+' يوم');
       }
     }
-    uid.dispose();days.dispose();reason.dispose();
+    uid.dispose();days.dispose();reason.dispose();tier.dispose();
   }
   Future<void> _contest() async {
     final title=TextEditingController(text:'مسابقة الأسبوع');final details=TextEditingController();
@@ -423,6 +431,25 @@ class ChatMemberProfilePage extends StatelessWidget {
         Center(child:CircleAvatar(radius:52,backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?const Icon(Icons.person,size:52):null)),
         const SizedBox(height:12),Center(child:Text(name,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold))),
         if((d['bio'] as String? ?? '').isNotEmpty)Center(child:Text(d['bio'] as String)),
+        StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+          stream:_chatDb.collection('memberships').doc(uid).snapshots(),
+          builder:(context,m){
+            final data=m.data?.data();
+            final expiry=data?['expiresAt'];
+            final active=data!=null && expiry is Timestamp && expiry.toDate().isAfter(DateTime.now());
+            if(!active)return const SizedBox.shrink();
+            final tier=(data['tier']??'premium').toString();
+            final label={'silver':'العضوية الفضية','gold':'العضوية الذهبية','diamond':'العضوية الماسية','premium':'العضوية المميزة'}[tier]??'العضوية المميزة';
+            final color={'silver':const Color(0xFF8795A1),'gold':const Color(0xFFD49A16),'diamond':const Color(0xFF24A6C7)}[tier]??const Color(0xFF8B70D6);
+            final days=expiry.toDate().difference(DateTime.now()).inDays;
+            return Card(color:color.withOpacity(.10),child:ListTile(
+              leading:Icon(Icons.workspace_premium,color:color,size:30),
+              title:Text(label,style:TextStyle(color:color,fontWeight:FontWeight.bold)),
+              subtitle:Text('عضوية مميزة • متبقي ${days<1?1:days} يوم'),
+              trailing:const Icon(Icons.verified,color:Color(0xFF24A36A)),
+            ));
+          },
+        ),
         const SizedBox(height:16),
         FilledButton.icon(onPressed:()async{
           final id=_uid.compareTo(uid)<0?'${_uid}_${uid}':'${uid}_${_uid}';
