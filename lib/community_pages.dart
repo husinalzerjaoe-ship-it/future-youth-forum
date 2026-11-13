@@ -15,6 +15,7 @@ import 'game_center.dart';
 import 'anime_experience.dart';
 import 'community_polls.dart';
 import 'community_events.dart';
+import 'media_upload_service.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -337,12 +338,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   try{
    final file=await picker.pickImage(source:ImageSource.gallery);
    if(file==null)return;
-   final ext=file.name.toLowerCase().split('.').last;
-   final safe=['jpg','jpeg','png','webp','gif'].contains(ext)?ext:'jpg';
-   final path='regional-chat/${widget.id}/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safe';
-   await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await file.readAsBytes(),
-    fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/$safe',upsert:false));
-   await send(imageUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
+   final url=await uploadForumMedia(file,folder:'regional-chat',roomId:widget.id);
+   await send(imageUrl:url,type:'image');
   }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
  }
 
@@ -374,18 +371,18 @@ class _RegionChatPageState extends State<RegionChatPage> {
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
    constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
-   decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,
-    color:mine?null:Colors.white.withValues(alpha:.96),borderRadius:BorderRadius.circular(16),
-    border:Border.all(color:isFounder?const Color(0xFFFFD77A):Colors.black12)),
+   decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
+    border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
+    boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:12))),
+     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:14,color:Color(0xFF4532A8)))),
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
      if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
     ]),
     if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
     if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
-    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:15))
+    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
    ])));
  }
 
