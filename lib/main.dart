@@ -741,6 +741,25 @@ class MemberProfilePage extends StatelessWidget {
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
+            if (uid != FirebaseAuth.instance.currentUser!.uid)
+              FilledButton.icon(
+                onPressed: () async {
+                  final me = FirebaseAuth.instance.currentUser!.uid;
+                  final id = me.compareTo(uid) < 0 ? '${me}_${uid}' : '${uid}_${me}';
+                  final ref = db.collection('conversations').doc(id);
+                  final old = await ref.get();
+                  if (!old.exists) {
+                    final mine = await db.collection('publicProfiles').doc(me).get();
+                    await ref.set({'members': [me, uid], 'memberNames': {
+                      me: mine.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+                      uid: d['name'] ?? fallbackName,
+                    }, 'updatedAt': FieldValue.serverTimestamp()});
+                  }
+                  if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(
+                    conversationId: id, otherUid: uid, otherName: d['name'] as String? ?? fallbackName)));
+                },
+                icon: const Icon(Icons.message), label: const Text('مراسلة خاصة'),
+              ),
             FollowControl(uid: uid),
             MemberSafetyActions(uid: uid, name: d['name'] as String? ?? fallbackName),
             StarRateControl(uid: uid),
