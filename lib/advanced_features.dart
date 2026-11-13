@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -310,7 +309,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
               return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
-                decoration: BoxDecoration(color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface, border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .55)), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: mine ? const Color(0xFFE8E2FF) : Colors.white, border: Border.all(color: const Color(0xFFB9B9C8)), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 5, offset: Offset(0, 2))]),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if ((d['senderId'] as String? ?? '').isNotEmpty)
                     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -338,7 +337,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     ),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
-                  if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 15, height: 1.45)),
+                  if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
                   StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream: doc.reference.collection('reactions').snapshots(), builder: (c, rs) {
                     final counts = <String,int>{};
                     for (final r in rs.data?.docs ?? []) { final e = r.data()['emoji'] as String? ?? ''; counts[e] = (counts[e] ?? 0) + 1; }
