@@ -4,8 +4,8 @@ values (
   'forum-media',
   'forum-media',
   true,
-  52428800,
-  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime']
+  104857600,
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -49,6 +49,10 @@ with check (
     or
     ((storage.foldername(name))[1] = 'anime-wallpapers'
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'shared-files'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
   )
 );
 
@@ -64,6 +68,7 @@ using (
     or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'private-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'shared-files' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
   )
 )
