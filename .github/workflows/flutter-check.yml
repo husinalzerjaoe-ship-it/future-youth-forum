@@ -26,6 +26,25 @@ jobs:
         run: flutter analyze --no-pub --no-fatal-infos
       - name: Generate Android platform files
         run: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Set Android compile SDK to 36
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          candidates = [Path('android/app/build.gradle.kts'), Path('android/app/build.gradle')]
+          for path in candidates:
+              if not path.exists():
+                  continue
+              content = path.read_text()
+              if path.suffix == '.kts':
+                  content = content.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+              else:
+                  content = content.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 36')
+              path.write_text(content)
+              print(f'Updated {path} to compile SDK 36')
+              break
+          else:
+              raise SystemExit('Android app Gradle file not found')
+          PY
       - name: Configure Android background audio
         run: python scripts/configure_android_audio.py
       - name: Set Android app display name
