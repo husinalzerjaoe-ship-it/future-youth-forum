@@ -589,6 +589,9 @@ service cloud.firestore {
         && request.resource.data.options.size() <= 5
         && request.resource.data.options[0] is string
         && request.resource.data.options[1] is string
+        && (request.resource.data.options.size() < 3 || request.resource.data.options[2] is string)
+        && (request.resource.data.options.size() < 4 || request.resource.data.options[3] is string)
+        && (request.resource.data.options.size() < 5 || request.resource.data.options[4] is string)
         && request.resource.data.active == true;
       allow update: if false;
       allow delete: if request.auth != null
