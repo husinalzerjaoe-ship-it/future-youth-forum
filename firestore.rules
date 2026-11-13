@@ -63,6 +63,7 @@ service cloud.firestore {
       match /following/{followedId} {
         allow read: if request.auth != null;
         allow create: if request.auth != null && request.auth.uid == userId
+          && followedId != userId
           && request.resource.data.userId == followedId;
         allow delete: if request.auth != null && request.auth.uid == userId;
         allow update: if false;
@@ -204,7 +205,11 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.mediaUrl is string
-        && request.resource.data.mediaType in ['image', 'video'];
+        && request.resource.data.mediaUrl.matches('https://.*')
+        && request.resource.data.mediaType in ['image', 'video']
+        && request.resource.data.expiresAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(24, 'h');
       allow update: if false;
       allow delete: if request.auth != null
         && resource.data.authorId == request.auth.uid;
