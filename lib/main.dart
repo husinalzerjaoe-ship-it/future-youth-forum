@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'community_pages.dart';
 import 'advanced_features.dart';
@@ -15,6 +15,10 @@ final db = FirebaseFirestore.instance;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Supabase.initialize(
+    url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
+    anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
+  );
   runApp(const FutureYouthApp());
 }
 
@@ -475,12 +479,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
             if (picked == null) return;
             setState(() => uploadingPhoto = true);
             final uid = FirebaseAuth.instance.currentUser!.uid;
-            final ref = FirebaseStorage.instance.ref().child('profiles/$uid/avatar.jpg');
-            await ref.putData(await picked.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
-            photo.text = await ref.getDownloadURL();
+            const path = 'profiles/';
+            final objectPath = '$path$uid/avatar.jpg';
+            await Supabase.instance.client.storage.from('forum-media').uploadBinary(
+              objectPath,
+              await picked.readAsBytes(),
+              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
+            );
+            photo.text = Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
           } catch (_) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة. تأكد من نشر قواعد التخزين.')));
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة. تأكد من إعداد سياسات Supabase Storage والإنترنت.')));
           } finally { if (mounted) setState(() => uploadingPhoto = false); }
         },
         icon: uploadingPhoto ? const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.photo_library_outlined),
