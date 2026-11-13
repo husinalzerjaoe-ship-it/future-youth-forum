@@ -24,12 +24,12 @@ class DirectMessagesPage extends StatelessWidget {
         icon: const Icon(Icons.edit), label: const Text('محادثة جديدة'),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('conversations').where('members', arrayContains: _uid).orderBy('updatedAt', descending: true).snapshots(),
+        stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
         builder: (context, s) {
           if (s.hasError) return const Center(child: Text('تعذر تحميل الرسائل. تأكد من نشر قواعد Firestore.'));
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           if (s.data!.docs.isEmpty) return const Center(child: Text('ما عندك محادثات بعد. ابدأ محادثة جديدة.'));
-          return ListView(children: s.data!.docs.map((doc) {
+          final conversations = [...s.data!.docs]..sort((a, b) {\n            final av = a.data()['updatedAt']; final bv = b.data()['updatedAt'];\n            final at = av is Timestamp ? av : Timestamp(0, 0);\n            final bt = bv is Timestamp ? bv : Timestamp(0, 0);\n            return bt.compareTo(at);\n          });\n          return ListView(children: conversations.map((doc) {
             final d = doc.data();
             final members = List<String>.from(d['members'] ?? []);
             final other = members.firstWhere((x) => x != _uid, orElse: () => '');
