@@ -1,33 +1,87 @@
--- Supabase Storage setup for public chat media.
--- Firebase Auth is the app identity provider; Flutter forwards its Firebase ID token.
--- Register Firebase as a Third-party Auth provider in Supabase and set role=authenticated.
-
--- Public chat media is intentionally public. Never store private files in this bucket.
+-- Forum media bucket: public media only (avatars, stories, chats, regional rooms, backgrounds).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('forum-media', 'forum-media', true, 10485760,
-  array['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+values (
+  'forum-media',
+  'forum-media',
+  true,
+  52428800,
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime']
+)
 on conflict (id) do update set
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
-drop policy if exists "Authenticated members upload their own public chat media" on storage.objects;
-create policy "Authenticated members upload their own public chat media"
-on storage.objects for insert to authenticated
+-- Public bucket: allow app users to read media URLs.
+drop policy if exists "Forum media public read" on storage.objects;
+create policy "Forum media public read"
+on storage.objects for select
+to public
+using (bucket_id = 'forum-media');
+
+-- Upload only into the signed-in Firebase user's own folders.
+-- Firebase must be configured as a Supabase Third-Party Auth provider;
+-- the Firebase UID is read from JWT sub (do not use auth.uid(), Firebase UID is not a UUID).
+drop policy if exists "Forum members upload own media" on storage.objects;
+create policy "Forum members upload own media"
+on storage.objects for insert
+to authenticated
 with check (
   bucket_id = 'forum-media'
-  and (storage.foldername(name))[1] = 'public-chat'
-  -- Firebase UID is text; auth.uid() casts sub to UUID and is not safe here.
-  and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
-  and metadata->>'mimetype' in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
-  and coalesce((metadata->>'size')::bigint, 0) <= 10485760
+  and (
+    ((storage.foldername(name))[1] = 'public-chat'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'profiles'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'stories'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'chat-backgrounds'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
+    ((storage.foldername(name))[1] = 'regional-chat'
+      and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+  )
 );
 
-drop policy if exists "Members delete their own public chat media" on storage.objects;
-create policy "Members delete their own public chat media"
-on storage.objects for delete to authenticated
+drop policy if exists "Forum members update own media" on storage.objects;
+create policy "Forum members update own media"
+on storage.objects for update
+to authenticated
 using (
   bucket_id = 'forum-media'
-  and (storage.foldername(name))[1] = 'public-chat'
-  and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
+  and (
+    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+  )
+)
+with check (
+  bucket_id = 'forum-media'
+  and (
+    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+  )
+);
+
+drop policy if exists "Forum members delete own media" on storage.objects;
+create policy "Forum members delete own media"
+on storage.objects for delete
+to authenticated
+using (
+  bucket_id = 'forum-media'
+  and (
+    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+  )
 );
