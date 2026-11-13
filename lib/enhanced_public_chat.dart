@@ -79,7 +79,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final old=await r.get(); if(old.data()?['emoji']==emoji){await r.delete();}else{await r.set({'uid':_uid,'emoji':emoji,'updatedAt':FieldValue.serverTimestamp()});}
   }
   Future<void> _menu(DocumentSnapshot<Map<String,dynamic>> doc) async {
-    final d=doc.data()??{}; final mine=d['senderId']==_uid; final staff=_isFounder;
+    final d=doc.data()??{}; final mine=d['senderId']==_uid; final staff=_isFounder || (await _chatDb.collection('chatModerators').doc(_uid).get()).exists;
     final a=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Column(mainAxisSize:MainAxisSize.min,children:[
       ListTile(leading:const Icon(Icons.reply),title:const Text('رد'),onTap:()=>Navigator.pop(c,'reply')),
       if(mine&&d['type']=='text')ListTile(leading:const Icon(Icons.edit),title:const Text('تعديل'),onTap:()=>Navigator.pop(c,'edit')),
