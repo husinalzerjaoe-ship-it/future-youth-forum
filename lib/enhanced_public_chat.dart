@@ -22,7 +22,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   String? _error;
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
-    final normalized = value.toLowerCase().replaceAll(RegExp(r'[\\sـ]+'), '');
+    final normalized = value.toLowerCase().replaceAll(RegExp(r'[\sـ]+'), '');
     return _blockedTerms.any((term) => normalized.contains(term.replaceAll(' ', '')));
   }
   DocumentSnapshot<Map<String, dynamic>>? _reply;
