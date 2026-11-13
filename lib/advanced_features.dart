@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 const _brand = Color(0xFF6554D9);
 final _db = FirebaseFirestore.instance;
@@ -105,6 +107,35 @@ class DirectChatPage extends StatefulWidget {
 class _DirectChatPageState extends State<DirectChatPage> {
   final controller = TextEditingController();
   bool busy = false;
+  bool changingBackground = false;
+  String? backgroundUrl;
+  @override void initState() { super.initState(); _loadBackground(); }
+  Future<void> _loadBackground() async {
+    try {
+      final snap = await _db.collection('conversations').doc(widget.conversationId).get();
+      final map = Map<String, dynamic>.from(snap.data()?['backgrounds'] ?? {});
+      if (mounted && map[_uid] is String) setState(() => backgroundUrl = map[_uid] as String);
+    } catch (_) {}
+  }
+  Future<void> _chooseBackground() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
+    if (picked == null || !mounted) return;
+    setState(() => changingBackground = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final path = 'chat-backgrounds/$_uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await Supabase.instance.client.storage.from('forum-media').uploadBinary(
+        path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
+      );
+      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      await _db.collection('conversations').doc(widget.conversationId).set({
+        'backgrounds': {_uid: url},
+      }, SetOptions(merge: true));
+      if (mounted) setState(() => backgroundUrl = url);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تغيير الخلفية. تحقق من صلاحيات تخزين Supabase.')));
+    } finally { if (mounted) setState(() => changingBackground = false); }
+  }
   @override void dispose() { controller.dispose(); super.dispose(); }
   Future<void> send() async {
     final value = controller.text.trim();
@@ -151,6 +182,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
         ]),
         actions: [
           IconButton(
+            tooltip: 'خلفية المحادثة',
+            icon: changingBackground ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.wallpaper_outlined),
+            onPressed: changingBackground ? null : _chooseBackground,
+          ),
+          IconButton(
             tooltip: 'معلومات المحادثة',
             icon: const Icon(Icons.info_outline),
             onPressed: () => showDialog<void>(
@@ -165,12 +201,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
         ],
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
+        decoration: BoxDecoration(
+          image: backgroundUrl != null
+              ? DecorationImage(image: NetworkImage(backgroundUrl!), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.white.withValues(alpha: .18), BlendMode.lighten))
+              : null,
+          gradient: backgroundUrl == null ? const LinearGradient(
             begin: Alignment.topRight,
             end: Alignment.bottomLeft,
             colors: [Color(0xFFF4F0FF), Color(0xFFEAF5FF), Color(0xFFFFF0F7)],
-          ),
+          ) : null,
         ),
         child: Stack(children: [
           Positioned(top: 22, right: 18, child: Icon(Icons.auto_awesome, color: _brand.withValues(alpha: .10), size: 54)),
