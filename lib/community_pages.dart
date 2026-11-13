@@ -299,7 +299,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
    if(file==null)return;
    final ext=file.name.toLowerCase().split('.').last;
    final safe=['jpg','jpeg','png','webp','gif'].contains(ext)?ext:'jpg';
-   final path='regional-chat/\${widget.id}/\${FirebaseAuth.instance.currentUser!.uid}/\${DateTime.now().millisecondsSinceEpoch}.$safe';
+   final path='regional-chat/${widget.id}/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safe';
    await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await file.readAsBytes(),
     fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/$safe',upsert:false));
    await send(imageUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
