@@ -5,6 +5,10 @@ service cloud.firestore {
       return request.auth != null
         && request.auth.token.email == 'husinalzerjaoe@gmail.com';
     }
+    function isChatStaff() {
+      return request.auth != null && (isFounder()
+        || exists(/databases/$(database)/documents/chatModerators/$(request.auth.uid)));
+    }
     function usersNotBlocked(a, b) {
       return !exists(/databases/$(database)/documents/userBlocks/$(a + '_' + b))
         && !exists(/databases/$(database)/documents/userBlocks/$(b + '_' + a));
@@ -138,7 +142,12 @@ service cloud.firestore {
       allow delete: if isFounder();
     }
 
+    // Public chat: users may edit/delete their own messages; founder/moderators can pin and moderate.
     match /messages/{messageId} {
+      function isChatStaff() {
+        return isFounder()
+          || exists(/databases/$(database)/documents/chatModerators/$(request.auth.uid));
+      }
       allow read: if request.auth != null;
       allow create: if request.auth != null
         && request.resource.data.senderId == request.auth.uid
@@ -152,8 +161,100 @@ service cloud.firestore {
           || (request.resource.data.type == 'image'
             && request.resource.data.imageUrl is string
             && request.resource.data.imageUrl.matches('https://.*'))
-        );
-      allow update, delete: if false;
+        )
+        && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map);
+      allow update: if request.auth != null && (
+        (resource.data.senderId == request.auth.uid
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'edited', 'editedAt'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000)
+        || (isChatStaff()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned', 'pinnedBy'])
+          && request.resource.data.pinnedBy == request.auth.uid
+          && request.resource.data.isPinned is bool)
+      );
+      allow delete: if request.auth != null
+        && (resource.data.senderId == request.auth.uid || isChatStaff());
+
+      match /reactions/{userId} {
+        allow read: if request.auth != null;
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.emoji in ['❤️', '😂', '🔥', '👏'];
+        allow delete: if request.auth != null
+          && (request.auth.uid == userId || isChatStaff());
+      }
+    }
+
+    match /chatPresence/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.online is bool;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /chatTyping/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.typing is bool;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /chatPreferences/{userId} {
+      allow read, create, update: if request.auth != null
+        && request.auth.uid == userId
+        && (!('background' in request.resource.data) || request.resource.data.background is int);
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Only the founder can grant/revoke paid or complimentary memberships.
+    match /memberships/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
+      allow create, update: if isFounder()
+        && request.resource.data.uid == userId
+        && request.resource.data.tier == 'premium'
+        && request.resource.data.expiresAt is timestamp;
+      allow delete: if isFounder();
+    }
+
+    match /chatModerators/{userId} {
+      allow read: if isFounder();
+      allow create, update: if isFounder()
+        && request.resource.data.uid == userId
+        && request.resource.data.grantedBy == request.auth.uid;
+      allow delete: if isFounder();
+    }
+
+    match /weeklyContests/{contestId} {
+      allow read: if request.auth != null;
+      allow create: if isFounder()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.status == 'open'
+        && request.resource.data.endsAt is timestamp;
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winnerUid', 'winnerChosenAt']);
+      allow delete: if isFounder();
+
+      match /entries/{userId} {
+        allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
+        allow create: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.uid == userId
+          && get(/databases/$(database)/documents/weeklyContests/$(contestId)).data.status == 'open'
+          && get(/databases/$(database)/documents/weeklyContests/$(contestId)).data.endsAt > request.time;
+        allow update: if false;
+        allow delete: if request.auth != null && (request.auth.uid == userId || isFounder());
+      }
     }
 
     match /poems/{itemId} {
