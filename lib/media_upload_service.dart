@@ -23,6 +23,7 @@ Future<String> uploadForumMedia(
     case 'private-chat':
     case 'chat-backgrounds':
     case 'profiles':
+    case 'shared-files':
       prefix = '$folder/${user.uid}/';
       break;
     case 'regional-chat':
@@ -63,6 +64,10 @@ Future<String> uploadForumMedia(
     'gif': 'image/gif',
     'mp4': 'video/mp4',
     'mov': 'video/quicktime',
+    'apk': 'application/vnd.android.package-archive',
+    'xapk': 'application/octet-stream',
+    'zip': 'application/zip',
+    'pdf': 'application/pdf',
   };
   final contentType = mimeTypes[ext];
   if (contentType == null) {
@@ -71,8 +76,9 @@ Future<String> uploadForumMedia(
 
   final bytes = await file.readAsBytes();
   if (bytes.isEmpty) throw StateError('ملف الصورة فارغ.');
-  if (bytes.length > 50 * 1024 * 1024) {
-    throw StateError('حجم الملف أكبر من الحد المسموح (50 ميغابايت).');
+  final maxBytes = folder == 'shared-files' ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
+  if (bytes.length > maxBytes) {
+    throw StateError('حجم الملف أكبر من الحد المسموح (' + (folder == 'shared-files' ? '100' : '50') + ' ميغابايت).');
   }
 
   final path = '$prefix${DateTime.now().microsecondsSinceEpoch}.$ext';
