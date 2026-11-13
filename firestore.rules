@@ -1,6 +1,15 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isFounder() {
+      return request.auth != null
+        && request.auth.token.email == 'husinalzerjaoe@gmail.com';
+    }
+    function roomNotBanned(roomId) {
+      return !exists(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid))
+        || (get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.permanent != true
+          && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt < request.time);
+    }
     // Private account data, including email, is visible only to its owner.
     match /users/{userId} {
       allow create, read, update: if request.auth != null
@@ -120,14 +129,19 @@ service cloud.firestore {
         && resource.data.authorId == request.auth.uid;
     }
 
+    match /regionalChats/{roomId}/bans/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
+      allow create, update, delete: if isFounder();
+    }
+
     match /regionalChats/{roomId}/messages/{messageId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow read: if request.auth != null && roomNotBanned(roomId);
+      allow create: if request.auth != null && roomNotBanned(roomId)
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 1000;
-      allow update, delete: if false;
+      allow update, delete: if isFounder();
     }
   }
 }
