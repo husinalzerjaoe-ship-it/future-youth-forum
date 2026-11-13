@@ -208,9 +208,10 @@ service cloud.firestore {
     }
 
     match /chatPreferences/{userId} {
-      allow read, create, update: if request.auth != null
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null
         && request.auth.uid == userId
-        && (!('background' in request.resource.data) || request.resource.data.background is int);
+        && request.resource.data.background is int;
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
