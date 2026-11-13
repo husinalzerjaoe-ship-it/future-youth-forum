@@ -20,6 +20,8 @@ Future<String> uploadForumMedia(
     case 'anime-wallpapers':
     case 'public-chat':
     case 'stories':
+    case 'private-chat':
+    case 'chat-backgrounds':
       prefix = '$folder/${user.uid}/';
       break;
     case 'regional-chat':
