@@ -1,3 +1,4 @@
+import 'leaderboard_widget.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,7 @@ class EngagementHubPage extends StatelessWidget {
   appBar:AppBar(title:const Text('المرح والإنجازات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
    Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF171936),_c,Color(0xFF20A8B8)]),borderRadius:BorderRadius.circular(18)),child:const Text('كل يوم بداية جديدة ✨\nاجمع النقاط وتحدَّ أصدقاءك واكتشف كلمات تلهمك',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:12),const _CheckIn(),const _Points(),const _Quote(),const _Quiz(),const _News(),
+   const SizedBox(height:12),const _CheckIn(),const _Points(),const _Leaderboard(),const _Quote(),const _Quiz(),const _News(),
   ]),
  ));
 }
