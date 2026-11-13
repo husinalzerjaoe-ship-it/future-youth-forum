@@ -310,10 +310,39 @@ class PostsPage extends StatelessWidget {
         final posts = s.data!.docs;
         return Scaffold(
           body: ListView(padding: const EdgeInsets.all(14), children: [
-            Container(padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(gradient: const LinearGradient(colors: [darkBrand, brand, Color(0xFF35BCEB)]), borderRadius: BorderRadius.circular(20)),
-              child: Text('أهلاً بك ${user.displayName ?? 'صديقنا'} 👋\nشارك أفكارك وتعرّف على أعضاء الملتقى.',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF17102F), Color(0xFF5123A8), Color(0xFF24134B)]),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF9C70FF), width: 1.2),
+                boxShadow: const [BoxShadow(color: Color(0x445D2DB5), blurRadius: 16, offset: Offset(0, 5))],
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: false,
+                  iconColor: Colors.white,
+                  collapsedIconColor: const Color(0xFFD6B7FF),
+                  leading: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD66B), size: 30),
+                  title: const Text('رسالة ترحيب من المطوّر ألفريدو 👑',
+                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                  subtitle: Text('أهلاً بك ${user.displayName ?? 'صديقنا'}… نورت الملتقى',
+                    style: const TextStyle(color: Color(0xFFE2D7FF))),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                  children: const [
+                    Text('«أنا لا أبحث عن مكانٍ بين النجوم؛ أنا السماء التي تتعلّم النجوم كيف تلمع فيها.»',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFFFD66B), fontSize: 16, fontWeight: FontWeight.bold, height: 1.6)),
+                    SizedBox(height: 12),
+                    Text(
+                      'أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.\\n\\n'
+                      'وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.\\n\\n'
+                      'قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.\\n— Alfredo | المطوّر 👑',
+                      style: TextStyle(color: Colors.white, fontSize: 14, height: 1.8)),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
