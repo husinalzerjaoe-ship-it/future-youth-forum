@@ -28,11 +28,23 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
  Future<void> createRoom() async {
   final name=TextEditingController();
+  final meetUrl=TextEditingController();
   final selected=<String>{uid};
+  String roomType='text';
   final result=await showDialog<bool>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,setD)=>AlertDialog(
-   title:const Text('إنشاء غرفة بالدعوات'),
-   content:SizedBox(width:420,height:460,child:Column(children:[
+   title:const Text('إنشاء غرفة خاصة'),
+   content:SizedBox(width:420,height:500,child:Column(children:[
     TextField(controller:name,decoration:const InputDecoration(labelText:'اسم الغرفة')),
+    const SizedBox(height:12),
+    const Align(alignment:Alignment.centerRight,child:Text('نوع الغرفة')),
+    Wrap(spacing:8,children:[
+     ChoiceChip(label:const Text('محادثة كتابية'),selected:roomType=='text',onSelected:(_)=>setD(()=>roomType='text')),
+     ChoiceChip(label:const Text('غرفة صوتية'),selected:roomType=='voice',onSelected:(_)=>setD(()=>roomType='voice')),
+    ]),
+    if(roomType=='voice')...[
+     TextField(controller:meetUrl,keyboardType:TextInputType.url,decoration:const InputDecoration(labelText:'رابط Google Meet',hintText:'https://meet.google.com/...')),
+     const Align(alignment:Alignment.centerRight,child:Text('أنشئ رابط الاجتماع في Google Meet ثم الصقه هنا',style:TextStyle(fontSize:11,color:Colors.grey))),
+    ],
     const SizedBox(height:12),const Align(alignment:Alignment.centerRight,child:Text('اختر الأعضاء المدعوين')),
     Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('publicProfiles').limit(200).snapshots(),builder:(ctx,s){
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
@@ -44,17 +56,22 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
    ])),
    actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('إنشاء'))]
   )));
-  if(result!=true)return;
-  if(name.text.trim().length<3||selected.length>30){
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اكتب اسماً من 3 أحرف واختر حتى 30 عضواً')));
-   return;
+  if(result!=true){name.dispose();meetUrl.dispose();return;}
+  final parsed=Uri.tryParse(meetUrl.text.trim());
+  final validMeet=parsed!=null&&parsed.scheme=='https'&&parsed.host=='meet.google.com';
+  if(name.text.trim().length<3||selected.length>30||(roomType=='voice'&&!validMeet)){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(roomType=='voice'&&!validMeet?'أدخل رابط Google Meet صحيحاً يبدأ بـ https://meet.google.com/':'اكتب اسماً من 3 أحرف واختر حتى 30 عضواً')));
+   name.dispose();meetUrl.dispose();return;
   }
-  await db.collection('privateRooms').add({
-   'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
-   'createdAt':FieldValue.serverTimestamp(),'lastMessage':'الغرفة جاهزة'
-  });
-  if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
-  name.dispose();
+  try{
+   await db.collection('privateRooms').add({
+    'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
+    'roomType':roomType,'meetUrl':roomType=='voice'?meetUrl.text.trim():'',
+    'createdAt':FieldValue.serverTimestamp(),'lastMessage':roomType=='voice'?'غرفة صوتية خاصة جاهزة':'الغرفة جاهزة'
+   });
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(roomType=='voice'?'تم إنشاء الغرفة الصوتية الخاصة بالدعوات':'تم إنشاء الغرفة الخاصة وإرسال الدعوات')));
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إنشاء الغرفة: $e')));}
+  name.dispose();meetUrl.dispose();
  }
  @override Widget build(BuildContext context)=>Scaffold(
   floatingActionButton:FloatingActionButton.extended(onPressed:createRoom,icon:const Icon(Icons.add),label:const Text('غرفة جديدة')),
@@ -64,10 +81,13 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
    if(s.data!.docs.isEmpty)return const Center(child:Text('ما عندك غرف خاصة بعد. أنشئ غرفة وادعُ أصدقاءك.'));
    return ListView(children:s.data!.docs.map((d){
     final x=d.data();
+    final voice=x['roomType']=='voice';
+    final meet=(x['meetUrl'] as String? ?? '').trim();
     return Card(margin:const EdgeInsets.symmetric(horizontal:12,vertical:6),child:ListTile(
-     leading:const CircleAvatar(child:Icon(Icons.lock_outline)),title:Text(x['name'] as String? ?? 'غرفة خاصة'),
-     subtitle:Text('الأعضاء: '+((x['members'] as List? ?? []).length).toString()+' • '+(x['lastMessage'] ?? ''),maxLines:1,overflow:TextOverflow.ellipsis),
-     trailing:const Icon(Icons.chevron_left),
+     leading:CircleAvatar(child:Icon(voice?Icons.mic:Icons.lock_outline)),
+     title:Text(x['name'] as String? ?? 'غرفة خاصة'),
+     subtitle:Text((voice?'غرفة صوتية • ':'محادثة كتابية • ')+'الأعضاء: '+((x['members'] as List? ?? []).length).toString()+' • '+(x['lastMessage'] ?? ''),maxLines:1,overflow:TextOverflow.ellipsis),
+     trailing:voice?IconButton(tooltip:'انضم للمكالمة',icon:const Icon(Icons.call,color:Colors.green),onPressed:meet.isEmpty?null:()=>launchUrl(Uri.parse(meet),mode:LaunchMode.externalApplication)):const Icon(Icons.chevron_left),
      onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PrivateRoomChatPage(roomId:d.id,roomName:x['name'] as String? ?? 'غرفة خاصة'))),
     ));
    }).toList());
