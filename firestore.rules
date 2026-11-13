@@ -673,8 +673,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid in resource.data.members
         && (
-          (exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','updatedAt'])
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','updatedAt'])
             && request.resource.data.lastMessage is string
             && request.resource.data.lastMessage.size() <= 200)
           ||
@@ -691,18 +690,16 @@ service cloud.firestore {
         function roomMembers() {
           return get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
         }
-        allow read: if request.auth != null && request.auth.uid in roomMembers()
-          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid));
+        allow read: if request.auth != null && request.auth.uid in roomMembers();
         allow create: if request.auth != null && accountNotBanned()
           && request.auth.uid in roomMembers()
-          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;
         allow update: if false;
         allow delete: if request.auth != null
-          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
+          && request.auth.uid in roomMembers()
           && (request.auth.uid == get(/databases/$(database)/documents/privateRooms/$(roomId)).data.ownerId
             || resource.data.senderId == request.auth.uid);
       }
