@@ -362,8 +362,36 @@ class _PublicChatPageState extends State<PublicChatPage> {
                   border: Border.all(color: mine ? const Color(0xFFD5CCFF) : const Color(0xFFEAEAEA)),
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  if (!mine) Text(data['senderName'] as String? ?? 'عضو',
-                    style: const TextStyle(color: brand, fontWeight: FontWeight.bold, fontSize: 12)),
+                  if (!mine && (data['senderId'] as String? ?? '').isNotEmpty)
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: db.collection('publicProfiles').doc(data['senderId'] as String).snapshots(),
+                      builder: (context, profile) {
+                        final p = profile.data?.data() ?? {};
+                        final senderId = data['senderId'] as String;
+                        final senderName = p['name'] as String? ?? data['senderName'] as String? ?? 'عضو';
+                        final photoUrl = p['photoUrl'] as String?;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => MemberProfilePage(uid: senderId, fallbackName: senderName),
+                          )),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 7),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              CircleAvatar(radius: 14,
+                                backgroundImage: photoUrl != null && photoUrl.startsWith('https://') ? NetworkImage(photoUrl) : null,
+                                child: photoUrl == null || !photoUrl.startsWith('https://') ? const Icon(Icons.person, size: 16) : null,
+                              ),
+                              const SizedBox(width: 7),
+                              Flexible(child: Text(senderName,
+                                style: const TextStyle(color: brand, fontWeight: FontWeight.bold, fontSize: 12))),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.open_in_new, size: 12, color: brand),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
                   Text(data['text'] as String? ?? '', style: const TextStyle(fontSize: 15)),
                 ]),
               ),
