@@ -5,7 +5,7 @@ values (
   'forum-media',
   true,
   104857600,
-  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf']
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf','audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/ogg','audio/flac']
 )
 on conflict (id) do update set
   public = excluded.public,
