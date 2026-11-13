@@ -158,6 +158,7 @@ class _HomePageState extends State<HomePage> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dynamic_feed_outlined), selectedIcon: Icon(Icons.dynamic_feed), label: 'المنشورات'),
           NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'المحادثة العامة'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'ملفي'),
         ],
       ),
     ));
@@ -166,31 +167,71 @@ class _HomePageState extends State<HomePage> {
 
 class PostsPage extends StatelessWidget {
   const PostsPage({super.key});
+  Future<void> addPost(BuildContext context) async {
+    final text = TextEditingController();
+    final video = TextEditingController();
+    final user = FirebaseAuth.instance.currentUser!;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(title: const Text('منشور جديد'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: text, maxLines: 4, maxLength: 1000,
+            decoration: const InputDecoration(labelText: 'اكتب منشورك', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          TextField(controller: video, keyboardType: TextInputType.url,
+            decoration: const InputDecoration(labelText: 'رابط فيديو (اختياري)', hintText: 'https://', border: OutlineInputBorder())),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('نشر'))],
+      )));
+    if (ok == true && (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
+      final profile = await db.collection('users').doc(user.uid).get();
+      await db.collection('posts').add({
+        'text': text.text.trim(), 'videoUrl': video.text.trim(), 'authorId': user.uid,
+        'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
+        'authorPhoto': profile.data()?['photoUrl'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    text.dispose();
+    video.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance.collection('posts').orderBy('createdAt', descending: true).limit(50).snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Padding(padding: EdgeInsets.all(20),
-          child: Text('تعذر تحميل المنشورات. تحقق من اتصال الإنترنت وقواعد قاعدة البيانات.')));
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-        final posts = snapshot.data!.docs;
-        return ListView(padding: const EdgeInsets.all(16), children: [
-          Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [darkBrand, brand, Color(0xFF35BCEB)]),
-            borderRadius: BorderRadius.circular(20)),
-            child: Text('أهلاً بك ${user.displayName ?? user.email ?? ''} 👋\nمساحة تجمع الشباب والأفكار والطموحات.',
-              style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold))),
-          const SizedBox(height: 20),
-          const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          if (posts.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('ماكو منشورات بعد. كن أول من ينشر!'))),
-          ...posts.map((doc) => Card(child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
-            title: Text(doc.data()['authorName'] as String? ?? 'عضو'),
-            subtitle: Text(doc.data()['text'] as String? ?? ''),
-          ))),
-        ]);
+      stream: db.collection('posts').orderBy('createdAt', descending: true).limit(70).snapshots(),
+      builder: (context, s) {
+        if (s.hasError) return const Center(child: Text('تعذر تحميل المنشورات.'));
+        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        final posts = s.data!.docs;
+        return Scaffold(
+          body: ListView(padding: const EdgeInsets.all(14), children: [
+            Container(padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(gradient: const LinearGradient(colors: [darkBrand, brand, Color(0xFF35BCEB)]), borderRadius: BorderRadius.circular(20)),
+              child: Text('أهلاً بك ${user.displayName ?? 'صديقنا'} 👋\nشارك أفكارك وتعرّف على أعضاء الملتقى.',
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            const SizedBox(height: 16),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.add), label: const Text('اكتب منشوراً')),
+            ]),
+            if (posts.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('ماكو منشورات بعد. كن أول من ينشر!'))),
+            ...posts.map((doc) {
+              final d = doc.data();
+              return Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ListTile(contentPadding: EdgeInsets.zero, leading: UserAvatar(url: d['authorPhoto'] as String?),
+                  title: Text(d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
+                if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(fontSize: 16)),
+                if ((d['videoUrl'] as String? ?? '').startsWith('https://'))
+                  Padding(padding: const EdgeInsets.only(top: 8), child: SelectableText('🎬 رابط الفيديو: ${d['videoUrl']}')),
+              ])));
+            }),
+          ]),
+          floatingActionButton: FloatingActionButton(backgroundColor: brand, foregroundColor: Colors.white,
+            onPressed: () => addPost(context), child: const Icon(Icons.add)),
+        );
       },
     );
   }
