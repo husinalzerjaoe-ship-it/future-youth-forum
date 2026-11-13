@@ -154,8 +154,12 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
         title: const Text('ملتقى شباب المستقبل'),
-        actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
-          icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج')],
+        actions: [
+          IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
+          IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
+            icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج'),
+        ],
       ),
       body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage(), CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
@@ -652,6 +656,82 @@ class FollowControl extends StatelessWidget {
           ),
         ]);
       },
+    );
+  }
+}
+
+
+class MemberSearchPage extends StatefulWidget {
+  const MemberSearchPage({super.key});
+  @override
+  State<MemberSearchPage> createState() => _MemberSearchPageState();
+}
+
+class _MemberSearchPageState extends State<MemberSearchPage> {
+  final search = TextEditingController();
+  @override
+  void dispose() { search.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final me = FirebaseAuth.instance.currentUser!.uid;
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('اكتشف الأعضاء')),
+        body: Column(children: [
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: TextField(
+              controller: search,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'ابحث باسم العضو...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: search.text.isEmpty ? null : IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () { search.clear(); setState(() {}); },
+                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: db.collection('publicProfiles').orderBy('name').limit(200).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) return const Center(child: Text('تعذر تحميل الأعضاء. تحقق من قواعد Firestore.'));
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final query = search.text.trim().toLowerCase();
+                final members = snapshot.data!.docs.where((doc) {
+                  if (doc.id == me) return false;
+                  final name = (doc.data()['name'] as String? ?? '').toLowerCase();
+                  final bio = (doc.data()['bio'] as String? ?? '').toLowerCase();
+                  return query.isEmpty || name.contains(query) || bio.contains(query);
+                }).toList();
+                if (members.isEmpty) return const Center(child: Text('ما لقينا أعضاء بهذا الاسم.'));
+                return ListView.builder(
+                  itemCount: members.length,
+                  itemBuilder: (context, index) {
+                    final doc = members[index];
+                    final data = doc.data();
+                    final name = data['name'] as String? ?? 'عضو';
+                    return ListTile(
+                      leading: UserAvatar(url: data['photoUrl'] as String?),
+                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(data['bio'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
+                      trailing: const Icon(Icons.chevron_left),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => MemberProfilePage(uid: doc.id, fallbackName: name),
+                      )),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ]),
+      ),
     );
   }
 }
