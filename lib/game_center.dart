@@ -79,14 +79,135 @@ const _players=[
  _Question('لاعب بلجيكي صانع ألعاب لعب لمانشستر سيتي؟',['هازارد','دي بروين','لوكاكو','كورتوا'],1,'هو كيفن دي بروين.'),
  _Question('أسطورة أرجنتينية ارتبط اسمها بيد الله وكأس العالم 1986؟',['باتيستوتا','مارادونا','ريكيلمي','أغويرو'],1,'هو دييغو مارادونا.'),
 ];
-class _QuizGame extends StatefulWidget{final String category;const _QuizGame({required this.category});@override State<_QuizGame> createState()=>_QuizGameState();}
-class _QuizGameState extends State<_QuizGame>{
- late List<_Question> qs;int index=0,score=0;int? picked;bool finished=false;
- @override void initState(){super.initState();final source=widget.category=='football'?_football:widget.category=='player'?_players:_general;qs=List<_Question>.from(source)..shuffle(Random());if(widget.category=='speed'){qs=qs.take(10).toList();}}
- void choose(int i){if(picked!=null)return;setState(()=>picked=i==qs[index].correct?i:i);}
- void next(){if(picked==qs[index].correct)score++;if(index==qs.length-1){setState(()=>finished=true);}else{setState(() { index++; picked=null; });}}
- @override Widget build(BuildContext c){final q=qs[index];return Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.category=='football'?'تحدي كرة القدم':widget.category=='player'?'من هو اللاعب؟':'تحدي المعلومات')),body:Padding(padding:const EdgeInsets.all(18),child:finished?Center(child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.emoji_events,size:70,color:Colors.amber),Text('نتيجتك: $score من ${qs.length}',style:const TextStyle(fontSize:25,fontWeight:FontWeight.bold)),FilledButton(onPressed:()=>setState(() { index=0; score=0; picked=null; finished=false; }),child:const Text('العب مرة ثانية'))])):Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[LinearProgressIndicator(value:(index+1)/qs.length),const SizedBox(height:18),Text('السؤال ${index+1} من ${qs.length}',style:const TextStyle(color:gameViolet,fontWeight:FontWeight.bold)),const SizedBox(height:12),Text(q.q,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),const SizedBox(height:18),...List.generate(q.a.length,(i){final selected=picked==i;final answered=picked!=null;return Padding(padding:const EdgeInsets.only(bottom:9),child:OutlinedButton(style:OutlinedButton.styleFrom(backgroundColor:answered&&i==q.correct?Colors.green.withValues(alpha:.12):selected?Colors.red.withValues(alpha:.1):null,padding:const EdgeInsets.all(15)),onPressed:answered?null:()=>choose(i),child:Align(alignment:Alignment.centerRight,child:Text(q.a[i]))));}),if(picked!=null)...[Text(picked==q.correct?'إجابة صحيحة!':'الإجابة الصحيحة: ${q.a[q.correct]}'),Text(q.why),const Spacer(),FilledButton(onPressed:next,child:Text(index==qs.length-1?'عرض النتيجة':'السؤال التالي'))]]))));
- }
+class _QuizGame extends StatefulWidget {
+  final String category;
+  const _QuizGame({required this.category});
+  @override
+  State<_QuizGame> createState() => _QuizGameState();
+}
+
+class _QuizGameState extends State<_QuizGame> {
+  late List<_Question> qs;
+  int index = 0;
+  int score = 0;
+  int? picked;
+  bool finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final source = widget.category == 'football'
+        ? _football
+        : widget.category == 'player'
+            ? _players
+            : _general;
+    qs = List<_Question>.from(source)..shuffle(Random());
+    if (widget.category == 'speed') qs = qs.take(10).toList();
+  }
+
+  void choose(int i) {
+    if (picked != null) return;
+    setState(() => picked = i);
+  }
+
+  void next() {
+    if (picked == qs[index].correct) score++;
+    if (index == qs.length - 1) {
+      setState(() => finished = true);
+    } else {
+      setState(() {
+        index++;
+        picked = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = qs[index];
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.category == 'football'
+              ? 'تحدي كرة القدم'
+              : widget.category == 'player'
+                  ? 'من هو اللاعب؟'
+                  : 'تحدي المعلومات'),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(18),
+          child: finished
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.emoji_events, size: 70, color: Colors.amber),
+                      Text('نتيجتك: $score من ${qs.length}',
+                          style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold)),
+                      FilledButton(
+                        onPressed: () => setState(() {
+                          index = 0;
+                          score = 0;
+                          picked = null;
+                          finished = false;
+                          qs.shuffle(Random());
+                        }),
+                        child: const Text('العب مرة ثانية'),
+                      ),
+                    ],
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    LinearProgressIndicator(value: (index + 1) / qs.length),
+                    const SizedBox(height: 18),
+                    Text('السؤال ${index + 1} من ${qs.length}',
+                        style: const TextStyle(color: gameViolet, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    Text(q.q, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 18),
+                    ...List.generate(q.a.length, (i) {
+                      final answered = picked != null;
+                      final correct = answered && i == q.correct;
+                      final selectedWrong = answered && picked == i && i != q.correct;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 9),
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: correct
+                                ? Colors.green.withValues(alpha: .12)
+                                : selectedWrong
+                                    ? Colors.red.withValues(alpha: .1)
+                                    : null,
+                            padding: const EdgeInsets.all(15),
+                          ),
+                          onPressed: answered ? null : () => choose(i),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(q.a[i]),
+                          ),
+                        ),
+                      );
+                    }),
+                    if (picked != null) ...[
+                      Text(picked == q.correct
+                          ? 'إجابة صحيحة!'
+                          : 'الإجابة الصحيحة: ${q.a[q.correct]}'),
+                      Text(q.why),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: next,
+                        child: Text(index == qs.length - 1 ? 'عرض النتيجة' : 'السؤال التالي'),
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
 }
 class GameInvitesPage extends StatefulWidget{const GameInvitesPage({super.key});@override State<GameInvitesPage> createState()=>_GameInvitesPageState();}
 class _GameInvitesPageState extends State<GameInvitesPage>{
