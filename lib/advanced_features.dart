@@ -209,7 +209,7 @@ class MemberSafetyPage extends StatelessWidget {
             return ListTile(
               leading: const CircleAvatar(child: Icon(Icons.block)),
               title: Text(d['blockedName'] as String? ?? 'عضو'),
-              subtitle: const Text('لن تتمكن من بدء محادثة معه'),
+              subtitle: const Text('الحظر الحالي يمنع الرسائل الخاصة بينكما فقط'),
               trailing: TextButton(
                 onPressed: () => doc.reference.delete(),
                 child: const Text('إلغاء الحظر'),
@@ -236,7 +236,7 @@ class MemberSafetyActions extends StatelessWidget {
         return Column(children: [
           OutlinedButton.icon(
             icon: Icon(blocked ? Icons.check_circle_outline : Icons.block),
-            label: Text(blocked ? 'إلغاء حظر العضو' : 'حظر هذا العضو'),
+            label: Text(blocked ? 'إلغاء حظر الرسائل الخاصة' : 'حظر الرسائل الخاصة لهذا العضو'),
             onPressed: () async {
               if (blocked) {
                 await ref.delete();
