@@ -10,8 +10,8 @@ with check (
   bucket_id = 'forum-media'
   and (storage.foldername(name))[1] = 'public-chat'
   and (storage.foldername(name))[2] = auth.uid()::text
-  and lower(storage.extension(name)) in ('jpg', 'jpeg', 'png', 'webp', 'gif')
-  and (metadata->>'size')::bigint <= 10485760
+  and metadata->>'mimetype' in ('image/jpeg', 'image/png', 'image/webp', 'image/gif')
+  and coalesce((metadata->>'size')::bigint, 0) <= 10485760
 );
 
 -- Public chat images are displayed with getPublicUrl(), so the forum-media
