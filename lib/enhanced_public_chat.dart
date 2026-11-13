@@ -307,7 +307,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onLongPress:()=>_menu(doc),child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
-      decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFE0A72E):_chatBrand.withValues(alpha:.42),width:founder?2:1),boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
+      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(mine?const Color(0xFFE8E2FF):Colors.white),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):_chatBrand.withValues(alpha:.42),width:founder?2.6:1),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -320,7 +320,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           ),
           const SizedBox(width:8),
           Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:13,color:founder?const Color(0xFF8A5A00):const Color(0xFF4532A8))),
+            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):const Color(0xFF4532A8))),
             if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
             if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
           ]))),
@@ -330,7 +330,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
-        if(type=='text'&&body.isNotEmpty)Text(body,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500)),
+        if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing:founder?.15:0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
           ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
