@@ -204,8 +204,22 @@ class _HomePageState extends State<HomePage> {
           IconButton(tooltip: 'الأمان والحظر', icon: const Icon(Icons.shield_outlined),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSafetyPage()))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
-            IconButton(tooltip: 'مراجعة البلاغات', icon: const Icon(Icons.admin_panel_settings),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderReportsPage()))),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: db.collection('reports').where('status', isEqualTo: 'new').limit(99).snapshots(),
+              builder: (context, reports) => IconButton(
+                tooltip: 'البلاغات الجديدة',
+                icon: Stack(clipBehavior: Clip.none, children: [
+                  const Icon(Icons.admin_panel_settings),
+                  if ((reports.data?.docs.length ?? 0) > 0)
+                    Positioned(right: -7, top: -7, child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: Text('${reports.data!.docs.length}', style: const TextStyle(color: Colors.white, fontSize: 9)),
+                    )),
+                ]),
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderReportsPage())),
+              ),
+            ),
             IconButton(tooltip: 'سجل المشرفين', icon: const Icon(Icons.history),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationLogPage()))),
           IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
