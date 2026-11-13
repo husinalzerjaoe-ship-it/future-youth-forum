@@ -89,13 +89,22 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                   final id = _chatId(_uid, d.id);
                   final me = FirebaseAuth.instance.currentUser!;
                   final myProfile = await _db.collection('publicProfiles').doc(_uid).get();
-                  await _db.collection('conversations').doc(id).set({
-                    'members': [_uid, d.id],
-                    'memberNames': {_uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو', d.id: name},
-                    'updatedAt': FieldValue.serverTimestamp(),
-                  }, SetOptions(merge: true));
-                  if (!context.mounted) return;
-                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: d.id, otherName: name)));
+                  try {
+                    final conversation = _db.collection('conversations').doc(id);
+                    final existing = await conversation.get();
+                    if (!existing.exists) {
+                      await conversation.set({
+                        'members': [_uid, d.id],
+                        'memberNames': {_uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو', d.id: name},
+                        'updatedAt': FieldValue.serverTimestamp(),
+                      });
+                    }
+                    if (!context.mounted) return;
+                    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: d.id, otherName: name)));
+                  } on FirebaseException catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر فتح المحادثة: ${e.code}')));
+                  }
                 },
               );
             }).toList());
