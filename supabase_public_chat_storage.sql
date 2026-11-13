@@ -57,6 +57,7 @@ using (
     or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'private-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
   )
 )
@@ -67,6 +68,7 @@ with check (
     or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'private-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
   )
 );
@@ -82,6 +84,7 @@ using (
     or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or ((storage.foldername(name))[1] = 'private-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
   )
 );
