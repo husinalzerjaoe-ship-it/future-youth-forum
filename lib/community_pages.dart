@@ -163,13 +163,61 @@ class _StoriesPageState extends State<StoriesPage>{
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
-     const Padding(padding:EdgeInsets.all(8),child:Text('تختفي بعد 24 ساعة',style:TextStyle(color:Colors.black54,fontSize:12)))
+     const Padding(padding:EdgeInsets.all(8),child:Text('تختفي بعد 24 ساعة',style:TextStyle(color:Colors.black54,fontSize:12))),
+     StoryInteractionPanel(storyId:doc.id,authorId:(d['authorId']??'').toString())
     ]));
    }).toList());
   }),
   floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:busy?null:add,icon:busy?const CircularProgressIndicator(color:Colors.white):const Icon(Icons.add_a_photo),label:Text(busy?'جارٍ الرفع':'إضافة ستوري'))
  ));
 }
+class StoryInteractionPanel extends StatefulWidget {
+  final String storyId, authorId;
+  const StoryInteractionPanel({super.key, required this.storyId, required this.authorId});
+  @override State<StoryInteractionPanel> createState() => _StoryInteractionPanelState();
+}
+class _StoryInteractionPanelState extends State<StoryInteractionPanel> {
+  final _reply = TextEditingController();
+  bool _sending = false;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  CollectionReference<Map<String,dynamic>> get _views => db2.collection('stories').doc(widget.storyId).collection('views');
+  CollectionReference<Map<String,dynamic>> get _replies => db2.collection('stories').doc(widget.storyId).collection('replies');
+  @override void initState() { super.initState(); _views.doc(_uid).set({'viewerId':_uid,'viewedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}); }
+  @override void dispose() { _reply.dispose(); super.dispose(); }
+  Future<void> _send() async {
+    final text = _reply.text.trim(); if (text.isEmpty || _sending) return;
+    setState(()=>_sending=true);
+    try {
+      final profile = await db2.collection('publicProfiles').doc(_uid).get();
+      await _replies.add({'authorId':_uid,'authorName':profile.data()?['name']??'عضو','text':text,'createdAt':FieldValue.serverTimestamp()});
+      if (widget.authorId.isNotEmpty && widget.authorId != _uid) {
+        await db2.collection('notifications').add({'recipientId':widget.authorId,'actorId':_uid,'actorName':profile.data()?['name']??'عضو','type':'story_reply','text':'رد على قصتك','read':false,'createdAt':FieldValue.serverTimestamp()});
+      }
+      _reply.clear();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر إرسال الرد')));
+    } finally { if(mounted)setState(()=>_sending=false); }
+  }
+  @override Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(12,0,12,12),
+    child: Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_views.snapshots(),builder:(c,s)=>Row(children:[
+        const Icon(Icons.visibility_outlined,size:18),const SizedBox(width:5),Text('${s.data?.docs.length??0} مشاهدة'),
+        const Spacer(),const Icon(Icons.chat_bubble_outline,size:17),const SizedBox(width:4),
+        StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_replies.snapshots(),builder:(c,r)=>Text('${r.data?.docs.length??0} رد')),
+      ])),
+      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_replies.orderBy('createdAt',descending:true).limit(10).snapshots(),builder:(c,s){
+        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
+        return Column(children:s.data!.docs.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.reply,size:18),title:Text(d['authorName']??'عضو'),subtitle:Text(d['text']??''));}).toList());
+      }),
+      Row(children:[
+        Expanded(child:TextField(controller:_reply,maxLength:300,minLines:1,maxLines:2,decoration:const InputDecoration(hintText:'رد على الستوري...',counterText:'',isDense:true))),
+        IconButton.filled(onPressed:_sending?null:_send,icon:_sending?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.send)),
+      ]),
+    ]),
+  );
+}
+
 class StoryVideoPage extends StatefulWidget{final String url;const StoryVideoPage({super.key,required this.url});@override State<StoryVideoPage> createState()=>_StoryVideoPageState();}
 class _StoryVideoPageState extends State<StoryVideoPage>{
  late VideoPlayerController v;
