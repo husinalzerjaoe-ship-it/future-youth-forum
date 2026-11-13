@@ -35,6 +35,47 @@ service cloud.firestore {
       allow create, read, update: if request.auth != null
         && request.auth.uid == userId;
       allow delete: if false;
+
+      match /animeWatchlist/{entryId} {
+        allow read, create, delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status in ['planned', 'watching', 'watched'];
+      }
+    }
+
+    match /animeWallpapers/{wallpaperId} {
+      allow read: if request.auth != null
+        && (resource.data.status == 'approved'
+          || resource.data.uploaderId == request.auth.uid
+          || isFounder());
+      allow create: if request.auth != null && accountNotBanned()
+        && request.resource.data.uploaderId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 100
+        && request.resource.data.anime is string
+        && request.resource.data.anime.size() <= 80
+        && request.resource.data.artist is string
+        && request.resource.data.artist.size() > 0
+        && request.resource.data.artist.size() <= 100
+        && request.resource.data.sourceUrl is string
+        && request.resource.data.sourceUrl.matches('https://.*')
+        && request.resource.data.rights in [
+          'أنا صاحب العمل وأسمح بنشره',
+          'ترخيص Creative Commons يسمح بإعادة الاستخدام',
+          'إذن مكتوب من صاحب الحقوق',
+          'مصدر رسمي يسمح صراحة بإعادة الاستخدام'
+        ]
+        && request.resource.data.imageUrl is string
+        && request.resource.data.imageUrl.matches('https://.*');
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.reviewedBy == request.auth.uid;
+      allow delete: if isFounder()
+        || (request.auth != null && resource.data.uploaderId == request.auth.uid && resource.data.status == 'pending');
     }
 
     // Public profile fields only: display name, biography and photo URL.
