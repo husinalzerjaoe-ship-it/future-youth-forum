@@ -376,7 +376,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
         fileOptions: FileOptions(contentType: safeExt == 'gif' ? 'image/gif' : 'image/$safeExt', upsert: false));
       final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
       await _send(imageUrl: url, type: 'image');
-    } catch (_) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة. تحقق من صلاحيات مخزن الصور.'); }
+    } on StorageException catch (e) { if (mounted) setState(() => sendError = 'فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}'); } catch (e) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة: $e'); }
   }
 
   void showStickers() {
@@ -599,8 +599,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
             );
             photo.text = Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
-          } catch (_) {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة إلى التخزين. تأكد من اتصال الإنترنت وسياسة INSERT في bucket forum-media.')));
+          } on StorageException catch (e) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع صورة الحساب (${e.statusCode ?? 'Storage'}): ${e.message}')));
+          } catch (e) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع صورة الحساب: $e')));
           } finally { if (mounted) setState(() => uploadingPhoto = false); }
         },
         icon: uploadingPhoto ? const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.photo_library_outlined),
