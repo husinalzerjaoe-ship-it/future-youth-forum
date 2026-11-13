@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
+import 'local_bot.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -18,6 +19,7 @@ class CommunityHubPage extends StatelessWidget {
    ('الاقتباسات','انسخ أجمل العبارات',Icons.format_quote,const QuotesPage()),
    ('الستوريات','صور وفيديوهات لمدة 24 ساعة',Icons.camera_alt,const StoriesPage()),
    ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
+   ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
@@ -134,7 +136,7 @@ class _RegionChatPageState extends State<RegionChatPage>{
  await db2.collection('regionalChats').doc(widget.id).collection('messages').add({'text':value,'senderId':u.uid,'senderName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});t.clear();}
  catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('انشر قواعد Firestore الجديدة أولاً')));}
  finally{if(mounted)setState(()=>busy=false);}}
- @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title)),body:Column(children:[
+ @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[IconButton(tooltip:'مساعد الملتقى',icon:const Icon(Icons.smart_toy),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const LocalHelperBotPage()))) ]),body:Column(children:[
  Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection('regionalChats').doc(widget.id).collection('messages').orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
  if(s.hasError)return const Center(child:Text('الدردشة تحتاج قواعد Firestore الجديدة'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
  if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة 👋'));
