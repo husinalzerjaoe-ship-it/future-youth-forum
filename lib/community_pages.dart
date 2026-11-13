@@ -55,9 +55,9 @@ class TextShelf extends StatelessWidget {
    if(!s.hasData)return const Center(child:CircularProgressIndicator());
    if(s.data!.docs.isEmpty)return Center(child:Text('لا يوجد $title بعد.'));
    return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
-    final d=doc.data();final value=d['text'] as String???'';
+    final d=doc.data();final value=d['text'] as String? ??'';
     return Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-     Row(children:[const Icon(Icons.person,color:p),const SizedBox(width:8),Expanded(child:Text(d['authorName'] as String???'عضو',style:const TextStyle(fontWeight:FontWeight.bold))),
+     Row(children:[const Icon(Icons.person,color:p),const SizedBox(width:8),Expanded(child:Text(d['authorName'] as String? ??'عضو',style:const TextStyle(fontWeight:FontWeight.bold))),
       IconButton(tooltip:'نسخ',icon:const Icon(Icons.copy),onPressed:(){Clipboard.setData(ClipboardData(text:value));ScaffoldMessenger.of(c).showSnackBar(const SnackBar(content:Text('تم نسخ النص')));})]),
      SelectableText(value,style:const TextStyle(fontSize:17,height:1.6))
     ])));
@@ -100,7 +100,7 @@ class _StoriesPageState extends State<StoriesPage>{
    if(docs.isEmpty)return const Center(child:Text('ماكو ستوريات حالياً'));
    return ListView(children:docs.map((doc){final d=doc.data();final video=d['mediaType']=='video';final url=d['mediaUrl'] as String;
     return Card(clipBehavior:Clip.antiAlias,child:Column(children:[
-     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String???'عضو')),
+     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو')),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      const Padding(padding:EdgeInsets.all(8),child:Text('تختفي بعد 24 ساعة',style:TextStyle(color:Colors.black54,fontSize:12)))
@@ -140,7 +140,7 @@ class _RegionChatPageState extends State<RegionChatPage>{
  if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة 👋'));
  final me=FirebaseAuth.instance.currentUser!.uid;
  return ListView.builder(reverse:true,padding:const EdgeInsets.all(12),itemCount:s.data!.docs.length,itemBuilder:(c,i){final d=s.data!.docs[i].data();final mine=d['senderId']==me;
- return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(12),constraints:BoxConstraints(maxWidth:MediaQuery.of(c).size.width*.8),decoration:BoxDecoration(color:mine?const Color(0xFFE8E3FF):Colors.white,borderRadius:BorderRadius.circular(14)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(!mine)Text(d['senderName'] as String???'عضو',style:const TextStyle(color:p,fontWeight:FontWeight.bold,fontSize:12)),Text(d['text'] as String???'')])));});
+ return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(12),constraints:BoxConstraints(maxWidth:MediaQuery.of(c).size.width*.8),decoration:BoxDecoration(color:mine?const Color(0xFFE8E3FF):Colors.white,borderRadius:BorderRadius.circular(14)),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(!mine)Text(d['senderName'] as String? ??'عضو',style:const TextStyle(color:p,fontWeight:FontWeight.bold,fontSize:12)),Text(d['text'] as String? ??'')])));});
  })),
  SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(),decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ])));
