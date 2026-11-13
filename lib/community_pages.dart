@@ -64,7 +64,7 @@ class TextShelf extends StatelessWidget {
      SelectableText(value,style:const TextStyle(fontSize:17,height:1.6))
     ])));
    }).toList());
-  })),
+  }),
   floatingActionButton:FloatingActionButton.extended(backgroundColor:p,foregroundColor:Colors.white,onPressed:()=>add(context),icon:const Icon(Icons.add),label:Text('أضف $title')),
  ));
 }
