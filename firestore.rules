@@ -374,6 +374,7 @@ service cloud.firestore {
         allow delete: if request.auth != null
           && (resource.data.authorId == request.auth.uid || isChatStaff());
       }
+    }
 
     match /regionalChats/{roomId}/bans/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
@@ -516,5 +517,4 @@ service cloud.firestore {
     }
 
   }
-}
 }
