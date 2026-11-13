@@ -55,7 +55,7 @@ class CommunityHubPage extends StatelessWidget {
        const SizedBox(height:5),
        Expanded(child:Center(child:Text(items[i].$2,textAlign:TextAlign.center,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11,color:cs.onSurfaceVariant)))),
        Align(alignment:Alignment.centerLeft,child:Icon(Icons.arrow_back_rounded,size:18,color:cs.primary)),
-      ]))))
+      ])))),
   ]));
  }
 }
