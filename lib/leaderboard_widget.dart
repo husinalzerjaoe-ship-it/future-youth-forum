@@ -8,7 +8,7 @@ class LeaderboardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = FirebaseFirestore.instance;
-    final week = _weekKey(DateTime.now());
+    final week = _weekKey(DateTime.now().toUtc());
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
@@ -20,7 +20,7 @@ class LeaderboardWidget extends StatelessWidget {
             builder: (context, snapshot) {
               if (snapshot.hasError) return const Text('الترتيب غير متاح حالياً.');
               if (!snapshot.hasData) return const LinearProgressIndicator();
-              final docs = snapshot.data!.docs;
+              final docs = [...snapshot.data!.docs];
               docs.sort((a, b) {
                 final av = (a.data()['weeklyPoints'] as Map<String, dynamic>?)?[week] as num? ?? 0;
                 final bv = (b.data()['weeklyPoints'] as Map<String, dynamic>?)?[week] as num? ?? 0;
