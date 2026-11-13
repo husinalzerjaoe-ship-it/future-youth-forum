@@ -20,6 +20,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _picker = ImagePicker();
   bool _sending = false;
   String? _error;
+  static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
+  bool _containsBlockedTerm(String value) {
+    final normalized = value.toLowerCase().replaceAll(RegExp(r'[\\sـ]+'), '');
+    return _blockedTerms.any((term) => normalized.contains(term.replaceAll(' ', '')));
+  }
   DocumentSnapshot<Map<String, dynamic>>? _reply;
   int _background = 0xFFF5F3FF;
   static const _backgrounds = [0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5];
@@ -41,6 +46,10 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
   Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
+    if (type == 'text' && _containsBlockedTerm(body)) {
+      if (mounted) setState(() => _error = 'رسالتك تحتوي كلمات ممنوعة. عدّلها قبل الإرسال.');
+      return;
+    }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
       await _chatDb.collection('messages').add({
