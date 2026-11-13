@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { onUserCreated } = require("firebase-functions/v2/identity");
@@ -44,6 +45,40 @@ exports.addSupabaseAuthenticatedRole = onUserCreated(async (event) => {
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const adminDb = getFirestore();
+
+exports.verifyPrivateRoomPasscode = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
+  const roomId = request.data?.roomId;
+  const passcode = request.data?.passcode;
+  if (typeof roomId !== "string" || roomId.length < 1 || roomId.length > 128
+      || typeof passcode !== "string" || passcode.length < 4 || passcode.length > 64) {
+    throw new HttpsError("invalid-argument", "Invalid room or passcode.");
+  }
+  const roomRef = adminDb.collection("privateRooms").doc(roomId);
+  const roomSnap = await roomRef.get();
+  if (!roomSnap.exists) throw new HttpsError("not-found", "Room not found.");
+  const room = roomSnap.data();
+  if (!Array.isArray(room.members) || !room.members.includes(request.auth.uid)) {
+    throw new HttpsError("permission-denied", "You are not invited to this room.");
+  }
+  const expected = crypto.createHash("sha256")
+    .update(String(room.passcodeSalt) + "|" + passcode)
+    .digest("hex");
+  const stored = String(room.passcodeHash || "");
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(stored, "hex");
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    throw new HttpsError("permission-denied", "Incorrect room passcode.");
+  }
+  await roomRef.collection("access").doc(request.auth.uid).set({
+    uid: request.auth.uid,
+    verifiedAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
+
 
 function weekKey(date = new Date()) {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
