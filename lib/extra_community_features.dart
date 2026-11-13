@@ -10,8 +10,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'media_upload_service.dart';
 
-const _featureFounder='husinalzerjaoe@gmail.com';
-bool get _isFeatureFounder=>FirebaseAuth.instance.currentUser?.email?.toLowerCase()==_featureFounder;
 
 class ExtraCommunityFeaturesPage extends StatelessWidget {
  const ExtraCommunityFeaturesPage({super.key});
@@ -124,6 +122,9 @@ class SharedFilesPage extends StatefulWidget {
 class _SharedFilesPageState extends State<SharedFilesPage> {
  final db=FirebaseFirestore.instance;bool uploading=false;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
+ Future<void> review(String id,String status) async {
+  await db.collection('sharedFiles').doc(id).update({'status':status,'reviewedBy':uid,'reviewedAt':FieldValue.serverTimestamp()});
+ }
  Future<void> upload() async {
   final picked=await FilePicker.platform.pickFiles(type:FileType.any);
   if(picked==null||picked.files.isEmpty)return;final f=picked.files.first;
@@ -143,6 +144,14 @@ class _SharedFilesPageState extends State<SharedFilesPage> {
   floatingActionButton:FloatingActionButton.extended(onPressed:uploading?null:upload,icon:uploading?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.upload_file),label:Text(uploading?'جاري الرفع':'مشاركة ملف')),
   body:Column(children:[
    const Padding(padding:EdgeInsets.all(12),child:Text('شارك التطبيقات والملفات التي تملك حق توزيعها. الملفات الجديدة لا تظهر للناس إلا بعد مراجعة المشرف. لا تثبّت ملفات APK من مصدر غير موثوق.',style:TextStyle(height:1.5))),
+   if(FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com')
+    SizedBox(height:180,child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'pending').limit(50).snapshots(),builder:(context,s){
+     if(!s.hasData)return const Center(child:CircularProgressIndicator());
+     return ListView(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(title:Text(x['title'] as String? ?? 'ملف'),subtitle:Text('مراجعة • '+(x['uploaderId']??'')),trailing:Wrap(children:[
+      IconButton(tooltip:'قبول',icon:const Icon(Icons.check_circle,color:Colors.green),onPressed:()=>review(d.id,'approved')),
+      IconButton(tooltip:'رفض',icon:const Icon(Icons.cancel,color:Colors.red),onPressed:()=>review(d.id,'rejected'))
+     ])));}).toList());
+    })),
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'approved').limit(100).snapshots(),builder:(context,s){
     if(s.hasError)return const Center(child:Text('تعذر تحميل الملفات'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو ملفات منشورة حالياً'));
