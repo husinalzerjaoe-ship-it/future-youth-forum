@@ -151,7 +151,7 @@ class _HomePageState extends State<HomePage> {
         actions: [IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
           icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج')],
       ),
-      body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage()]),
+      body: IndexedStack(index: selected, children: const [PostsPage(), PublicChatPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
@@ -219,7 +219,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
       await FirebaseFirestore.instance.collection('messages').add({
         'text': text,
         'senderId': user.uid,
-        'senderName': user.displayName ?? user.email ?? 'عضو',
+        'senderName': (await db.collection('users').doc(user.uid).get()).data()?['name'] ?? user.displayName ?? 'عضو',
         'createdAt': FieldValue.serverTimestamp(),
       });
       messageController.clear();
@@ -312,4 +312,120 @@ class _PublicChatPageState extends State<PublicChatPage> {
       ]),
     )),
   ]);
+}
+
+
+class MyProfilePage extends StatelessWidget {
+  const MyProfilePage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: db.collection('users').doc(uid).snapshots(),
+      builder: (context, s) {
+        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        final d = s.data!.data() ?? {};
+        return ListView(padding: const EdgeInsets.all(18), children: [
+          const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 15),
+          Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+          const SizedBox(height: 8),
+          Center(child: Text(d['name'] as String? ?? 'عضو', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold))),
+          Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
+          const SizedBox(height: 10),
+          Center(child: RatingSummary(uid: uid)),
+          FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
+            icon: const Icon(Icons.edit), label: const Text('تعديل الملف الشخصي')),
+          const SizedBox(height: 12),
+          const Text('منشوراتي', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          MemberPosts(uid: uid),
+        ]);
+      },
+    );
+  }
+}
+
+class UserAvatar extends StatelessWidget {
+  final String? url;
+  const UserAvatar({super.key, this.url});
+  @override
+  Widget build(BuildContext context) => CircleAvatar(radius: 42,
+    backgroundImage: url != null && url!.startsWith('https://') ? NetworkImage(url!) : null,
+    child: url == null || !url!.startsWith('https://') ? const Icon(Icons.person, size: 42) : null);
+}
+
+class EditProfilePage extends StatefulWidget {
+  const EditProfilePage({super.key});
+  @override
+  State<EditProfilePage> createState() => _EditProfilePageState();
+}
+class _EditProfilePageState extends State<EditProfilePage> {
+  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController();
+  bool loading = true, saving = false;
+  @override
+  void initState() {
+    super.initState();
+    db.collection('users').doc(FirebaseAuth.instance.currentUser!.uid).get().then((s) {
+      final d = s.data() ?? {};
+      name.text = d['name'] as String? ?? '';
+      bio.text = d['bio'] as String? ?? '';
+      photo.text = d['photoUrl'] as String? ?? '';
+      if (mounted) setState(() => loading = false);
+    });
+  }
+  @override
+  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+    appBar: AppBar(title: const Text('تعديل الملف الشخصي')),
+    body: loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(18), children: [
+      TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم الظاهر', border: OutlineInputBorder())),
+      const SizedBox(height: 12),
+      TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
+      const SizedBox(height: 12),
+      TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط صورتك المباشر https://', border: OutlineInputBorder())),
+      const Padding(padding: EdgeInsets.only(top: 8), child: Text('حالياً الصورة عن طريق رابط؛ رفع صورة من الاستوديو يحتاج تفعيل خدمة التخزين.', style: TextStyle(color: Colors.black54))),
+      const SizedBox(height: 16),
+      FilledButton(onPressed: saving ? null : () async {
+        if (name.text.trim().isEmpty) return;
+        setState(() => saving = true);
+        try {
+          final u = FirebaseAuth.instance.currentUser!;
+          await db.collection('users').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          await u.updateDisplayName(name.text.trim());
+          if (context.mounted) Navigator.pop(context);
+        } catch (_) {
+          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر الحفظ. تحقق من قواعد Firestore.')));
+        } finally { if (mounted) setState(() => saving = false); }
+      }, child: saving ? const CircularProgressIndicator(color: Colors.white) : const Text('حفظ')),
+    ]),
+  ));
+}
+
+class RatingSummary extends StatelessWidget {
+  final String uid;
+  const RatingSummary({super.key, required this.uid});
+  @override
+  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: db.collection('users').doc(uid).collection('ratings').snapshots(),
+    builder: (context, s) {
+      final docs = s.data?.docs ?? [];
+      final total = docs.fold<int>(0, (v, d) => v + ((d.data()['stars'] as num?)?.toInt() ?? 0));
+      final avg = docs.isEmpty ? 0.0 : total / docs.length;
+      return Text('⭐ ${avg.toStringAsFixed(1)} من 5  •  ${docs.length} تقييم');
+    });
+}
+
+class MemberPosts extends StatelessWidget {
+  final String uid;
+  const MemberPosts({super.key, required this.uid});
+  @override
+  Widget build(BuildContext context) => StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+    stream: db.collection('posts').where('authorId', isEqualTo: uid).limit(50).snapshots(),
+    builder: (context, s) {
+      if (!s.hasData) return const Center(child: CircularProgressIndicator());
+      if (s.data!.docs.isEmpty) return const Text('ماكو منشورات بعد.');
+      return Column(children: s.data!.docs.map((d) => Card(child: ListTile(
+        leading: const Icon(Icons.article_outlined), title: Text(d.data()['text'] as String? ?? 'منشور')))).toList());
+    });
 }
