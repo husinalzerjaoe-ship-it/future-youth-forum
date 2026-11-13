@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
+import 'engagement_features.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -23,6 +24,7 @@ class CommunityHubPage extends StatelessWidget {
    ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
    ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
    ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
+   ('النقاط والتحديات','مكافآت يومية وألعاب وأخبار',Icons.emoji_events,const EngagementHubPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
