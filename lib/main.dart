@@ -544,11 +544,31 @@ class MyProfilePage extends StatelessWidget {
 
 class UserAvatar extends StatelessWidget {
   final String? url;
-  const UserAvatar({super.key, this.url});
+  final double radius;
+  const UserAvatar({super.key, this.url, this.radius = 42});
   @override
-  Widget build(BuildContext context) => CircleAvatar(radius: 42,
-    backgroundImage: url != null && url!.startsWith('https://') ? NetworkImage(url!) : null,
-    child: url == null || !url!.startsWith('https://') ? const Icon(Icons.person, size: 42) : null);
+  Widget build(BuildContext context) {
+    final valid = url != null && url!.startsWith('https://');
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      child: valid
+          ? ClipOval(
+              child: Image.network(
+                url!,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : SizedBox(width: radius * 2, height: radius * 2,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                errorBuilder: (context, error, stack) => Icon(Icons.person, size: radius, color: Theme.of(context).colorScheme.onPrimaryContainer),
+              ),
+            )
+          : Icon(Icons.person, size: radius, color: Theme.of(context).colorScheme.onPrimaryContainer),
+    );
+  }
 }
 
 class EditProfilePage extends StatefulWidget {
