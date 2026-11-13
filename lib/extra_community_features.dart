@@ -61,9 +61,13 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
    'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
    'passcodeSalt':saltHex,'passcodeHash':hash,'createdAt':FieldValue.serverTimestamp(),'lastMessage':'الغرفة جاهزة'
   });
-  await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':room.id,'passcode':code.text.trim()});
+  try{
+   await FirebaseFunctions.instance.httpsCallable('verifyPrivateRoomPasscode').call({'roomId':room.id,'passcode':code.text.trim()});
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
+  }catch(e){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم حفظ الغرفة؛ انشر Cloud Functions حتى يتم تفعيل رمز الدخول: '+e.toString())));
+  }
   name.dispose();code.dispose();
-  if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إنشاء الغرفة وإرسال الدعوات للأعضاء المحددين')));
  }
  @override Widget build(BuildContext context)=>Scaffold(
   floatingActionButton:FloatingActionButton.extended(onPressed:createRoom,icon:const Icon(Icons.add),label:const Text('غرفة جديدة')),
