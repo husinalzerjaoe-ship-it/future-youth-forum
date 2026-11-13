@@ -255,6 +255,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid in resource.data.members
         && request.resource.data.members == resource.data.members
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'updatedAt', 'memberNames'])
         && usersNotBlocked(resource.data.members[0], resource.data.members[1]);
       allow delete: if false;
 
@@ -282,6 +283,10 @@ service cloud.firestore {
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId.size() > 0
         && request.resource.data.recipientId != request.auth.uid
+        && exists(/databases/$(database)/documents/publicProfiles/$(request.auth.uid))
+        && exists(/databases/$(database)/documents/publicProfiles/$(request.resource.data.recipientId))
+        && request.resource.data.actorName is string
+        && request.resource.data.actorName.size() <= 60
         && request.resource.data.type in ['follow', 'like', 'comment', 'message']
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
