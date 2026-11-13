@@ -649,6 +649,14 @@ class PostSocialActions extends StatelessWidget {
               final user=FirebaseAuth.instance.currentUser!;
               final profile=await db.collection('publicProfiles').doc(user.uid).get();
               await comments.add({'text':value,'authorId':user.uid,'authorName':profile.data()?['name'] ?? user.displayName ?? 'عضو','createdAt':FieldValue.serverTimestamp()});
+              if (authorId.isNotEmpty && authorId != user.uid) {
+                await db.collection('notifications').add({
+                  'recipientId': authorId, 'actorId': user.uid,
+                  'actorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
+                  'type': 'comment', 'text': 'علّق على منشورك',
+                  'read': false, 'createdAt': FieldValue.serverTimestamp(),
+                });
+              }
               controller.clear();
             },icon:const Icon(Icons.send)),
           ]))),
