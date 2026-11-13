@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
 final _db = FirebaseFirestore.instance;
@@ -178,12 +179,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
     if (picked == null || !mounted) return;
     setState(() => changingBackground = true);
     try {
-      final bytes = await picked.readAsBytes();
-      final path = 'chat-backgrounds/$_uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-        path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-      );
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(picked, folder: 'chat-backgrounds');
       await _db.collection('conversations').doc(widget.conversationId).set({
         'backgrounds': {_uid: url},
       }, SetOptions(merge: true));
@@ -223,13 +219,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
     if (picked == null || !mounted) return;
     setState(() => busy = true);
     try {
-      final bytes = await picked.readAsBytes();
-      final ext = picked.name.toLowerCase().split('.').last;
-      final safe = ['jpg','jpeg','png','webp','gif'].contains(ext) ? ext : 'jpg';
-      final path = 'private-chat/$_uid/${DateTime.now().millisecondsSinceEpoch}.$safe';
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, bytes,
-        fileOptions: FileOptions(contentType: safe == 'gif' ? 'image/gif' : 'image/$safe', upsert: false));
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(picked, folder: 'private-chat');
       if (mounted) setState(() => busy = false);
       await send(imageUrl: url);
     } catch (e) {
