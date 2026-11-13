@@ -38,6 +38,9 @@ with check (
     ((storage.foldername(name))[1] = 'stories'
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or
+    ((storage.foldername(name))[1] = 'private-chat'
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
+    or
     ((storage.foldername(name))[1] = 'chat-backgrounds'
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
     or
