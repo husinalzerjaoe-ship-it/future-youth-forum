@@ -37,7 +37,7 @@ npm install
 cd ..
 firebase deploy --only functions
 ```
-يجب اختيار Firebase project الصحيح قبل النشر. الدالة `ensureSupabaseAuthenticatedRole` تعالج الحسابات القديمة حتى تحصل على مطالبة التخزين المطلوبة. لا تمنح هذه الدالة صلاحية مؤسس أو مدير.
+يجب اختيار Firebase project الصحيح قبل النشر. الدالة `ensureSupabaseAuthenticatedRole` تعالج الحسابات القديمة حتى تحصل على مطالبة التخزين المطلوبة. والدالة `verifyPrivateRoomPasscode` تتحقق من رمز الغرفة على الخادم وتمنح العضو المدعو سجل وصول لا يستطيع إنشاءه من التطبيق. لا تمنح هذه الدوال صلاحية مؤسس أو مدير.
 
 ### 4. بناء Android
 Workflow البناء ينشئ ملفات Android ويضيف إعدادات خدمة الصوت بالخلفية تلقائياً عبر:
