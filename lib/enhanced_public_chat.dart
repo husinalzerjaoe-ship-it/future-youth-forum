@@ -100,9 +100,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   void _snack(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
 
   Future<void> _grant({String? presetUid}) async {
+    final profiles=await _chatDb.collection('publicProfiles').limit(100).get();
     final uid=TextEditingController(text:presetUid??''); final days=TextEditingController(text:'7'); final reason=TextEditingController(text:'هدية من المؤسس');
     final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('منح عضوية مجانية'),content:Column(mainAxisSize:MainAxisSize.min,children:[
-      TextField(controller:uid,decoration:const InputDecoration(labelText:'UID العضو')),
+      DropdownButtonFormField<String>(isExpanded:true,decoration:const InputDecoration(labelText:'اختيار عضو'),items:profiles.docs.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.data()['name'] as String? ?? p.id,overflow:TextOverflow.ellipsis))).toList(),onChanged:(v){if(v!=null)uid.text=v;}),
+      TextField(controller:uid,decoration:const InputDecoration(labelText:'UID العضو (يُملأ عند الاختيار)')),
       TextField(controller:days,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'المدة بالأيام')),
       TextField(controller:reason,decoration:const InputDecoration(labelText:'السبب')),
     ]),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('منح'))])));
