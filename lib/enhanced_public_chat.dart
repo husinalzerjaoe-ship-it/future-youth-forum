@@ -195,10 +195,64 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ]))));
   }
 
+  Future<void> _moderateMember(String targetUid, String targetName, String kind) async {
+    final options = <String, Duration?>{
+      'ساعة واحدة': const Duration(hours: 1),
+      '24 ساعة': const Duration(hours: 24),
+      '7 أيام': const Duration(days: 7),
+      'دائم': null,
+    };
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(title: Text(kind == 'mute' ? 'كتم $targetName' : 'حظر $targetName')),
+          ...options.keys.map((label) => ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: Text(label),
+            onTap: () => Navigator.pop(c, label),
+          )),
+        ])),
+      ),
+    );
+    if (selected == null) return;
+    final duration = options[selected];
+    final now = DateTime.now();
+    final until = duration == null ? null : Timestamp.fromDate(now.add(duration));
+    final ref = _chatDb.collection('userSanctions').doc(targetUid);
+    final fields = <String, dynamic>{
+      'uid': targetUid,
+      'updatedBy': _uid,
+      'reason': 'إجراء إداري من الدردشة',
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (kind == 'mute') ...{
+        'permanentMute': duration == null,
+        'muteUntil': until,
+      } else ...{
+        'permanentBan': duration == null,
+        'banUntil': until,
+      },
+    };
+    await ref.set(fields, SetOptions(merge: true));
+    await _chatDb.collection('adminLogs').add({
+      'actorId': _uid,
+      'targetId': targetUid,
+      'action': kind == 'mute' ? 'mute' : 'ban',
+      'duration': selected,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    _snack(kind == 'mute'
+        ? 'تم كتم $targetName ($selected)'
+        : 'تم حظر $targetName ($selected)');
+  }
+
   Future<void> _showMemberActions(Map<String, dynamic> data) async {
     final memberUid = (data['senderId'] ?? '').toString();
     final memberName = (data['senderName'] ?? 'عضو').toString();
     if (memberUid.isEmpty || memberUid == _uid) return;
+    final staff = _isFounder || (await _chatDb.collection('chatModerators').doc(_uid).get()).exists;
     final action = await showModalBottomSheet<String>(
       context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl,
@@ -207,7 +261,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           ListTile(leading: const Icon(Icons.account_circle_outlined), title: const Text('عرض الملف الشخصي'), onTap: () => Navigator.pop(c, 'profile')),
           ListTile(leading: const Icon(Icons.chat_bubble_outline), title: const Text('مراسلة خاصة'), onTap: () => Navigator.pop(c, 'message')),
           ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('إبلاغ عن العضو'), onTap: () => Navigator.pop(c, 'report')),
-          ListTile(leading: const Icon(Icons.block_outlined), title: const Text('حظر العضو'), onTap: () => Navigator.pop(c, 'block')),
+          ListTile(leading: const Icon(Icons.block_outlined), title: const Text('حظر العضو عندي'), onTap: () => Navigator.pop(c, 'block')),
+          if (staff) ListTile(leading: const Icon(Icons.volume_off_outlined), title: const Text('كتم العضو'), onTap: () => Navigator.pop(c, 'mute')),
+          if (staff) ListTile(leading: const Icon(Icons.gavel_outlined), title: const Text('حظر العضو من الملتقى'), onTap: () => Navigator.pop(c, 'ban')),
         ])),
       ),
     );
@@ -231,12 +287,16 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         child: SimpleDialog(title: const Text('سبب الإبلاغ'), children: ['إساءة أو تنمّر', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة', 'سبب آخر']
           .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList())));
       if (reason != null) {
-        await _chatDb.collection('reports').add({'type': 'user', 'reportedUserId': memberUid, 'reporterId': _uid, 'reason': reason, 'status': 'new', 'createdAt': FieldValue.serverTimestamp()});
+        await _chatDb.collection('reports').add({'type': 'user', 'targetId': memberUid, 'reporterId': _uid, 'reason': reason, 'status': 'new', 'createdAt': FieldValue.serverTimestamp()});
         _snack('وصل بلاغك للإدارة');
       }
     } else if (action == 'block') {
-      await _chatDb.collection('users').doc(_uid).collection('blockedUsers').doc(memberUid).set({'uid': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
-      _snack('تم حظر العضو');
+      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
+      _snack('تم حظر العضو عندك');
+    } else if (action == 'mute' && staff) {
+      await _moderateMember(memberUid, memberName, 'mute');
+    } else if (action == 'ban' && staff) {
+      await _moderateMember(memberUid, memberName, 'ban');
     }
   }
 
