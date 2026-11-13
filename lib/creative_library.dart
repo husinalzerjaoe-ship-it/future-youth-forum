@@ -221,7 +221,6 @@ class _CreativeLibraryPageState extends State<CreativeLibraryPage> {
   }
   Future<void> saveCard(String text) async {
     try {
-      final key=GlobalKey();
       final bytes=await showDialog<Uint8List>(context:context,builder:(ctx)=>_CardExportDialog(text:text,exportKey:key));
       if(bytes==null)return;
       await Gal.putImageBytes(bytes,album:'ملتقى الأنمي');
@@ -247,7 +246,7 @@ class _CreativeLibraryPageState extends State<CreativeLibraryPage> {
           const SizedBox(height:10),
           Wrap(alignment:WrapAlignment.center,spacing:4,children:[
             IconButton(tooltip:'نسخ',onPressed:()=>Clipboard.setData(ClipboardData(text:item.value)),icon:const Icon(Icons.copy)),
-            IconButton(tooltip:'مشاركة',onPressed:()=>ShareText.share(context,item.value),icon:const Icon(Icons.share)),
+            IconButton(tooltip:'نسخ للمشاركة',onPressed:()=>ShareText.share(context,item.value),icon:const Icon(Icons.copy_all)),
             IconButton(tooltip:'حفظ كصورة',onPressed:()=>saveCard(item.value),icon:const Icon(Icons.download)),
           ])
         ])));
