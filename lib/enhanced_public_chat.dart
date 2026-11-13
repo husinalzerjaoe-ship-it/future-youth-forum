@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'advanced_features.dart';
 
 const _chatBrand = Color(0xFF6554D9);
 const _founderEmail = 'husinalzerjaoe@gmail.com';
@@ -173,6 +174,27 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ]))));
   }
 
+  Future<void> _showMemberActions(Map<String, dynamic> data) async {
+    final memberUid = (data['senderId'] ?? '').toString();
+    final memberName = (data['senderName'] ?? 'عضو').toString();
+    if (memberUid.isEmpty) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(memberName), subtitle: const Text('إجراءات الحساب')),
+            MemberSafetyActions(uid: memberUid, name: memberName),
+          ]),
+        )),
+      ),
+    );
+  }
+
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
     final d=doc.data()??{};final mine=d['senderId']==_uid;final founder=d['senderRole']=='founder';final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
@@ -181,11 +203,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,color:mine?null:Colors.white,borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFD77A):const Color(0x1A6554D9))),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
-        Row(mainAxisSize:MainAxisSize.min,children:[
+        GestureDetector(onTap:()=>_showMemberActions(d),child:Row(mainAxisSize:MainAxisSize.min,children:[
           Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:founder?const Color(0xFFB77900):_chatBrand))),
           if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:16),
           if(d['edited']==true)const Text(' • معدّلة',style:TextStyle(fontSize:10,color:Colors.black45)),
-        ]),
+        ])),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
