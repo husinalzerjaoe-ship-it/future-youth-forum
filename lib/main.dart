@@ -21,6 +21,10 @@ Future<void> main() async {
   await Supabase.initialize(
     url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
     anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
+    // Forward the signed-in Firebase ID token so Supabase Storage RLS can
+    // identify the same user. Configure Firebase as a Supabase Third-party Auth
+    // provider and add role=authenticated to Firebase ID tokens.
+    accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
   runApp(const FutureYouthApp());
 }
