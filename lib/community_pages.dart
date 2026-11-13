@@ -303,7 +303,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
    await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await file.readAsBytes(),
     fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/$safe',upsert:false));
    await send(imageUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
-  }catch(_){if(mounted)setState(()=>error='تعذر رفع الصورة. تحقق من صلاحيات مخزن الصور.');}
+  }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
  }
 
  void showStickers()=>showModalBottomSheet<void>(context:context,showDragHandle:true,
