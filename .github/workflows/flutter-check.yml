@@ -1,11 +1,11 @@
-name: Flutter quality check
+name: Flutter quality check and Android APK
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
 jobs:
-  analyze:
+  analyze-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -16,3 +16,13 @@ jobs:
         run: flutter pub get
       - name: Analyze Flutter code
         run: flutter analyze --no-pub --no-fatal-infos
+      - name: Generate Android platform files
+        run: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: future-youth-forum-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
