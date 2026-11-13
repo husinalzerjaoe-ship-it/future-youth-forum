@@ -102,7 +102,7 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
             if (s.data!.docs.isEmpty) return const Center(child: Text('ماكو خلفيات معلقة'));
             return ListView(children: s.data!.docs.map((doc) {
               final d = doc.data();
-              return ListTile(title: Text(d['title'] ?? 'خلفية'), subtitle: Text('\${d['artist'] ?? ''} • \${d['rights'] ?? ''}'),
+              return ListTile(title: Text(d['title'] ?? 'خلفية'), subtitle: Text('${d['artist'] ?? ''} • ${d['rights'] ?? ''}'),
                 trailing: Wrap(children: [
                   IconButton(icon: const Icon(Icons.check_circle, color: Colors.green), onPressed: () => review(doc, true)),
                   IconButton(icon: const Icon(Icons.cancel, color: Colors.red), onPressed: () => review(doc, false)),
@@ -133,7 +133,7 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final docs = s.data!.docs.where((doc) {
             if (filter == 'الكل') return true;
-            final d = doc.data(); return '\${d['anime'] ?? ''} \${d['title'] ?? ''}'.toLowerCase().contains(filter.toLowerCase());
+            final d = doc.data(); return '${d['anime'] ?? ''} ${d['title'] ?? ''}'.toLowerCase().contains(filter.toLowerCase());
           }).toList();
           if (docs.isEmpty) return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('المكتبة بانتظار أول الأعمال المرخّصة. شارك عملاً تملك حق نشره!')));
           return GridView.builder(padding: const EdgeInsets.all(12), itemCount: docs.length,
@@ -145,7 +145,7 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Expanded(child: Image.network(d['imageUrl'] ?? '', fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.broken_image))),
                   Padding(padding: const EdgeInsets.all(8), child: Text(d['title'] ?? 'خلفية', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold))),
-                  Padding(padding: const EdgeInsets.fromLTRB(8,0,8,8), child: Text('\${d['anime'] ?? ''} • \${d['artist'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11))),
+                  Padding(padding: const EdgeInsets.fromLTRB(8,0,8,8), child: Text('${d['anime'] ?? ''} • ${d['artist'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11))),
                 ]),
               ));
             });
@@ -235,7 +235,7 @@ class _AnimeWatchlistPageState extends State<AnimeWatchlistPage> {
             final d = doc.data(); final status = d['status'] ?? 'planned';
             return Card(child: ListTile(
               leading: CircleAvatar(child: Icon(status == 'watched' ? Icons.check : Icons.play_arrow)),
-              title: Text(d['title'] ?? 'أنمي'), subtitle: Text('\${d['genre'] ?? ''} • \${status == 'watched' ? 'تمت المشاهدة' : status == 'watching' ? 'أشاهده حالياً' : 'أريد مشاهدته'}'),
+              title: Text(d['title'] ?? 'أنمي'), subtitle: Text('${d['genre'] ?? ''} • ${status == 'watched' ? 'تمت المشاهدة' : status == 'watching' ? 'أشاهده حالياً' : 'أريد مشاهدته'}'),
               trailing: PopupMenuButton<String>(onSelected: (v) async {
                 if (v == 'delete') { await doc.reference.delete(); } else { await doc.reference.update({'status': v}); }
               }, itemBuilder: (_) => const [
@@ -282,14 +282,14 @@ class _AnimeQuizPageState extends State<AnimeQuizPage> {
     if (finished) return Center(child: Card(margin: const EdgeInsets.all(24), child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.emoji_events, size: 64, color: Colors.amber),
       const Text('خلص التحدي!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-      Text('\$score من \${questions.length}', style: const TextStyle(fontSize: 30, color: _violet, fontWeight: FontWeight.bold)),
+      Text('$score من ${questions.length}', style: const TextStyle(fontSize: 30, color: _violet, fontWeight: FontWeight.bold)),
       FilledButton.icon(onPressed: restart, icon: const Icon(Icons.replay), label: const Text('إعادة اللعب')),
     ]))));
     final q = questions[index];
     return ListView(padding: const EdgeInsets.all(18), children: [
       LinearProgressIndicator(value: (index + 1) / questions.length, minHeight: 8),
       const SizedBox(height: 12),
-      Text('السؤال \${index + 1} من \${questions.length} • نقاطك \$score', style: const TextStyle(color: _violet, fontWeight: FontWeight.bold)),
+      Text('السؤال ${index + 1} من ${questions.length} • نقاطك $score', style: const TextStyle(color: _violet, fontWeight: FontWeight.bold)),
       Card(child: Padding(padding: const EdgeInsets.all(20), child: Text(q.$1, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold)))),
       ...List.generate(q.$2.length, (i) {
         final correct = q.$3 == i, chosen = selected == i;
