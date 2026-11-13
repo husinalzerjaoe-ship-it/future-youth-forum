@@ -138,8 +138,44 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: Text(widget.otherName)),
-      body: Column(children: [
+      appBar: AppBar(
+        title: Row(children: [
+          CircleAvatar(
+            radius: 17,
+            backgroundColor: const Color(0xFF6554D9).withValues(alpha: .18),
+            child: Text(widget.otherName.isNotEmpty ? widget.otherName.characters.first : '؟',
+                style: const TextStyle(color: _brand, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(widget.otherName)),
+        ]),
+        actions: [
+          IconButton(
+            tooltip: 'معلومات المحادثة',
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('محادثة خاصة'),
+                content: Text('محادثتك مع ${widget.otherName} خاصة بينكما. يمكنك استخدام الحظر والإبلاغ من ملف العضو.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('حسناً'))],
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFFF4F0FF), Color(0xFFEAF5FF), Color(0xFFFFF0F7)],
+          ),
+        ),
+        child: Stack(children: [
+          Positioned(top: 22, right: 18, child: Icon(Icons.auto_awesome, color: _brand.withValues(alpha: .10), size: 54)),
+          Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
+          Column(children: [
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt').limit(300).snapshots(),
           builder: (context, s) {
@@ -182,7 +218,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
         ]))),
-      ]),
+          ]),
+        ]),
+      ),
     ),
   );
 }
