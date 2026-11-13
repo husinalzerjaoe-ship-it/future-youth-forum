@@ -237,7 +237,11 @@ service cloud.firestore {
     }
 
     match /userBlocks/{blockId} {
-      allow read: if request.auth != null && resource.data.blockerId == request.auth.uid;
+      // A user may check their own deterministic block document even when it does not exist yet.
+      allow get: if request.auth != null
+        && (resource == null || resource.data.blockerId == request.auth.uid);
+      allow list: if request.auth != null
+        && resource.data.blockerId == request.auth.uid;
       allow create: if request.auth != null
         && request.resource.data.blockerId == request.auth.uid
         && request.resource.data.blockedId is string
