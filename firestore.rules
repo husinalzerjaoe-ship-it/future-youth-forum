@@ -452,10 +452,30 @@ service cloud.firestore {
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 1000
+          && (
+            (request.resource.data.type == 'image'
+              && request.resource.data.imageUrl is string
+              && request.resource.data.imageUrl.matches('https://.*'))
+            || (request.resource.data.type != 'image'
+              && request.resource.data.text.size() > 0)
+          )
           && usersNotBlocked(members()[0], members()[1]);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if false;
+
+        match /reactions/{userId} {
+          allow read: if request.auth != null && request.auth.uid in members();
+          allow create, update: if request.auth != null
+            && request.auth.uid == userId
+            && request.auth.uid in members()
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.emoji in ['❤️', '😂', '🔥', '👏', '😍', '😢']
+            && usersNotBlocked(members()[0], members()[1]);
+          allow delete: if request.auth != null
+            && request.auth.uid == userId
+            && request.auth.uid in members();
+        }
       }
     }
 
