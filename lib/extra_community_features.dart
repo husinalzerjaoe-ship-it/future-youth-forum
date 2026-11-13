@@ -176,24 +176,88 @@ class LocalMusicPage extends StatefulWidget {
  @override State<LocalMusicPage> createState()=>_LocalMusicPageState();
 }
 class _LocalMusicPageState extends State<LocalMusicPage> {
- final tracks=<PlatformFile>[];int current=-1;bool loading=false;
+ final tracks=<PlatformFile>[];
+ int current=-1;
+ bool loading=false,uploading=false;
+ final db=FirebaseFirestore.instance;
+ String get uid=>FirebaseAuth.instance.currentUser!.uid;
  Future<void> addTracks() async {
   final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true);
-  if(result==null)return;setState(()=>tracks.addAll(result.files.where((f)=>f.path!=null)));
+  if(result==null)return;
+  setState(()=>tracks.addAll(result.files.where((f)=>f.path!=null)));
+ }
+ Future<void> uploadTracks() async {
+  final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true);
+  if(result==null||result.files.isEmpty)return;
+  final chosen=result.files.where((f)=>f.path!=null).toList();
+  if(chosen.isEmpty){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة ملفات الصوت من الجهاز')));return;}
+  if(chosen.any((f)=>f.size>100*1024*1024)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حجم الأغنية يتجاوز 100 ميغابايت')));return;}
+  setState(()=>uploading=true);
+  var success=0;
+  try{
+   for(final f in chosen){
+    final ext=(f.extension??'').toLowerCase();
+    if(!['mp3','m4a','aac','wav','ogg','flac'].contains(ext))continue;
+    final url=await uploadForumMedia(XFile(f.path!,name:f.name),folder:'shared-files');
+    await db.collection('sharedFiles').add({
+     'uploaderId':uid,'title':f.name,'fileName':f.name,'extension':ext,
+     'size':f.size,'fileUrl':url,'status':'pending','category':'music',
+     'createdAt':FieldValue.serverTimestamp(),
+     'safetyNote':'ملف صوتي بانتظار مراجعة المشرف. ارفع فقط ما تملك حق مشاركته.'
+    });
+    success++;
+   }
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم رفع '+success.toString()+' أغنية، وهي بانتظار موافقة الإدارة')));
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر رفع الأغاني: '+e.toString())));}
+  finally{if(mounted)setState(()=>uploading=false);}
  }
  Future<void> play(int index) async {
-  if(index<0||index>=tracks.length)return;setState(()=>loading=true);
-  try{await appAudioHandler.loadLocalQueue(tracks.map((f)=>MediaItem(id:f.path!,title:f.name,album:'مكتبتي المحلية')).toList());await appAudioHandler.skipToQueueItem(index);await appAudioHandler.play();setState(()=>current=index);}
-  catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الملف: '+e.toString())));}
+  if(index<0||index>=tracks.length)return;
+  setState(()=>loading=true);
+  try{
+   await appAudioHandler.loadLocalQueue(tracks.map((f)=>MediaItem(id:f.path!,title:f.name,album:'مكتبتي المحلية')).toList());
+   await appAudioHandler.skipToQueueItem(index);
+   await appAudioHandler.play();
+   if(mounted)setState(()=>current=index);
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الملف: '+e.toString())));}
   finally{if(mounted)setState(()=>loading=false);}
  }
-
+ Future<void> playShared(String url,String title) async {
+  setState(()=>loading=true);
+  try{await appAudioHandler.loadRemoteTrack(url,title);}
+  catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الأغنية: '+e.toString())));}
+  finally{if(mounted)setState(()=>loading=false);}
+ }
  @override Widget build(BuildContext context)=>Scaffold(
-  floatingActionButton:FloatingActionButton.extended(onPressed:addTracks,icon:const Icon(Icons.library_music),label:const Text('إضافة أغاني من جهازي')),
+  floatingActionButton:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.end,children:[
+   FloatingActionButton.extended(heroTag:'upload_shared_music',onPressed:uploading?null:uploadTracks,icon:uploading?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.cloud_upload),label:Text(uploading?'جاري الرفع':'رفع أغنية للمجتمع')),
+   const SizedBox(height:10),
+   FloatingActionButton.extended(heroTag:'add_local_music',onPressed:addTracks,icon:const Icon(Icons.library_music),label:const Text('أغاني من جهازي')),
+  ]),
   body:Column(children:[
-   Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlaybackState>(stream:appAudioHandler.playbackState,builder:(context,s){final playing=s.data?.playing??false;return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى المحلي'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية من قائمتك'),trailing:IconButton(onPressed:current<0?null:()=>playing?appAudioHandler.pause():appAudioHandler.play(),icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));})),
-   Expanded(child:tracks.isEmpty?const Center(child:Text('أضف ملفات MP3 أو صوتية من جهازك')):ListView.builder(itemCount:tracks.length,itemBuilder:(context,i)=>ListTile(leading:Icon(current==i?Icons.equalizer:Icons.audiotrack),title:Text(tracks[i].name),onTap:()=>play(i),trailing:IconButton(icon:const Icon(Icons.close),onPressed:() async {setState(()=>tracks.removeAt(i));if(tracks.isEmpty){await appAudioHandler.stop();current=-1;}})))),
-   const Padding(padding:EdgeInsets.all(12),child:Text('الموسيقى محلية ولا تُرفع إلى الخادم. التشغيل بالخلفية يعتمد على استمرار التطبيق ونظام Android وإعدادات توفير الطاقة.',style:TextStyle(fontSize:12)))
+   Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlaybackState>(stream:appAudioHandler.playbackState,builder:(context,s){
+    final playing=s.data?.playing??false;
+    return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
+   })),
+   const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • الملفات المنشورة بعد موافقة الإدارة'))),
+   Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'approved').limit(150).snapshots(),builder:(context,s){
+    if(s.hasError)return const Center(child:Text('تعذر تحميل الأغاني المنشورة'));
+    if(!s.hasData)return const Center(child:CircularProgressIndicator());
+    final docs=s.data!.docs.where((d)=>['mp3','m4a','aac','wav','ogg','flac'].contains((d.data()['extension']??'').toString().toLowerCase())).toList();
+    return ListView(children:[
+     if(docs.isEmpty)const ListTile(title:Text('ماكو أغاني منشورة بعد'),subtitle:Text('ارفع أغنية وانتظر موافقة الإدارة')),
+     ...docs.map((d){final x=d.data();return Card(child:ListTile(
+      leading:const CircleAvatar(child:Icon(Icons.audiotrack)),
+      title:Text(x['title'] as String? ?? 'مقطع صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
+      subtitle:Text('من مكتبة المجتمع • '+(x['size']??0).toString()+' بايت'),
+      trailing:IconButton(tooltip:'تشغيل',icon:const Icon(Icons.play_circle_fill),onPressed:()=>playShared(x['fileUrl'] as String,x['title'] as String? ?? 'مقطع صوتي'))
+     ));})
+    ]);
+   })),
+   const Divider(height:1),
+   const Padding(padding:EdgeInsets.all(10),child:Align(alignment:Alignment.centerRight,child:Text('مكتبتي من الجهاز'))),
+   SizedBox(height:tracks.isEmpty?64:160,child:tracks.isEmpty?const Center(child:Text('ما أضفت أغاني محلية بعد')):ListView.builder(itemCount:tracks.length,itemBuilder:(context,i)=>ListTile(leading:Icon(current==i?Icons.equalizer:Icons.audiotrack),title:Text(tracks[i].name,maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>play(i),trailing:IconButton(icon:const Icon(Icons.close),onPressed:() async {setState(()=>tracks.removeAt(i));if(tracks.isEmpty){await appAudioHandler.stop();current=-1;}})))),
+   const Padding(padding:EdgeInsets.all(10),child:Text('التشغيل بالخلفية يستخدم مشغل Android. مشاركة الأغاني تمر بمراجعة الإدارة.',style:TextStyle(fontSize:12)))
   ])
  );
 }
