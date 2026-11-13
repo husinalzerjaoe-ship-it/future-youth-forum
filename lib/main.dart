@@ -499,6 +499,7 @@ class MemberProfilePage extends StatelessWidget {
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
+            FollowControl(uid: uid),
             StarRateControl(uid: uid),
             Center(child: RatingSummary(uid: uid)),
             const Divider(height: 28),
@@ -612,5 +613,45 @@ class PostSocialActions extends StatelessWidget {
         ]))),
     ));
     controller.dispose();
+  }
+}
+
+
+class FollowControl extends StatelessWidget {
+  final String uid;
+  const FollowControl({super.key, required this.uid});
+  @override
+  Widget build(BuildContext context) {
+    final me = FirebaseAuth.instance.currentUser!.uid;
+    if (me == uid) return const SizedBox.shrink();
+    final followerRef = db.collection('publicProfiles').doc(uid).collection('followers').doc(me);
+    final followingRef = db.collection('publicProfiles').doc(me).collection('following').doc(uid);
+    return StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+      stream: followerRef.snapshots(),
+      builder: (context, snap) {
+        final following = snap.data?.exists ?? false;
+        return Column(children: [
+          FilledButton.icon(
+            onPressed: () async {
+              final batch = db.batch();
+              if (following) {
+                batch.delete(followerRef);
+                batch.delete(followingRef);
+              } else {
+                batch.set(followerRef, {'userId':me,'createdAt':FieldValue.serverTimestamp()});
+                batch.set(followingRef, {'userId':uid,'createdAt':FieldValue.serverTimestamp()});
+              }
+              await batch.commit();
+            },
+            icon: Icon(following ? Icons.person_remove_alt_1 : Icons.person_add_alt_1),
+            label: Text(following ? 'إلغاء المتابعة' : 'متابعة'),
+          ),
+          StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+            stream: db.collection('publicProfiles').doc(uid).collection('followers').snapshots(),
+            builder: (c, count) => Text('المتابعون: \${count.data?.docs.length ?? 0}'),
+          ),
+        ]);
+      },
+    );
   }
 }
