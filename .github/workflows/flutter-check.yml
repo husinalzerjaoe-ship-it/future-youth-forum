@@ -3,11 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main, fix/media-private-chat-reactions]
-  pull_request:
-    branches: [main]
 
 concurrency:
-  group: flutter-apk-${{ github.event.pull_request.head.ref || github.ref }}
+  group: flutter-apk-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   analyze-and-build:
