@@ -644,6 +644,13 @@ service cloud.firestore {
     }
 
     // Invite-only rooms: only the owner and explicitly invited member UIDs can read.
+    match /privateRooms/{roomId}/access/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId
+        && request.auth.uid in get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
+      // Access grants are written only by the trusted Cloud Function (Admin SDK).
+      allow create, update, delete: if false;
+    }
+
     match /privateRooms/{roomId} {
       allow read: if request.auth != null
         && resource.data.members is list
@@ -664,7 +671,8 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid in resource.data.members
         && (
-          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','updatedAt'])
+          (exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage','updatedAt'])
             && request.resource.data.lastMessage is string
             && request.resource.data.lastMessage.size() <= 200)
           ||
@@ -681,15 +689,18 @@ service cloud.firestore {
         function roomMembers() {
           return get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
         }
-        allow read: if request.auth != null && request.auth.uid in roomMembers();
+        allow read: if request.auth != null && request.auth.uid in roomMembers()
+          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid));
         allow create: if request.auth != null && accountNotBanned()
           && request.auth.uid in roomMembers()
+          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;
         allow update: if false;
         allow delete: if request.auth != null
+          && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
           && (request.auth.uid == get(/databases/$(database)/documents/privateRooms/$(roomId)).data.ownerId
             || resource.data.senderId == request.auth.uid);
       }
