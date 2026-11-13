@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'community_pages.dart';
 import 'advanced_features.dart';
@@ -440,7 +442,7 @@ class EditProfilePage extends StatefulWidget {
 }
 class _EditProfilePageState extends State<EditProfilePage> {
   final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController();
-  bool loading = true, saving = false;
+  bool loading = true, saving = false, uploadingPhoto = false;
   @override
   void initState() {
     super.initState();
@@ -462,8 +464,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
       const SizedBox(height: 12),
       TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
       const SizedBox(height: 12),
-      TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط صورتك المباشر https://', border: OutlineInputBorder())),
-      const Padding(padding: EdgeInsets.only(top: 8), child: Text('حالياً الصورة عن طريق رابط؛ رفع صورة من الاستوديو يحتاج تفعيل خدمة التخزين.', style: TextStyle(color: Colors.black54))),
+      TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
+      const SizedBox(height: 10),
+      OutlinedButton.icon(
+        onPressed: uploadingPhoto ? null : () async {
+          try {
+            final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1200);
+            if (picked == null) return;
+            setState(() => uploadingPhoto = true);
+            final uid = FirebaseAuth.instance.currentUser!.uid;
+            final ref = FirebaseStorage.instance.ref().child('profiles/$uid/avatar.jpg');
+            await ref.putData(await picked.readAsBytes(), SettableMetadata(contentType: 'image/jpeg'));
+            photo.text = await ref.getDownloadURL();
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
+          } catch (_) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر رفع الصورة. تأكد من نشر قواعد التخزين.')));
+          } finally { if (mounted) setState(() => uploadingPhoto = false); }
+        },
+        icon: uploadingPhoto ? const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)) : const Icon(Icons.photo_library_outlined),
+        label: Text(uploadingPhoto ? 'جارٍ رفع الصورة...' : 'اختيار صورة من الاستوديو'),
+      ),
       const SizedBox(height: 16),
       FilledButton(onPressed: saving ? null : () async {
         if (name.text.trim().isEmpty) return;
