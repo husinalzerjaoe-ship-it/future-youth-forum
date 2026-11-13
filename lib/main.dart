@@ -443,10 +443,21 @@ class MyProfilePage extends StatelessWidget {
         return ListView(padding: const EdgeInsets.all(18), children: [
           const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
-          Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+          Center(child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFFFB52E) : brand, width: 4),
+            ),
+            child: UserAvatar(url: d['photoUrl'] as String?),
+          )),
           const SizedBox(height: 8),
-          Center(child: Text(d['name'] as String? ?? 'عضو', style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold))),
+          Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
+          if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
+            const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
+          if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
+            const Center(child: Text('تطوير التطبيق: Alfredo', style: TextStyle(color: brand, fontWeight: FontWeight.bold))),
           const SizedBox(height: 10),
           Center(child: RatingSummary(uid: uid)),
           FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfilePage())),
