@@ -24,7 +24,7 @@ class DirectMessagesPage extends StatelessWidget {
         icon: const Icon(Icons.edit), label: const Text('محادثة جديدة'),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
+        stream: _db.collection('conversations').where('members', arrayContains: _uid).orderBy('updatedAt', descending: true).snapshots(),
         builder: (context, s) {
           if (s.hasError) return const Center(child: Text('تعذر تحميل الرسائل. تأكد من نشر قواعد Firestore.'));
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
@@ -216,11 +216,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
           Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
           Column(children: [
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt').limit(300).snapshots(),
+          stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt', descending: true).limit(300).snapshots(),
           builder: (context, s) {
             if (s.hasError) return const Center(child: Text('تعذر تحميل المحادثة'));
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
-            return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.map((doc) {
+            return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
               return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
