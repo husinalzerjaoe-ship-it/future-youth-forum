@@ -307,3 +307,65 @@ class FounderReportsPage extends StatelessWidget {
     );
   }
 }
+
+
+class SavedPostsPage extends StatelessWidget {
+  const SavedPostsPage({super.key});
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('المنشورات المحفوظة')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _db.collection('users').doc(_uid).collection('savedPosts').orderBy('savedAt', descending: true).limit(100).snapshots(),
+        builder: (context, s) {
+          if (s.hasError) return const Center(child: Text('تعذر تحميل المحفوظات'));
+          if (!s.hasData) return const Center(child: CircularProgressIndicator());
+          if (s.data!.docs.isEmpty) return const Center(child: Text('ما حفظت أي منشور لحد الآن'));
+          return ListView(children: s.data!.docs.map((doc) {
+            final d = doc.data();
+            return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              future: _db.collection('posts').doc(doc.id).get(),
+              builder: (context, post) {
+                if (!post.hasData || !post.data!.exists) return const ListTile(title: Text('المنشور غير متاح'));
+                final p = post.data!.data()!;
+                return Card(child: ListTile(
+                  leading: const Icon(Icons.bookmark, color: _brand),
+                  title: Text(p['authorName'] as String? ?? 'عضو'),
+                  subtitle: Text(p['text'] as String? ?? p['videoUrl'] as String? ?? 'منشور محفوظ', maxLines: 2, overflow: TextOverflow.ellipsis),
+                  trailing: IconButton(icon: const Icon(Icons.bookmark_remove_outlined), onPressed: () => doc.reference.delete()),
+                ));
+              },
+            );
+          }).toList());
+        },
+      ),
+    ),
+  );
+}
+
+class SavePostControl extends StatelessWidget {
+  final String postId;
+  const SavePostControl({super.key, required this.postId});
+  @override
+  Widget build(BuildContext context) {
+    final ref = _db.collection('users').doc(_uid).collection('savedPosts').doc(postId);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: ref.snapshots(),
+      builder: (context, s) {
+        final saved = s.data?.exists ?? false;
+        return IconButton(
+          tooltip: saved ? 'إزالة من المحفوظات' : 'حفظ المنشور',
+          onPressed: () async {
+            if (saved) {
+              await ref.delete();
+            } else {
+              await ref.set({'postId': postId, 'savedAt': FieldValue.serverTimestamp()});
+            }
+          },
+          icon: Icon(saved ? Icons.bookmark : Icons.bookmark_border, color: saved ? _brand : null),
+        );
+      },
+    );
+  }
+}
