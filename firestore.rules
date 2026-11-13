@@ -252,9 +252,13 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
+      // The array-contains query in the app already targets conversations
+      // containing the signed-in user. Do not require members.size() here:
+      // Firestore rules are not filters and cannot prove an array's size from
+      // that query, which otherwise makes the entire inbox query fail.
       allow read: if request.auth != null
+        && resource.data.members is list
         && request.auth.uid in resource.data.members
-        && resource.data.members.size() == 2
         && usersNotBlocked(resource.data.members[0], resource.data.members[1]);
       allow create: if request.auth != null
         && request.resource.data.members is list
