@@ -4,6 +4,27 @@ const { onUserCreated } = require("firebase-functions/v2/identity");
 
 initializeApp();
 
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+
+// Existing accounts can request the minimal Supabase authenticated role for
+// their own Firebase identity. This does not grant founder/admin privileges.
+exports.ensureSupabaseAuthenticatedRole = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
+  const auth = getAuth();
+  const user = await auth.getUser(request.auth.uid);
+  const claims = user.customClaims || {};
+  if (claims.role !== "authenticated") {
+    await auth.setCustomUserClaims(user.uid, {
+      ...claims,
+      role: "authenticated",
+    });
+  }
+  return { role: "authenticated" };
+});
+
+
 // Adds the role Supabase needs to recognize Firebase users as authenticated.
 // This grants no administrative privileges in either Firebase or Supabase.
 exports.addSupabaseAuthenticatedRole = onUserCreated(async (event) => {
