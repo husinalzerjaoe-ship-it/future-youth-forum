@@ -329,7 +329,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
 
   Future<void> sendImage() async {
     try {
-      final XFile? file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 1800);
+      final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (file == null) return;
       final bytes = await file.readAsBytes();
       final ext = file.name.toLowerCase().split('.').last;
