@@ -307,6 +307,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
       await FirebaseFirestore.instance.collection('messages').add({
         'text': text,
         'senderId': user.uid,
+        'senderRole': user.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member',
         'senderName': (await db.collection('publicProfiles').doc(user.uid).get()).data()?['name'] ?? user.displayName ?? 'عضو',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -386,6 +387,11 @@ class _PublicChatPageState extends State<PublicChatPage> {
                               const SizedBox(width: 7),
                               Flexible(child: Text(senderName,
                                 style: const TextStyle(color: brand, fontWeight: FontWeight.bold, fontSize: 12))),
+                              if (data['senderRole'] == 'founder') ...[
+                                const SizedBox(width: 5),
+                                const Icon(Icons.workspace_premium, size: 15, color: Color(0xFFFFB52E)),
+                                const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold)),
+                              ],
                               const SizedBox(width: 4),
                               const Icon(Icons.open_in_new, size: 12, color: brand),
                             ]),
