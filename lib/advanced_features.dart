@@ -527,12 +527,31 @@ class FounderReportsPage extends StatelessWidget {
               return Card(child: ListTile(
                 leading: Icon(d['type'] == 'user' ? Icons.person : Icons.article, color: _brand),
                 title: Text(d['reason'] as String? ?? 'بلاغ'),
-                subtitle: Text('النوع: ${d['type'] ?? 'محتوى'} • المبلّغ: ${d['reporterId'] ?? '-'}\nالمستهدف: ${d['targetId'] ?? '-'}'),
+                subtitle: Text('النوع: ${d['type'] ?? 'محتوى'} • المبلّغ: ${d['reporterName'] ?? d['reporterId'] ?? '-'}\\nالحساب المبلّغ عليه: ${d['reportedName'] ?? d['reportedUserId'] ?? d['targetId'] ?? '-'}\\nالسبب: ${d['reason'] ?? '-'}'),
                 isThreeLine: true,
-                trailing: IconButton(
-                  tooltip: done ? 'تمت المراجعة' : 'تحديد كمراجع',
-                  icon: Icon(done ? Icons.check_circle : Icons.pending_actions, color: done ? Colors.green : _brand),
-                  onPressed: () => doc.reference.update({'status': 'reviewed', 'reviewedAt': FieldValue.serverTimestamp(), 'reviewedBy': _uid}),
+                trailing: PopupMenuButton<String>(
+                  tooltip: 'إجراء إداري',
+                  icon: Icon(done ? Icons.check_circle : Icons.gavel, color: done ? Colors.green : _brand),
+                  onSelected: (action) async {
+                    final target = (d['reportedUserId'] ?? d['targetId'] ?? '').toString();
+                    if (action == 'review') {
+                      await doc.reference.update({'status': 'reviewed', 'reviewedAt': FieldValue.serverTimestamp(), 'reviewedBy': _uid});
+                    } else if (target.isNotEmpty) {
+                      final sanction = <String, dynamic>{'uid': target, 'updatedBy': _uid, 'updatedAt': FieldValue.serverTimestamp(), 'reason': d['reason'] ?? 'بلاغ عضو'};
+                      if (action == 'mute') sanction['muteUntil'] = Timestamp.fromDate(DateTime.now().add(const Duration(days: 1)));
+                      if (action == 'ban') sanction['permanentBan'] = true;
+                      if (action == 'clear') { sanction['muteUntil'] = FieldValue.delete(); sanction['permanentMute'] = false; sanction['banUntil'] = FieldValue.delete(); sanction['permanentBan'] = false; }
+                      await _db.collection('userSanctions').doc(target).set(sanction, SetOptions(merge: true));
+                      await _db.collection('adminLogs').add({'actorId': _uid, 'targetId': target, 'targetName': d['reportedName'] ?? target, 'action': action, 'createdAt': FieldValue.serverTimestamp(), 'source': 'report_review', 'reportId': doc.id});
+                      await doc.reference.update({'status': 'reviewed', 'reviewedAt': FieldValue.serverTimestamp(), 'reviewedBy': _uid});
+                    }
+                  },
+                  itemBuilder: (c) => [
+                    const PopupMenuItem(value: 'review', child: Text('تحديد كمراجع')),
+                    const PopupMenuItem(value: 'mute', child: Text('كتم يوم')),
+                    const PopupMenuItem(value: 'ban', child: Text('حظر نهائي')),
+                    const PopupMenuItem(value: 'clear', child: Text('رفع العقوبات')),
+                  ],
                 ),
               ));
             }).toList());
