@@ -118,15 +118,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final msg = convo.collection('messages').doc();
       batch.set(msg, {'senderId': _uid, 'senderName': name, 'text': value, 'createdAt': FieldValue.serverTimestamp()});
       batch.set(convo, {'lastMessage': value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-      batch.set(_db.collection('notifications').doc(), {
-        'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-        'type': 'message', 'text': 'أرسل لك رسالة خاصة', 'read': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      // Commit the message first. A notification failure must never cancel delivery.
       await batch.commit();
       controller.clear();
+      try {
+        await _db.collection('notifications').add({
+          'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
+          'type': 'message', 'text': 'أرسل لك رسالة خاصة', 'read': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        // The conversation remains delivered even if notification rules reject this write.
+      }
     } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. تحقق من قواعد Firestore.')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
   }
   @override
