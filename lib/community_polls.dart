@@ -181,7 +181,7 @@ class _PollCard extends StatelessWidget {
                     );
                   }),
                   Row(children: [
-                    Text('$total'.replaceFirst('$', '') + ' صوت', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text('$total صوت', style: const TextStyle(color: Colors.grey, fontSize: 12)),
                     const Spacer(),
                     Text(hasVoted ? 'صوّتت بالفعل' : (data['active'] == false ? 'منتهي' : 'اختر إجابتك'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
                   ]),
