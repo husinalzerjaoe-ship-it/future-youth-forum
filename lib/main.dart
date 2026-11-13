@@ -10,6 +10,7 @@ import 'community_pages.dart';
 import 'enhanced_public_chat.dart';
 import 'advanced_features.dart';
 import 'inspiration_hub.dart';
+import 'media_upload_service.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -378,13 +379,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
     try {
       final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final ext = file.name.toLowerCase().split('.').last;
-      final safeExt = ['jpg','jpeg','png','webp','gif'].contains(ext) ? ext : 'jpg';
-      final path = 'public-chat/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, bytes,
-        fileOptions: FileOptions(contentType: safeExt == 'gif' ? 'image/gif' : 'image/$safeExt', upsert: false));
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(file, folder: 'public-chat');
       await _send(imageUrl: url, type: 'image');
     } on StorageException catch (e) { if (mounted) setState(() => sendError = 'فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}'); } catch (e) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة: $e'); }
   }
@@ -657,16 +652,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1200);
             if (picked == null) return;
             setState(() => uploadingPhoto = true);
-            final uid = FirebaseAuth.instance.currentUser!.uid;
-            // Use a fresh object name so replacing an avatar needs INSERT only,
-            // avoiding Storage upsert/update-policy failures on some projects.
-            final objectPath = 'profiles/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
-            await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-              objectPath,
-              await picked.readAsBytes(),
-              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-            );
-            photo.text = Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
+            photo.text = await uploadForumMedia(picked, folder: 'profiles');
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
           } on StorageException catch (e) {
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع صورة الحساب (${e.statusCode ?? 'Storage'}): ${e.message}')));
