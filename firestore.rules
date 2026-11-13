@@ -94,8 +94,20 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow create: if request.auth != null
         && request.resource.data.reporterId == request.auth.uid
-        && request.resource.data.reason is string;
-      allow read, update, delete: if isFounder();
+        && request.resource.data.targetId is string
+        && request.resource.data.targetId.size() > 0
+        && request.resource.data.targetId != request.auth.uid
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0
+        && request.resource.data.reason.size() <= 300
+        && request.resource.data.status == 'new';
+      allow read: if isFounder();
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'reviewedAt', 'reviewedBy'])
+        && request.resource.data.status == 'reviewed'
+        && request.resource.data.reviewedBy == request.auth.uid;
+      allow delete: if isFounder();
     }
 
     match /messages/{messageId} {
@@ -217,7 +229,13 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.recipientId is string
-        && request.resource.data.recipientId != request.auth.uid;
+        && request.resource.data.recipientId.size() > 0
+        && request.resource.data.recipientId != request.auth.uid
+        && request.resource.data.type in ['follow', 'like', 'comment', 'message']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 180
+        && request.resource.data.read == false;
       allow read: if request.auth != null && resource.data.recipientId == request.auth.uid;
       allow update: if request.auth != null
         && resource.data.recipientId == request.auth.uid
