@@ -102,6 +102,8 @@ class PrivateRoomChatPage extends StatefulWidget {
 }
 class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
  final db=FirebaseFirestore.instance;final text=TextEditingController();bool busy=false;
+ int _background=0xFFF5F3FF;
+ static const _roomBackgrounds=[0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5,0xFFEDE7F6,0xFFE0F2F1,0xFFFFF8E1,0xFFE3F2FD,0xFF263238,0xFFFCE4EC];
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
  Future<void> send() async {
   final value=text.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
@@ -112,11 +114,13 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   finally{if(mounted)setState(()=>busy=false);}
  }
  @override void dispose(){text.dispose();super.dispose();}
- @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName)),body:Column(children:[
-  Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
+ @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName),actions:[
+  IconButton(tooltip:'خلفية المحادثة',icon:const Icon(Icons.palette_outlined),onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_roomBackgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:const Text('اختيار هذه الخلفية'),onTap:(){Navigator.pop(c);setState(()=>_background=v);})).toList())))
+ ]),body:Column(children:[
+  Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
    if(s.hasError)return const Center(child:Text('تعذر تحميل الرسائل'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
    return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Text(x['text'] as String? ?? '',style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))));}).toList());
-  })),
+  }))),
   SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ]));
 }
