@@ -669,7 +669,8 @@ service cloud.firestore {
         && request.resource.data.invitedUids == request.resource.data.members
         && (!('roomType' in request.resource.data)
           || request.resource.data.roomType in ['text', 'voice'])
-        && (request.resource.data.roomType != 'voice'
+        && (!('roomType' in request.resource.data)
+          || request.resource.data.roomType != 'voice'
           || (request.resource.data.meetUrl is string
             && request.resource.data.meetUrl.matches('https://meet\\.google\\.com/.*')));
       allow update: if request.auth != null
