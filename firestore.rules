@@ -84,7 +84,7 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.reporterId == request.auth.uid
         && request.resource.data.reason is string;
-      allow read, update, delete: if false;
+      allow read, update, delete: if isFounder();
     }
 
     match /messages/{messageId} {
@@ -143,5 +143,64 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 1000;
       allow update, delete: if isFounder();
     }
+
+    match /userBlocks/{blockId} {
+      allow read: if request.auth != null && resource.data.blockerId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.blockerId == request.auth.uid
+        && request.resource.data.blockedId is string
+        && request.resource.data.blockedId != request.auth.uid
+        && blockId == request.auth.uid + '_' + request.resource.data.blockedId;
+      allow delete: if request.auth != null && resource.data.blockerId == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /conversations/{conversationId} {
+      allow read: if request.auth != null
+        && request.auth.uid in resource.data.members
+        && resource.data.members.size() == 2
+        && usersNotBlocked(resource.data.members[0], resource.data.members[1]);
+      allow create: if request.auth != null
+        && request.resource.data.members is list
+        && request.resource.data.members.size() == 2
+        && request.auth.uid in request.resource.data.members
+        && usersNotBlocked(request.resource.data.members[0], request.resource.data.members[1]);
+      allow update: if request.auth != null
+        && request.auth.uid in resource.data.members
+        && request.resource.data.members == resource.data.members
+        && usersNotBlocked(resource.data.members[0], resource.data.members[1]);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function members() {
+          return get(/databases/$(database)/documents/conversations/$(conversationId)).data.members;
+        }
+        allow read: if request.auth != null
+          && request.auth.uid in members()
+          && usersNotBlocked(members()[0], members()[1]);
+        allow create: if request.auth != null
+          && request.auth.uid in members()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && usersNotBlocked(members()[0], members()[1]);
+        allow update, delete: if false;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow create: if request.auth != null
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != request.auth.uid;
+      allow read: if request.auth != null && resource.data.recipientId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+        && request.resource.data.read is bool;
+      allow delete: if false;
+    }
+
   }
 }
