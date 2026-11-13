@@ -36,20 +36,40 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Existing accounts may predate the onUserCreated trigger. This callable
-  // safely adds role=authenticated to the current user's custom claims.
-  await FirebaseFunctions.instance
-      .httpsCallable('ensureSupabaseAuthenticatedRole')
-      .call();
-
-  final token = await user.getIdToken(true);
-  if (token == null || token.split('.').length != 3) {
-    throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
+  // First inspect the existing Firebase token. Most users already have the
+  // Supabase authenticated claim from account creation, so do not make every
+  // upload depend on a separately deployed callable function.
+  Future<Map<String, dynamic>> readClaims({required bool forceRefresh}) async {
+    final token = await user.getIdToken(forceRefresh);
+    if (token == null || token.split('.').length != 3) {
+      throw StateError('تعذر قراءة رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
+    }
+    final payload = token.split('.')[1];
+    return jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(payload))),
+    ) as Map<String, dynamic>;
   }
-  final payload = token.split('.')[1];
-  final claims = jsonDecode(
-    utf8.decode(base64Url.decode(base64Url.normalize(payload))),
-  ) as Map<String, dynamic>;
+
+  var claims = await readClaims(forceRefresh: false);
+  if (claims['role'] != 'authenticated') {
+    // Backward compatibility for older accounts. If the callable is absent,
+    // surface a clear setup error instead of the raw NOT_FOUND stack trace.
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('ensureSupabaseAuthenticatedRole')
+          .call();
+      claims = await readClaims(forceRefresh: true);
+    } on FirebaseFunctionsException catch (e) {
+      if (e.code == 'not-found') {
+        throw StateError(
+          'رفع الصور غير مهيأ لهذا الحساب: صلاحية التخزين غير موجودة '
+          'وخدمة التهيئة على Firebase غير منشورة. يلزم إعداد الصلاحية '
+          'من جهة الخادم قبل الرفع؛ لن نفتح التخزين للعامة.',
+        );
+      }
+      rethrow;
+    }
+  }
   if (claims['role'] != 'authenticated') {
     throw StateError('صلاحية التخزين لم تتحدث بعد. أعد المحاولة بعد لحظات.');
   }
