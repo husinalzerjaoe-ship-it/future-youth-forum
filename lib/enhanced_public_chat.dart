@@ -20,6 +20,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  DateTime? _lastSuccessfulSend;
   String? _error;
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
@@ -47,6 +48,13 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
   Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
+    final now = DateTime.now();
+    final last = _lastSuccessfulSend;
+    if (last != null && now.difference(last) < const Duration(seconds: 5)) {
+      final remaining = 5 - now.difference(last).inSeconds;
+      if (mounted) setState(() => _error = 'حتى نحافظ على هدوء الرومات، انتظر $remaining ثواني قبل الرسالة التالية.');
+      return;
+    }
     if (type == 'text' && _containsBlockedTerm(body)) {
       if (mounted) setState(() => _error = 'رسالتك تحتوي كلمات ممنوعة. عدّلها قبل الإرسال.');
       return;
@@ -74,6 +82,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           }
         }
       }
+      _lastSuccessfulSend = DateTime.now();
       _text.clear(); _reply=null;
       await _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_) {});
     } catch (_) { if(mounted)setState(()=>_error='تعذر إرسال الرسالة. تحقق من قواعد Firestore والتخزين.'); }
