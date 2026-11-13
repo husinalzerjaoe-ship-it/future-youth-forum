@@ -2,8 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 /// Live ranking. Weekly points are written by trusted Cloud Functions.
-class _Leaderboard extends StatelessWidget {
-  const _Leaderboard();
+class LeaderboardWidget extends StatelessWidget {
+  const LeaderboardWidget();
 
   @override
   Widget build(BuildContext context) {
