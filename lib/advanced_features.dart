@@ -193,6 +193,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
     if ((value.isEmpty && imageUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
+      final theirBlock = await _db.collection('userBlocks').doc('${widget.otherUid}_${_uid}').get();
+      if (myBlock.exists || theirBlock.exists) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن إرسال الرسائل: يوجد حظر بين الحسابين.')));
+        return;
+      }
+      final sanction = (await _db.collection('userSanctions').doc(_uid).get()).data() ?? {};
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      final banUntil = sanction['banUntil'] is Timestamp ? (sanction['banUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      if (sanction['permanentBan'] == true || banUntil > nowMs || sanction['permanentMute'] == true || muteUntil > nowMs) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكنك إرسال الرسائل حالياً بسبب إجراء إداري على حسابك.')));
+        return;
+      }
       final profile = await _db.collection('publicProfiles').doc(_uid).get();
       final name = profile.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
       final batch = _db.batch();
