@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -168,7 +169,7 @@ class WallpaperDetailPage extends StatelessWidget {
       if (response.statusCode != 200) throw Exception('download');
       final bytes = await response.fold<List<int>>(<int>[], (all, chunk) => all..addAll(chunk));
       if (!await Gal.hasAccess() && !await Gal.requestAccess()) throw Exception('permission');
-      await Gal.putImageBytes(bytes, album: 'ملتقى الأنمي');
+      await Gal.putImageBytes(Uint8List.fromList(bytes), album: 'ملتقى الأنمي');
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الخلفية بالمعرض')));
     } catch (_) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تنزيل الخلفية')));
