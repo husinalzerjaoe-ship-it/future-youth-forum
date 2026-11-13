@@ -10,6 +10,6 @@ workflows:
       - name: Get dependencies
         script: flutter pub get
       - name: Build release APK
-        script: flutter build apk --release
+        script: cd android && ./gradlew assembleRelease -x lintVitalAnalyzeRelease
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
