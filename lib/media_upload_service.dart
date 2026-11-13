@@ -58,10 +58,12 @@ Future<String> uploadForumMedia(
     'png': 'image/png',
     'webp': 'image/webp',
     'gif': 'image/gif',
+    'mp4': 'video/mp4',
+    'mov': 'video/quicktime',
   };
   final contentType = mimeTypes[ext];
   if (contentType == null) {
-    throw ArgumentError('صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WEBP أو GIF.');
+    throw ArgumentError('صيغة الملف غير مدعومة. استخدم JPG أو PNG أو WEBP أو GIF أو MP4 أو MOV.');
   }
 
   final bytes = await file.readAsBytes();
