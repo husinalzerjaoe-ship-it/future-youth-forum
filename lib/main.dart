@@ -527,6 +527,11 @@ class MyProfilePage extends StatelessWidget {
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
+          if (d['membershipTier'] is String && (d['membershipTier'] as String).isNotEmpty)
+            Center(child: Padding(padding: const EdgeInsets.only(top: 10), child: _MembershipCard(
+              tier: d['membershipTier'] as String,
+              expiresAt: d['membershipExpiresAt'],
+            ))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Text('تطوير التطبيق: Alfredo', style: TextStyle(color: brand, fontWeight: FontWeight.bold))),
           const SizedBox(height: 10),
@@ -538,6 +543,33 @@ class MyProfilePage extends StatelessWidget {
           MemberPosts(uid: uid),
         ]);
       },
+    );
+  }
+}
+
+class _MembershipCard extends StatelessWidget {
+  final String tier;
+  final dynamic expiresAt;
+  const _MembershipCard({required this.tier, this.expiresAt});
+  @override
+  Widget build(BuildContext context) {
+    final date = expiresAt is Timestamp ? (expiresAt as Timestamp).toDate() : null;
+    final active = date == null || date.isAfter(DateTime.now());
+    final label = switch (tier.toLowerCase()) {
+      'gold' || 'ذهبية' => 'عضوية ذهبية',
+      'silver' || 'فضية' => 'عضوية فضية',
+      'legendary' || 'أسطورية' => 'عضوية أسطورية',
+      _ => 'عضوية مشتركة',
+    };
+    final color = tier.toLowerCase() == 'gold' || tier == 'ذهبية' ? const Color(0xFFFFB52E)
+      : tier.toLowerCase() == 'silver' || tier == 'فضية' ? const Color(0xFF8FA9C8) : brand;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: color.withValues(alpha: .13), border: Border.all(color: color, width: 1.5), borderRadius: BorderRadius.circular(16)),
+      child: Column(children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.workspace_premium, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
+        if (date != null) Text(active ? 'تنتهي: ${date.year}/${date.month}/${date.day}' : 'انتهت العضوية', style: const TextStyle(fontSize: 12)),
+      ]),
     );
   }
 }
