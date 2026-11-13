@@ -5,6 +5,9 @@
 - Members can report another account and block private messages.
 - Founder and assigned chat moderators can apply 1-minute, 1-hour, 1-day, or permanent chat mutes; a 24-hour temporary suspension; a permanent account ban; or clear sanctions.
 - Report review displays the reporter and reported account, and lets the founder review, mute for one day, permanently ban, or clear sanctions.
+- The founder shield shows a count of new reports.
+- Stories record unique viewer accounts and support replies with notifications to the story owner.
+- Public chat supports exact-name `@mentions` and sends a notification to the matching account.
 - Every moderation action writes an append-only `adminLogs` record.
 - The founder has a quick link to the moderation log.
 - Public chat input has a basic Arabic profanity filter.
