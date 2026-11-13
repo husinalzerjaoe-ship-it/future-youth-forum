@@ -156,35 +156,7 @@ class _StoriesPageState extends State<StoriesPage>{
   if(file==null)return;setState(()=>busy=true);
   try{
    final u=FirebaseAuth.instance.currentUser!;
-   // Refresh Firebase ID token before Storage upload so newly assigned custom
-   // claims (especially role=authenticated) are included.
-   final idToken=await u.getIdToken(true);
-   if(idToken==null||idToken.split('.').length!=3){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة رمز Firebase. سجّل خروج وادخل من جديد.')));
-    return;
-   }
-   final jwtParts=idToken.split('.');
-   Map<String,dynamic> jwtHeader={},jwtClaims={};
-   try{
-    jwtHeader=jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwtParts[0])))) as Map<String,dynamic>;
-    jwtClaims=jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwtParts[1])))) as Map<String,dynamic>;
-   }catch(_){}
-   if(jwtHeader['alg']!='RS256'){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('إعداد توقيع Firebase غير متوافق: alg=${jwtHeader['alg']??'غير موجود'}.')));
-    return;
-   }
-   if(jwtClaims['role']!='authenticated'){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('رمز Firebase ما بيه role=authenticated. لازم نضيف الصلاحية من Firebase Admin/Cloud Functions، مو من التطبيق.')));
-    return;
-   }
-   final ext=file.path.split('.').last;
-   final objectPath='stories/'+u.uid+'/'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+ext;
-   final contentType=type=='video' ? (ext.toLowerCase()=='mov' ? 'video/quicktime' : 'video/mp4') : (ext.toLowerCase()=='png' ? 'image/png' : ext.toLowerCase()=='webp' ? 'image/webp' : 'image/jpeg');
-   await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-    objectPath, await file.readAsBytes(),
-    fileOptions: FileOptions(contentType:contentType,upsert:false),
-   );
-   final url=Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
+   final url=await uploadForumMedia(file,folder:'stories');
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
    await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(hours:24)))});
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الستوري لمدة 24 ساعة')));
