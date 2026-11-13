@@ -688,7 +688,8 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
           && request.resource.data.text.size() <= 2000;
-        allow update, delete: if request.auth != null
+        allow update: if false;
+        allow delete: if request.auth != null
           && (request.auth.uid == get(/databases/$(database)/documents/privateRooms/$(roomId)).data.ownerId
             || resource.data.senderId == request.auth.uid);
       }
