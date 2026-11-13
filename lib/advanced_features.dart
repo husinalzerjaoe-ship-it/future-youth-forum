@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
 final _db = FirebaseFirestore.instance;
@@ -148,16 +148,37 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } catch (_) {}
   }
   Future<void> _chooseBackground() async {
+    final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
+      builder: (c) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const ListTile(title: Text('اختر خلفية المحادثة')),
+        ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('صورة من جهازي'), onTap: () => Navigator.pop(c, 'device')),
+        ListTile(leading: const Icon(Icons.nightlight_round), title: const Text('ليل بنفسجي'), onTap: () => Navigator.pop(c, 'preset:violet')),
+        ListTile(leading: const Icon(Icons.landscape_outlined), title: const Text('سماء الأنمي'), onTap: () => Navigator.pop(c, 'preset:sky')),
+        ListTile(leading: const Icon(Icons.brightness_4_outlined), title: const Text('قمر ساكورا'), onTap: () => Navigator.pop(c, 'preset:sakura')),
+        ListTile(leading: const Icon(Icons.restart_alt), title: const Text('إزالة الخلفية'), onTap: () => Navigator.pop(c, 'clear')),
+      ]))));
+    if (choice == null || !mounted) return;
+    if (choice == 'clear') {
+      await _db.collection('conversations').doc(widget.conversationId).set({'backgrounds': {_uid: FieldValue.delete()}}, SetOptions(merge: true));
+      if (mounted) setState(() => backgroundUrl = null);
+      return;
+    }
+    if (choice.startsWith('preset:')) {
+      const presets = {
+        'preset:violet': 'https://images.unsplash.com/photo-1519608487953-e999c86e7455?w=1200',
+        'preset:sky': 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200',
+        'preset:sakura': 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=1200',
+      };
+      final url = presets[choice]!;
+      await _db.collection('conversations').doc(widget.conversationId).set({'backgrounds': {_uid: url}}, SetOptions(merge: true));
+      if (mounted) setState(() => backgroundUrl = url);
+      return;
+    }
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1600);
     if (picked == null || !mounted) return;
     setState(() => changingBackground = true);
     try {
-      final bytes = await picked.readAsBytes();
-      final path = 'chat-backgrounds/$_uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-        path, bytes, fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-      );
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(picked, folder: 'chat-backgrounds');
       await _db.collection('conversations').doc(widget.conversationId).set({
         'backgrounds': {_uid: url},
       }, SetOptions(merge: true));
@@ -167,33 +188,71 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
   @override void dispose() { controller.dispose(); super.dispose(); }
-  Future<void> send() async {
+  Future<void> send({String? imageUrl}) async {
     final value = controller.text.trim();
-    if (value.isEmpty || busy) return;
+    if ((value.isEmpty && imageUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
+      final theirBlock = await _db.collection('userBlocks').doc('${widget.otherUid}_${_uid}').get();
+      if (myBlock.exists || theirBlock.exists) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن إرسال الرسائل: يوجد حظر بين الحسابين.')));
+        return;
+      }
+      final sanction = (await _db.collection('userSanctions').doc(_uid).get()).data() ?? {};
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      final banUntil = sanction['banUntil'] is Timestamp ? (sanction['banUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      if (sanction['permanentBan'] == true || banUntil > nowMs || sanction['permanentMute'] == true || muteUntil > nowMs) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكنك إرسال الرسائل حالياً بسبب إجراء إداري على حسابك.')));
+        return;
+      }
       final profile = await _db.collection('publicProfiles').doc(_uid).get();
       final name = profile.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-      // Commit the message first. A notification failure must never cancel delivery.
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': imageUrl == null ? 'text' : 'image', if (imageUrl != null) 'imageUrl': imageUrl, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': imageUrl == null ? value : '📷 صورة', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': 'أرسل لك رسالة خاصة', 'read': false,
-          'createdAt': FieldValue.serverTimestamp(),
+          'type': 'message', 'text': imageUrl == null ? 'أرسل لك رسالة خاصة' : 'أرسل لك صورة',
+          'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
-      } catch (_) {
-        // The conversation remains delivered even if notification rules reject this write.
-      }
+      } catch (_) {}
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
+  }
+  Future<void> sendImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1600);
+    if (picked == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      final url = await uploadForumMedia(picked, folder: 'private-chat');
+      if (mounted) setState(() => busy = false);
+      await send(imageUrl: url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع الصورة: $e')));
+      if (mounted) setState(() => busy = false);
+    }
+  }
+  Future<void> reactToMessage(String messageId, String emoji) async {
+    final ref = _db.collection('conversations').doc(widget.conversationId).collection('messages').doc(messageId).collection('reactions').doc(_uid);
+    final old = await ref.get();
+    if (old.data()?['emoji'] == emoji) { await ref.delete(); }
+    else { await ref.set({'uid': _uid, 'emoji': emoji, 'updatedAt': FieldValue.serverTimestamp()}); }
+  }
+  Future<void> showMessageActions(DocumentSnapshot<Map<String,dynamic>> doc) async {
+    final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
+      builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
+        const ListTile(title: Text('تفاعل مع الرسالة')),
+        ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
+      ])));
+    if (choice != null) await reactToMessage(doc.id, choice);
   }
   @override
   Widget build(BuildContext context) => Directionality(
@@ -261,10 +320,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
-              return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
+              return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
-                decoration: BoxDecoration(color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface, border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .55)), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: mine ? const Color(0xFFE8E2FF) : Colors.white, border: Border.all(color: const Color(0xFFB9B9C8)), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 5, offset: Offset(0, 2))]),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if ((d['senderId'] as String? ?? '').isNotEmpty)
                     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
@@ -290,13 +349,22 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
-                  Text(d['text'] as String? ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 15, height: 1.45)),
+                  if (d['type'] == 'image' && d['imageUrl'] is String)
+                    ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
+                  if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
+                  StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream: doc.reference.collection('reactions').snapshots(), builder: (c, rs) {
+                    final counts = <String,int>{};
+                    for (final r in rs.data?.docs ?? []) { final e = r.data()['emoji'] as String? ?? ''; counts[e] = (counts[e] ?? 0) + 1; }
+                    if (counts.isEmpty) return const SizedBox.shrink();
+                    return Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 8, children: counts.entries.map((e) => Text('${e.key} ${e.value}', style: const TextStyle(fontSize: 12))).toList()));
+                  }),
                 ]),
-              ));
+              )));
             }).toList());
           },
         )),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
+          IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),

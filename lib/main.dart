@@ -7,9 +7,13 @@ import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'community_pages.dart';
+import 'community_plus.dart';
 import 'enhanced_public_chat.dart';
 import 'advanced_features.dart';
-import 'inspiration_hub.dart';
+import 'media_upload_service.dart';
+import 'creative_library.dart';
+import 'extra_community_features.dart';
+import 'local_audio_handler.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -27,6 +31,7 @@ Future<void> main() async {
     // provider and add role=authenticated to Firebase ID tokens.
     accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
+  await initializeLocalAudioService();
   runApp(const FutureYouthApp());
 }
 
@@ -35,7 +40,7 @@ class FutureYouthApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'ملتقى شباب المستقبل',
+    title: 'ملتقى الأنمي',
     themeMode: ThemeMode.system,
     theme: ThemeData(
       useMaterial3: true,
@@ -132,7 +137,7 @@ class _AuthPageState extends State<AuthPage> {
             child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Icon(Icons.groups_rounded, size: 58, color: brand),
               const SizedBox(height: 12),
-              const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
+              const Text('ملتقى الأنمي', textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(registering ? 'أنشئ حسابك وابدأ المشاركة' : 'سجّل دخولك للمتابعة',
@@ -196,41 +201,61 @@ class _HomePageState extends State<HomePage> {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
-        title: const Text('ملتقى شباب المستقبل'),
+        title: const Text('ملتقى الأنمي'),
         actions: [
+          IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
           IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
-          IconButton(tooltip: 'المحفوظات', icon: const Icon(Icons.bookmarks_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsPage()))),
-          IconButton(tooltip: 'القصائد والاقتباسات والأدعية', icon: const Icon(Icons.auto_awesome),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InspirationHubPage()))),
           IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesPage()))),
           IconButton(tooltip: 'الإشعارات', icon: const Icon(Icons.notifications_none),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()))),
-          IconButton(tooltip: 'الأمان والحظر', icon: const Icon(Icons.shield_outlined),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSafetyPage()))),
-          if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
-            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: db.collection('reports').where('status', isEqualTo: 'new').limit(99).snapshots(),
-              builder: (context, reports) => IconButton(
-                tooltip: 'البلاغات الجديدة',
-                icon: Stack(clipBehavior: Clip.none, children: [
-                  const Icon(Icons.admin_panel_settings),
-                  if ((reports.data?.docs.length ?? 0) > 0)
-                    Positioned(right: -7, top: -7, child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      child: Text('${reports.data!.docs.length}', style: const TextStyle(color: Colors.white, fontSize: 9)),
-                    )),
-                ]),
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderReportsPage())),
-              ),
-            ),
-            IconButton(tooltip: 'سجل المشرفين', icon: const Icon(Icons.history),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationLogPage()))),
-          IconButton(onPressed: () => FirebaseAuth.instance.signOut(),
-            icon: const Icon(Icons.logout), tooltip: 'تسجيل الخروج'),
+          PopupMenuButton<String>(
+            tooltip: 'المزيد من الخدمات',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              switch (value) {
+                case 'communityPlus':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage()));
+                  break;
+                case 'saved':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const SavedPostsPage()));
+                  break;
+                case 'inspiration':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CreativeLibraryPage()));
+                  break;
+                case 'extras':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()));
+                  break;
+                case 'safety':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSafetyPage()));
+                  break;
+                case 'reports':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderReportsPage()));
+                  break;
+                case 'moderation':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationLogPage()));
+                  break;
+                case 'logout':
+                  FirebaseAuth.instance.signOut();
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'communityPlus', child: ListTile(leading: Icon(Icons.forum_outlined), title: Text('مجتمع الأوتاكو والنقاشات'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'saved', child: ListTile(leading: Icon(Icons.bookmarks_outlined), title: Text('المحفوظات'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'inspiration', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('مكتبة العبارات والأدعية'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'extras', child: ListTile(leading: Icon(Icons.hub_outlined), title: Text('الغرف الخاصة والملفات والموسيقى'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'safety', child: ListTile(leading: Icon(Icons.shield_outlined), title: Text('الأمان والحظر'), contentPadding: EdgeInsets.zero)),
+              if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
+                const PopupMenuItem(value: 'reports', child: ListTile(leading: Icon(Icons.admin_panel_settings), title: Text('لوحة البلاغات'), contentPadding: EdgeInsets.zero)),
+              if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
+                const PopupMenuItem(value: 'moderation', child: ListTile(leading: Icon(Icons.history), title: Text('سجل المشرفين'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'), contentPadding: EdgeInsets.zero)),
+            ],
+          ),
         ],
       ),
       body: IndexedStack(index: selected, children: const [PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
@@ -290,10 +315,39 @@ class PostsPage extends StatelessWidget {
         final posts = s.data!.docs;
         return Scaffold(
           body: ListView(padding: const EdgeInsets.all(14), children: [
-            Container(padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(gradient: const LinearGradient(colors: [darkBrand, brand, Color(0xFF35BCEB)]), borderRadius: BorderRadius.circular(20)),
-              child: Text('أهلاً بك ${user.displayName ?? 'صديقنا'} 👋\nشارك أفكارك وتعرّف على أعضاء الملتقى.',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF17102F), Color(0xFF5123A8), Color(0xFF24134B)]),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF9C70FF), width: 1.2),
+                boxShadow: const [BoxShadow(color: Color(0x445D2DB5), blurRadius: 16, offset: Offset(0, 5))],
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: false,
+                  iconColor: Colors.white,
+                  collapsedIconColor: const Color(0xFFD6B7FF),
+                  leading: const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD66B), size: 30),
+                  title: const Text('رسالة ترحيب من المطوّر ألفريدو 👑',
+                    style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                  subtitle: Text('أهلاً بك ${user.displayName ?? 'صديقنا'}… نورت الملتقى',
+                    style: const TextStyle(color: Color(0xFFE2D7FF))),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                  children: const [
+                    Text('«أنا لا أبحث عن مكانٍ بين النجوم؛ أنا السماء التي تتعلّم النجوم كيف تلمع فيها.»',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFFFD66B), fontSize: 16, fontWeight: FontWeight.bold, height: 1.6)),
+                    SizedBox(height: 12),
+                    Text(
+                      'أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.\\n\\n'
+                      'وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.\\n\\n'
+                      'قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.\\n— Alfredo | المطوّر 👑',
+                      style: TextStyle(color: Colors.white, fontSize: 14, height: 1.8)),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -368,13 +422,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
     try {
       final XFile? file = await picker.pickImage(source: ImageSource.gallery);
       if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final ext = file.name.toLowerCase().split('.').last;
-      final safeExt = ['jpg','jpeg','png','webp','gif'].contains(ext) ? ext : 'jpg';
-      final path = 'public-chat/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path, bytes,
-        fileOptions: FileOptions(contentType: safeExt == 'gif' ? 'image/gif' : 'image/$safeExt', upsert: false));
-      final url = Supabase.instance.client.storage.from('forum-media').getPublicUrl(path);
+      final url = await uploadForumMedia(file, folder: 'public-chat');
       await _send(imageUrl: url, type: 'image');
     } on StorageException catch (e) { if (mounted) setState(() => sendError = 'فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}'); } catch (e) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة: $e'); }
   }
@@ -527,6 +575,17 @@ class MyProfilePage extends StatelessWidget {
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: db.collection('memberships').doc(uid).snapshots(),
+            builder: (context, membership) {
+              final m = membership.data?.data() ?? {};
+              final tier = (m['tier'] ?? d['membershipTier'] ?? '').toString();
+              final expiry = m['expiresAt'] ?? d['membershipExpiresAt'];
+              if (tier.isEmpty) return const SizedBox.shrink();
+              return Center(child: Padding(padding: const EdgeInsets.only(top: 10),
+                child: _MembershipCard(tier: tier, expiresAt: expiry)));
+            },
+          ),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Text('تطوير التطبيق: Alfredo', style: TextStyle(color: brand, fontWeight: FontWeight.bold))),
           const SizedBox(height: 10),
@@ -542,13 +601,61 @@ class MyProfilePage extends StatelessWidget {
   }
 }
 
+class _MembershipCard extends StatelessWidget {
+  final String tier;
+  final dynamic expiresAt;
+  const _MembershipCard({required this.tier, this.expiresAt});
+  @override
+  Widget build(BuildContext context) {
+    final date = expiresAt is Timestamp ? (expiresAt as Timestamp).toDate() : null;
+    final active = date == null || date.isAfter(DateTime.now());
+    final label = switch (tier.toLowerCase()) {
+      'gold' || 'ذهبية' => 'عضوية ذهبية',
+      'silver' || 'فضية' => 'عضوية فضية',
+      'legendary' || 'أسطورية' => 'عضوية أسطورية',
+      'premium' || 'مميزة' => 'عضوية مميزة',
+      _ => 'عضوية مشتركة',
+    };
+    final color = tier.toLowerCase() == 'gold' || tier == 'ذهبية' ? const Color(0xFFFFB52E)
+      : tier.toLowerCase() == 'silver' || tier == 'فضية' ? const Color(0xFF8FA9C8) : brand;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(color: color.withValues(alpha: .13), border: Border.all(color: color, width: 1.5), borderRadius: BorderRadius.circular(16)),
+      child: Column(children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.workspace_premium, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
+        if (date != null) Text(active ? 'تنتهي: ${date.year}/${date.month}/${date.day}' : 'انتهت العضوية', style: const TextStyle(fontSize: 12)),
+      ]),
+    );
+  }
+}
+
 class UserAvatar extends StatelessWidget {
   final String? url;
-  const UserAvatar({super.key, this.url});
+  final double radius;
+  const UserAvatar({super.key, this.url, this.radius = 42});
   @override
-  Widget build(BuildContext context) => CircleAvatar(radius: 42,
-    backgroundImage: url != null && url!.startsWith('https://') ? NetworkImage(url!) : null,
-    child: url == null || !url!.startsWith('https://') ? const Icon(Icons.person, size: 42) : null);
+  Widget build(BuildContext context) {
+    final valid = url != null && url!.startsWith('https://');
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      child: valid
+          ? ClipOval(
+              child: Image.network(
+                url!,
+                width: radius * 2,
+                height: radius * 2,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : SizedBox(width: radius * 2, height: radius * 2,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                errorBuilder: (context, error, stack) => Icon(Icons.person, size: radius, color: Theme.of(context).colorScheme.onPrimaryContainer),
+              ),
+            )
+          : Icon(Icons.person, size: radius, color: Theme.of(context).colorScheme.onPrimaryContainer),
+    );
+  }
 }
 
 class EditProfilePage extends StatefulWidget {
@@ -588,16 +695,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1200);
             if (picked == null) return;
             setState(() => uploadingPhoto = true);
-            final uid = FirebaseAuth.instance.currentUser!.uid;
-            // Use a fresh object name so replacing an avatar needs INSERT only,
-            // avoiding Storage upsert/update-policy failures on some projects.
-            final objectPath = 'profiles/$uid/${DateTime.now().millisecondsSinceEpoch}.jpg';
-            await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-              objectPath,
-              await picked.readAsBytes(),
-              fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-            );
-            photo.text = Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
+            photo.text = await uploadForumMedia(picked, folder: 'profiles');
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الصورة')));
           } on StorageException catch (e) {
             if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل رفع صورة الحساب (${e.statusCode ?? 'Storage'}): ${e.message}')));
@@ -689,6 +787,25 @@ class MemberProfilePage extends StatelessWidget {
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
+            if (uid != FirebaseAuth.instance.currentUser!.uid)
+              FilledButton.icon(
+                onPressed: () async {
+                  final me = FirebaseAuth.instance.currentUser!.uid;
+                  final id = me.compareTo(uid) < 0 ? '${me}_${uid}' : '${uid}_${me}';
+                  final ref = db.collection('conversations').doc(id);
+                  final old = await ref.get();
+                  if (!old.exists) {
+                    final mine = await db.collection('publicProfiles').doc(me).get();
+                    await ref.set({'members': [me, uid], 'memberNames': {
+                      me: mine.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+                      uid: d['name'] ?? fallbackName,
+                    }, 'updatedAt': FieldValue.serverTimestamp()});
+                  }
+                  if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(
+                    conversationId: id, otherUid: uid, otherName: d['name'] as String? ?? fallbackName)));
+                },
+                icon: const Icon(Icons.message), label: const Text('مراسلة خاصة'),
+              ),
             FollowControl(uid: uid),
             MemberSafetyActions(uid: uid, name: d['name'] as String? ?? fallbackName),
             StarRateControl(uid: uid),

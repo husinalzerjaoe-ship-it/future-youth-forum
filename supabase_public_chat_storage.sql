@@ -4,8 +4,8 @@ values (
   'forum-media',
   'forum-media',
   true,
-  52428800,
-  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime']
+  104857600,
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -19,9 +19,8 @@ on storage.objects for select
 to public
 using (bucket_id = 'forum-media');
 
--- Upload only into the signed-in Firebase user's own folders.
--- Firebase must be configured as a Supabase Third-Party Auth provider;
--- the Firebase UID is read from JWT sub (do not use auth.uid(), Firebase UID is not a UUID).
+-- Upload, update and delete only inside the signed-in Firebase user's own folder.
+-- Firebase UID is read from JWT sub; auth.uid() is not a Firebase UID UUID.
 drop policy if exists "Forum members upload own media" on storage.objects;
 create policy "Forum members upload own media"
 on storage.objects for insert
@@ -29,20 +28,17 @@ to authenticated
 with check (
   bucket_id = 'forum-media'
   and (
-    ((storage.foldername(name))[1] = 'public-chat'
-      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or
-    ((storage.foldername(name))[1] = 'profiles'
-      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or
-    ((storage.foldername(name))[1] = 'stories'
-      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or
-    ((storage.foldername(name))[1] = 'chat-backgrounds'
-      and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or
-    ((storage.foldername(name))[1] = 'regional-chat'
-      and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+    (
+      (storage.foldername(name))[1] in (
+        'public-chat','profiles','stories','private-chat',
+        'chat-backgrounds','anime-wallpapers','shared-files'
+      )
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
+    )
+    or (
+      (storage.foldername(name))[1] = 'regional-chat'
+      and (storage.foldername(name))[3] = (auth.jwt()->>'sub')
+    )
   )
 );
 
@@ -53,21 +49,33 @@ to authenticated
 using (
   bucket_id = 'forum-media'
   and (
-    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+    (
+      (storage.foldername(name))[1] in (
+        'public-chat','profiles','stories','private-chat',
+        'chat-backgrounds','anime-wallpapers','shared-files'
+      )
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
+    )
+    or (
+      (storage.foldername(name))[1] = 'regional-chat'
+      and (storage.foldername(name))[3] = (auth.jwt()->>'sub')
+    )
   )
 )
 with check (
   bucket_id = 'forum-media'
   and (
-    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+    (
+      (storage.foldername(name))[1] in (
+        'public-chat','profiles','stories','private-chat',
+        'chat-backgrounds','anime-wallpapers','shared-files'
+      )
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
+    )
+    or (
+      (storage.foldername(name))[1] = 'regional-chat'
+      and (storage.foldername(name))[3] = (auth.jwt()->>'sub')
+    )
   )
 );
 
@@ -78,10 +86,16 @@ to authenticated
 using (
   bucket_id = 'forum-media'
   and (
-    ((storage.foldername(name))[1] = 'public-chat' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'profiles' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'stories' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'chat-backgrounds' and (storage.foldername(name))[2] = (auth.jwt()->>'sub'))
-    or ((storage.foldername(name))[1] = 'regional-chat' and (storage.foldername(name))[3] = (auth.jwt()->>'sub'))
+    (
+      (storage.foldername(name))[1] in (
+        'public-chat','profiles','stories','private-chat',
+        'chat-backgrounds','anime-wallpapers','shared-files'
+      )
+      and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
+    )
+    or (
+      (storage.foldername(name))[1] = 'regional-chat'
+      and (storage.foldername(name))[3] = (auth.jwt()->>'sub')
+    )
   )
 );

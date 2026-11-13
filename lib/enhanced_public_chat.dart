@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'advanced_features.dart';
+import 'media_upload_service.dart';
 
 const _chatBrand = Color(0xFF6554D9);
 const _founderEmail = 'husinalzerjaoe@gmail.com';
@@ -20,6 +21,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  DateTime? _lastSuccessfulSend;
   String? _error;
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
@@ -47,12 +49,31 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
   Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
+    final now = DateTime.now();
+    final last = _lastSuccessfulSend;
+    if (last != null && now.difference(last) < const Duration(seconds: 5)) {
+      final remaining = 5 - now.difference(last).inSeconds;
+      if (mounted) setState(() => _error = 'حتى نحافظ على هدوء الرومات، انتظر $remaining ثواني قبل الرسالة التالية.');
+      return;
+    }
     if (type == 'text' && _containsBlockedTerm(body)) {
       if (mounted) setState(() => _error = 'رسالتك تحتوي كلمات ممنوعة. عدّلها قبل الإرسال.');
       return;
     }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
+      final sanction = (await _chatDb.collection('userSanctions').doc(_uid).get()).data() ?? {};
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      final banUntil = sanction['banUntil'] is Timestamp ? (sanction['banUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      if (sanction['permanentBan'] == true || banUntil > nowMs) {
+        if (mounted) setState(() => _error = 'حسابك محظور من المشاركة حالياً. راجع الإدارة.');
+        return;
+      }
+      if (sanction['permanentMute'] == true || muteUntil > nowMs) {
+        if (mounted) setState(() => _error = 'تم كتم حسابك مؤقتاً أو دائماً، لا يمكنك إرسال الرسائل.');
+        return;
+      }
       final senderName = await _name();
       await _chatDb.collection('messages').add({
         'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
@@ -74,6 +95,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           }
         }
       }
+      _lastSuccessfulSend = DateTime.now();
       _text.clear(); _reply=null;
       await _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_) {});
     } catch (_) { if(mounted)setState(()=>_error='تعذر إرسال الرسالة. تحقق من قواعد Firestore والتخزين.'); }
@@ -83,13 +105,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     try {
       final f=await _picker.pickImage(source:ImageSource.gallery); if(f==null)return;
       setState(()=>_sending=true);
-      final ext=f.name.toLowerCase().split('.').last;
-      final safe=['jpg','jpeg','png','webp','gif'].contains(ext)?ext:'jpg';
-      final path='public-chat/'+_uid+'/'+DateTime.now().microsecondsSinceEpoch.toString()+'.'+safe;
-      await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await f.readAsBytes(),
-        fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/'+safe,upsert:false));
-      await _send(mediaUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image',uploadInProgress:true);
-    } catch (_) { if(mounted)setState(()=>_error='تعذر رفع الصورة أو GIF. راجع صلاحيات bucket forum-media.'); }
+      final url=await uploadForumMedia(f,folder:'public-chat');
+      await _send(mediaUrl:url,type:'image',uploadInProgress:true);
+    } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
   Future<void> _showStickers() async {
@@ -126,10 +144,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
 
   Future<void> _grant({String? presetUid}) async {
     final profiles=await _chatDb.collection('publicProfiles').limit(100).get();
-    final uid=TextEditingController(text:presetUid??''); final days=TextEditingController(text:'7'); final reason=TextEditingController(text:'هدية من المؤسس');
+    final uid=TextEditingController(text:presetUid??''); final days=TextEditingController(text:'7'); final reason=TextEditingController(text:'هدية من المؤسس'); final tier=TextEditingController(text:'gold');
     final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('منح عضوية مجانية'),content:Column(mainAxisSize:MainAxisSize.min,children:[
       DropdownButtonFormField<String>(isExpanded:true,decoration:const InputDecoration(labelText:'اختيار عضو'),items:profiles.docs.map((p)=>DropdownMenuItem(value:p.id,child:Text(p.data()['name'] as String? ?? p.id,overflow:TextOverflow.ellipsis))).toList(),onChanged:(v){if(v!=null)uid.text=v;}),
       TextField(controller:uid,decoration:const InputDecoration(labelText:'UID العضو (يُملأ عند الاختيار)')),
+      DropdownButtonFormField<String>(value:'gold',decoration:const InputDecoration(labelText:'نوع العضوية'),items:const [DropdownMenuItem(value:'silver',child:Text('فضية')),DropdownMenuItem(value:'gold',child:Text('ذهبية')),DropdownMenuItem(value:'diamond',child:Text('ماسية'))],onChanged:(v){if(v!=null)tier.text=v;}),
       TextField(controller:days,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'المدة بالأيام')),
       TextField(controller:reason,decoration:const InputDecoration(labelText:'السبب')),
     ]),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('منح'))])));
@@ -138,14 +157,21 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(uid.text.trim().isEmpty||n<1||n>365){_snack('UID مطلوب والمدة من 1 إلى 365 يوماً');}
       else{
         await _chatDb.collection('memberships').doc(uid.text.trim()).set({
-          'uid':uid.text.trim(),'tier':'premium','source':'founder_gift','reason':reason.text.trim(),'grantedBy':_uid,
+          'uid':uid.text.trim(),'tier':tier.text,'source':'founder_gift','reason':reason.text.trim(),'grantedBy':_uid,
           'startedAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(Duration(days:n))),
           'updatedAt':FieldValue.serverTimestamp(),
         });
-        _snack('تم منح العضوية لمدة '+n.toString()+' يوم');
+        final target=uid.text.trim();
+        final profile=(await _chatDb.collection('publicProfiles').doc(target).get()).data()??{};
+        final targetName=(profile['name']??'عضو').toString();
+        final tierName={'silver':'الفضية','gold':'الذهبية','diamond':'الماسية'}[tier.text]??'المميزة';
+        final founderName=await _name();
+        await _chatDb.collection('messages').add({'text':'🎉 أعلنوا معنا! قام $founderName بمنح $targetName العضوية $tierName لمدة $n يوم. مبارك له!','type':'text','senderId':_uid,'senderRole':'founder','senderName':founderName,'createdAt':FieldValue.serverTimestamp()});
+        await _chatDb.collection('adminLogs').add({'actorId':_uid,'targetId':target,'action':'grant_membership_${tier.text}','durationDays':n,'createdAt':FieldValue.serverTimestamp()});
+        _snack('تم منح العضوية $tierName لمدة '+n.toString()+' يوم');
       }
     }
-    uid.dispose();days.dispose();reason.dispose();
+    uid.dispose();days.dispose();reason.dispose();tier.dispose();
   }
   Future<void> _contest() async {
     final title=TextEditingController(text:'مسابقة الأسبوع');final details=TextEditingController();
@@ -189,49 +215,164 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ]))));
   }
 
-  Future<void> _showMemberActions(Map<String, dynamic> data) async {
-    final memberUid = (data['senderId'] ?? '').toString();
-    final memberName = (data['senderName'] ?? 'عضو').toString();
-    if (memberUid.isEmpty) return;
-    await showModalBottomSheet<void>(
+  Future<void> _moderateMember(String targetUid, String targetName, String kind) async {
+    final options = <String, Duration?>{
+      'ساعة واحدة': const Duration(hours: 1),
+      '24 ساعة': const Duration(hours: 24),
+      '7 أيام': const Duration(days: 7),
+      'دائم': null,
+    };
+    final selected = await showModalBottomSheet<String>(
       context: context,
-      isScrollControlled: true,
       showDragHandle: true,
       builder: (c) => Directionality(
         textDirection: TextDirection.rtl,
-        child: SafeArea(child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(memberName), subtitle: const Text('إجراءات الحساب')),
-            MemberSafetyActions(uid: memberUid, name: memberName),
-          ]),
-        )),
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(title: Text(kind == 'mute' ? 'كتم $targetName' : 'حظر $targetName')),
+          ...options.keys.map((label) => ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: Text(label),
+            onTap: () => Navigator.pop(c, label),
+          )),
+        ])),
       ),
     );
+    if (selected == null) return;
+    final duration = options[selected];
+    final now = DateTime.now();
+    final until = duration == null ? null : Timestamp.fromDate(now.add(duration));
+    final ref = _chatDb.collection('userSanctions').doc(targetUid);
+    final fields = <String, dynamic>{
+      'uid': targetUid,
+      'updatedBy': _uid,
+      'reason': 'إجراء إداري من الدردشة',
+      'updatedAt': FieldValue.serverTimestamp(),
+      if (kind == 'mute') ...{
+        'permanentMute': duration == null,
+        'muteUntil': until,
+      } else ...{
+        'permanentBan': duration == null,
+        'banUntil': until,
+      },
+    };
+    await ref.set(fields, SetOptions(merge: true));
+    await _chatDb.collection('adminLogs').add({
+      'actorId': _uid,
+      'targetId': targetUid,
+      'action': kind == 'mute' ? 'mute' : 'ban',
+      'duration': selected,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    _snack(kind == 'mute'
+        ? 'تم كتم $targetName ($selected)'
+        : 'تم حظر $targetName ($selected)');
+  }
+
+  Future<void> _showMemberActions(Map<String, dynamic> data) async {
+    final memberUid = (data['senderId'] ?? '').toString();
+    final memberName = (data['senderName'] ?? 'عضو').toString();
+    if (memberUid.isEmpty || memberUid == _uid) return;
+    final staff = _isFounder || (await _chatDb.collection('chatModerators').doc(_uid).get()).exists;
+    final action = await showModalBottomSheet<String>(
+      context: context, showDragHandle: true,
+      builder: (c) => Directionality(textDirection: TextDirection.rtl,
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const CircleAvatar(child: Icon(Icons.person)), title: Text(memberName), subtitle: const Text('اختر الإجراء')),
+          ListTile(leading: const Icon(Icons.account_circle_outlined), title: const Text('عرض الملف الشخصي'), onTap: () => Navigator.pop(c, 'profile')),
+          ListTile(leading: const Icon(Icons.chat_bubble_outline), title: const Text('مراسلة خاصة'), onTap: () => Navigator.pop(c, 'message')),
+          ListTile(leading: const Icon(Icons.flag_outlined), title: const Text('إبلاغ عن العضو'), onTap: () => Navigator.pop(c, 'report')),
+          ListTile(leading: const Icon(Icons.block_outlined), title: const Text('حظر العضو عندي'), onTap: () => Navigator.pop(c, 'block')),
+          if (staff) ListTile(leading: const Icon(Icons.volume_off_outlined), title: const Text('كتم العضو'), onTap: () => Navigator.pop(c, 'mute')),
+          if (staff) ListTile(leading: const Icon(Icons.gavel_outlined), title: const Text('حظر العضو من الملتقى'), onTap: () => Navigator.pop(c, 'ban')),
+          if (staff) ListTile(leading: const Icon(Icons.lock_open_outlined), title: const Text('رفع الكتم والحظر'), onTap: () => Navigator.pop(c, 'clear')),
+        ])),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'profile') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatMemberProfilePage(uid: memberUid, fallbackName: memberName)));
+    } else if (action == 'message') {
+      final id = _uid.compareTo(memberUid) < 0 ? '${_uid}_${memberUid}' : '${memberUid}_${_uid}';
+      final ref = _chatDb.collection('conversations').doc(id);
+      final existing = await ref.get();
+      if (!existing.exists) {
+        final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
+        await ref.set({'members': [_uid, memberUid], 'memberNames': {
+          _uid: me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+          memberUid: memberName,
+        }, 'updatedAt': FieldValue.serverTimestamp()});
+      }
+      if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: memberUid, otherName: memberName)));
+    } else if (action == 'report') {
+      final reason = await showDialog<String>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl,
+        child: SimpleDialog(title: const Text('سبب الإبلاغ'), children: ['إساءة أو تنمّر', 'محتوى غير مناسب', 'إزعاج أو رسائل مزعجة', 'سبب آخر']
+          .map((v) => SimpleDialogOption(onPressed: () => Navigator.pop(c, v), child: Text(v))).toList())));
+      if (reason != null) {
+        await _chatDb.collection('reports').add({'type': 'user', 'targetId': memberUid, 'reporterId': _uid, 'reason': reason, 'status': 'new', 'createdAt': FieldValue.serverTimestamp()});
+        _snack('وصل بلاغك للإدارة');
+      }
+    } else if (action == 'block') {
+      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
+      _snack('تم حظر العضو عندك');
+    } else if (action == 'mute' && staff) {
+      await _moderateMember(memberUid, memberName, 'mute');
+    } else if (action == 'ban' && staff) {
+      await _moderateMember(memberUid, memberName, 'ban');
+    } else if (action == 'clear' && staff) {
+      await _chatDb.collection('userSanctions').doc(memberUid).set({
+        'uid': memberUid,
+        'permanentMute': false,
+        'permanentBan': false,
+        'muteUntil': FieldValue.delete(),
+        'banUntil': FieldValue.delete(),
+        'updatedBy': _uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await _chatDb.collection('adminLogs').add({
+        'actorId': _uid, 'targetId': memberUid, 'targetName': memberName,
+        'action': 'clear_sanctions', 'createdAt': FieldValue.serverTimestamp(),
+        'source': 'public_chat',
+      });
+      _snack('تم رفع الكتم والحظر عن $memberName');
+    }
   }
 
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
-    final d=doc.data()??{};final mine=d['senderId']==_uid;final founder=d['senderRole']=='founder';final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
+    final d=doc.data()??{};final mine=d['senderId']==_uid;final sender=(d['senderId']??'').toString();
+    final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
+    final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onLongPress:()=>_menu(doc),child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
-      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.82),margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
-      decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,color:mine?null:Colors.white,borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFD77A):const Color(0x1A6554D9))),
+      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
+      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(mine?const Color(0xFFE8E2FF):Colors.white),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):_chatBrand.withValues(alpha:.42),width:founder?2.6:1),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
-        GestureDetector(onTap:()=>_showMemberActions(d),child:Row(mainAxisSize:MainAxisSize.min,children:[
-          Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:founder?const Color(0xFFB77900):_chatBrand))),
-          if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:16),
-          if(d['edited']==true)const Text(' • معدّلة',style:TextStyle(fontSize:10,color:Colors.black45)),
-        ])),
+        Row(mainAxisSize:MainAxisSize.min,children:[
+          GestureDetector(onTap:()=>_showMemberActions(d),child:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+            stream:_chatDb.collection('publicProfiles').doc(sender).snapshots(),
+            builder:(context,profile){final photo=profile.data?.data()?['photoUrl'] as String? ?? d['senderPhoto'] as String?;return Container(
+              padding:EdgeInsets.all(founder?2:1),decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:founder?const Color(0xFFFFC94A):_chatBrand,width:founder?2:1)),
+              child:CircleAvatar(radius:19,backgroundColor:_chatBrand.withValues(alpha:.12),backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?Text((d['senderName'] as String? ?? 'ع').characters.first):null));
+            }),
+          ),
+          const SizedBox(width:8),
+          Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):const Color(0xFF4532A8))),
+            if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
+            if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
+          ]))),
+          if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:19),
+        ]),
+        const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
-        if(type=='text'&&body.isNotEmpty)Text(body,style:const TextStyle(fontSize:15)),
+        if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
           ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
             final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
-            return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:10));
+            return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:11));
           }),
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
         ]),
@@ -272,4 +413,51 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
     ]))),
   ]));
+}
+
+
+class ChatMemberProfilePage extends StatelessWidget {
+  final String uid, fallbackName;
+  const ChatMemberProfilePage({super.key, required this.uid, required this.fallbackName});
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+    appBar: AppBar(title: const Text('الملف الشخصي')),
+    body: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('publicProfiles').doc(uid).snapshots(),builder:(context,s){
+      if(!s.hasData)return const Center(child:CircularProgressIndicator());
+      final d=s.data!.data()??{};
+      final name=d['name'] as String? ?? fallbackName;
+      final photo=d['photoUrl'] as String?;
+      return ListView(padding:const EdgeInsets.all(20),children:[
+        Center(child:CircleAvatar(radius:52,backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?const Icon(Icons.person,size:52):null)),
+        const SizedBox(height:12),Center(child:Text(name,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold))),
+        if((d['bio'] as String? ?? '').isNotEmpty)Center(child:Text(d['bio'] as String)),
+        StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+          stream:_chatDb.collection('memberships').doc(uid).snapshots(),
+          builder:(context,m){
+            final data=m.data?.data();
+            final expiry=data?['expiresAt'];
+            final active=data!=null && expiry is Timestamp && expiry.toDate().isAfter(DateTime.now());
+            if(!active)return const SizedBox.shrink();
+            final tier=(data['tier']??'premium').toString();
+            final label={'silver':'العضوية الفضية','gold':'العضوية الذهبية','diamond':'العضوية الماسية','premium':'العضوية المميزة'}[tier]??'العضوية المميزة';
+            final color={'silver':const Color(0xFF8795A1),'gold':const Color(0xFFD49A16),'diamond':const Color(0xFF24A6C7)}[tier]??const Color(0xFF8B70D6);
+            final days=expiry.toDate().difference(DateTime.now()).inDays;
+            return Card(color:color.withOpacity(.10),child:ListTile(
+              leading:Icon(Icons.workspace_premium,color:color,size:30),
+              title:Text(label,style:TextStyle(color:color,fontWeight:FontWeight.bold)),
+              subtitle:Text('عضوية مميزة • متبقي ${days<1?1:days} يوم'),
+              trailing:const Icon(Icons.verified,color:Color(0xFF24A36A)),
+            ));
+          },
+        ),
+        const SizedBox(height:16),
+        FilledButton.icon(onPressed:()async{
+          final id=_uid.compareTo(uid)<0?'${_uid}_${uid}':'${uid}_${_uid}';
+          final ref=_chatDb.collection('conversations').doc(id);final old=await ref.get();
+          if(!old.exists){final me=await _chatDb.collection('publicProfiles').doc(_uid).get();await ref.set({'members':[_uid,uid],'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},'updatedAt':FieldValue.serverTimestamp()});}
+          if(context.mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>DirectChatPage(conversationId:id,otherUid:uid,otherName:name)));
+        },icon:const Icon(Icons.message),label:const Text('مراسلة')),
+      ]);
+    }),
+  ));
 }

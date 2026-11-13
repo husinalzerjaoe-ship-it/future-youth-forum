@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:gal/gal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -12,6 +11,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 import 'engagement_features.dart';
 import 'game_center.dart';
+import 'anime_experience.dart';
+import 'community_polls.dart';
+import 'community_events.dart';
+import 'media_upload_service.dart';
+import 'creative_library.dart';
+import 'extra_community_features.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -21,6 +26,7 @@ bool get isForumFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase
 class CommunityHubPage extends StatelessWidget {
  const CommunityHubPage({super.key});
  @override Widget build(BuildContext context) {
+  final cs=Theme.of(context).colorScheme;
   final items=[
    ('الشعر','قصائد الأعضاء',Icons.auto_awesome,const PoetryPage()),
    ('الاقتباسات','انسخ أجمل العبارات',Icons.format_quote,const QuotesPage()),
@@ -30,20 +36,35 @@ class CommunityHubPage extends StatelessWidget {
    ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
    ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
    ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
+   ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
+   ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
+   ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
+   ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
+   ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
     gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),borderRadius:BorderRadius.circular(20)),
-    child:const Text('مساحات ملتقى شباب المستقبل ✨\nشارك إبداعك وتواصل مع الجميع',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
+    child:const Text('مساحات ملتقى الأنمي ✨\nشارك إبداعك وتواصل مع عشّاق الأنمي',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
    const SizedBox(height:14),
    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
     gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
-    itemBuilder:(c,i)=>Card(child:InkWell(borderRadius:BorderRadius.circular(16),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
-     child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-      Icon(items[i].$3,size:38,color:p),const SizedBox(height:8),
-      Text(items[i].$1,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
-      Padding(padding:const EdgeInsets.all(6),child:Text(items[i].$2,textAlign:TextAlign.center,style:const TextStyle(fontSize:12,color:Colors.black54)))
-     ]))))
+    itemBuilder:(c,i)=>Card(
+     elevation:0,color:cs.surfaceContainerLow,
+     shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.55))),
+     child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
+      child:Padding(padding:const EdgeInsets.all(12),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+       Container(width:58,height:58,decoration:BoxDecoration(
+        gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
+        borderRadius:BorderRadius.circular(18)),
+        child:Icon(items[i].$3,size:30,color:Colors.white)),
+       const SizedBox(height:10),
+       Text(items[i].$1,textAlign:TextAlign.center,style:TextStyle(fontWeight:FontWeight.bold,fontSize:16,color:cs.onSurface)),
+       const SizedBox(height:5),
+       Expanded(child:Center(child:Text(items[i].$2,textAlign:TextAlign.center,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11,color:cs.onSurfaceVariant)))),
+       Align(alignment:Alignment.centerLeft,child:Icon(Icons.arrow_back_rounded,size:18,color:cs.primary)),
+      ])))),
+   ),
   ]));
  }
 }
@@ -118,7 +139,7 @@ class _StoriesPageState extends State<StoriesPage>{
    final bytes = await response.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
    file = File('${Directory.systemTemp.path}/forum_story_${DateTime.now().millisecondsSinceEpoch}.mp4');
    await file.writeAsBytes(bytes, flush: true);
-   await Gal.putVideo(file.path, album: 'ملتقى شباب المستقبل');
+   await Gal.putVideo(file.path, album: 'ملتقى الأنمي');
    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الفيديو في معرض الجهاز')));
   } catch (_) {
    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر تنزيل الفيديو. تحقق من الصلاحية ومساحة الجهاز.')));
@@ -138,35 +159,7 @@ class _StoriesPageState extends State<StoriesPage>{
   if(file==null)return;setState(()=>busy=true);
   try{
    final u=FirebaseAuth.instance.currentUser!;
-   // Refresh Firebase ID token before Storage upload so newly assigned custom
-   // claims (especially role=authenticated) are included.
-   final idToken=await u.getIdToken(true);
-   if(idToken==null||idToken.split('.').length!=3){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة رمز Firebase. سجّل خروج وادخل من جديد.')));
-    return;
-   }
-   final jwtParts=idToken.split('.');
-   Map<String,dynamic> jwtHeader={},jwtClaims={};
-   try{
-    jwtHeader=jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwtParts[0])))) as Map<String,dynamic>;
-    jwtClaims=jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(jwtParts[1])))) as Map<String,dynamic>;
-   }catch(_){}
-   if(jwtHeader['alg']!='RS256'){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('إعداد توقيع Firebase غير متوافق: alg=${jwtHeader['alg']??'غير موجود'}.')));
-    return;
-   }
-   if(jwtClaims['role']!='authenticated'){
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('رمز Firebase ما بيه role=authenticated. لازم نضيف الصلاحية من Firebase Admin/Cloud Functions، مو من التطبيق.')));
-    return;
-   }
-   final ext=file.path.split('.').last;
-   final objectPath='stories/'+u.uid+'/'+DateTime.now().millisecondsSinceEpoch.toString()+'.'+ext;
-   final contentType=type=='video' ? (ext.toLowerCase()=='mov' ? 'video/quicktime' : 'video/mp4') : (ext.toLowerCase()=='png' ? 'image/png' : ext.toLowerCase()=='webp' ? 'image/webp' : 'image/jpeg');
-   await Supabase.instance.client.storage.from('forum-media').uploadBinary(
-    objectPath, await file.readAsBytes(),
-    fileOptions: FileOptions(contentType:contentType,upsert:false),
-   );
-   final url=Supabase.instance.client.storage.from('forum-media').getPublicUrl(objectPath);
+   final url=await uploadForumMedia(file,folder:'stories');
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
    await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(hours:24)))});
    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الستوري لمدة 24 ساعة')));
@@ -320,12 +313,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   try{
    final file=await picker.pickImage(source:ImageSource.gallery);
    if(file==null)return;
-   final ext=file.name.toLowerCase().split('.').last;
-   final safe=['jpg','jpeg','png','webp','gif'].contains(ext)?ext:'jpg';
-   final path='regional-chat/${widget.id}/${FirebaseAuth.instance.currentUser!.uid}/${DateTime.now().millisecondsSinceEpoch}.$safe';
-   await Supabase.instance.client.storage.from('forum-media').uploadBinary(path,await file.readAsBytes(),
-    fileOptions:FileOptions(contentType:safe=='gif'?'image/gif':'image/$safe',upsert:false));
-   await send(imageUrl:Supabase.instance.client.storage.from('forum-media').getPublicUrl(path),type:'image');
+   final url=await uploadForumMedia(file,folder:'regional-chat',roomId:widget.id);
+   await send(imageUrl:url,type:'image');
   }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
  }
 
@@ -357,18 +346,18 @@ class _RegionChatPageState extends State<RegionChatPage> {
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
    constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
-   decoration:BoxDecoration(gradient:mine?const LinearGradient(colors:[Color(0xFFEDE8FF),Color(0xFFDCD5FF)]):null,
-    color:mine?null:Colors.white.withValues(alpha:.96),borderRadius:BorderRadius.circular(16),
-    border:Border.all(color:isFounder?const Color(0xFFFFD77A):Colors.black12)),
+   decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
+    border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
+    boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFFB77900):p,fontWeight:FontWeight.bold,fontSize:12))),
+     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
      if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
     ]),
     if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
     if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
-    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:15))
+    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
    ])));
  }
 

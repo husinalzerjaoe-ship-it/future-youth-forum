@@ -1,3 +1,4 @@
+import 'leaderboard_widget.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +14,7 @@ class EngagementHubPage extends StatelessWidget {
   appBar:AppBar(title:const Text('المرح والإنجازات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
    Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF171936),_c,Color(0xFF20A8B8)]),borderRadius:BorderRadius.circular(18)),child:const Text('كل يوم بداية جديدة ✨\nاجمع النقاط وتحدَّ أصدقاءك واكتشف كلمات تلهمك',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:12),const _CheckIn(),const _Points(),const _Quote(),const _Quiz(),const _News(),
+   const SizedBox(height:12),const _CheckIn(),const _Points(),const LeaderboardWidget(),const _Quote(),const _Quiz(),const _News(),
   ]),
  ));
 }
@@ -31,7 +32,7 @@ class _CheckInState extends State<_CheckIn>{
 class _Points extends StatelessWidget{const _Points();@override Widget build(BuildContext context)=>StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_db.collection('publicProfiles').doc(_uid).snapshots(),builder:(c,s){final d=s.data?.data()??{};return Card(child:ListTile(leading:const Icon(Icons.emoji_events,color:Colors.orange,size:32),title:Text('${d['points']??0} نقطة',style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)),subtitle:Text('أيام الحضور: ${d['checkInCount']??0}')));});}
 const _sayings=['لا تؤجل حلمك؛ فالخطوة الصغيرة اليوم تصنع فرقاً كبيراً غداً.','كن لطيفاً، فكل إنسان يخوض معركة لا تعرف عنها شيئاً.','من سار على الدرب وصل، ومن زرع المعروف حصد المحبة.','ليس النجاح أن لا تسقط، بل أن تنهض كلما تعثرت.','ابتسم، فربما تكون ابتسامتك أجمل ما يحدث لشخص اليوم.','إذا غامرتَ في شرفٍ مرومِ فلا تقنعْ بما دونَ النجومِ.','وما نيل المطالب بالتمني ولكن تؤخذ الدنيا غلابا.','اجعل أثرك طيباً؛ فالأيام تمضي والذكرى تبقى.','تعلم فليس المرء يولد عالماً وليس أخو علم كمن هو جاهل.','العقول الكبيرة تناقش الأفكار، والقلوب الكبيرة تتسع للناس.'];
 class _Quote extends StatefulWidget{const _Quote();@override State<_Quote> createState()=>_QuoteState();}
-class _QuoteState extends State<_Quote>{int i=DateTime.now().day%_sayings.length;@override Widget build(BuildContext context)=>Card(color:const Color(0xFFF1EEFF),child:Padding(padding:const EdgeInsets.all(15),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('ومضة اليوم ✨',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),Text(_sayings[i],style:const TextStyle(fontSize:18,height:1.6)),Align(alignment:Alignment.centerLeft,child:TextButton(onPressed:()=>setState(()=>i=(i+1)%_sayings.length),child:const Text('عبارة أخرى')))])));}
+class _QuoteState extends State<_Quote>{int i=DateTime.now().day%_sayings.length;@override Widget build(BuildContext context)=>Card(color:const Color(0xFFF1EEFF),child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('ومضة اليوم ✨',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold,color:Color(0xFF33265F))),const SizedBox(height:8),Text(_sayings[i],style:const TextStyle(fontSize:18,height:1.7,color:Color(0xFF29233D),fontWeight:FontWeight.w600)),Align(alignment:Alignment.centerLeft,child:TextButton(onPressed:()=>setState(()=>i=(i+1)%_sayings.length),style:TextButton.styleFrom(foregroundColor:const Color(0xFF5141A8)),child:const Text('عبارة أخرى')))])));}
 class _Quiz extends StatefulWidget{const _Quiz();@override State<_Quiz> createState()=>_QuizState();}
 class _QuizState extends State<_Quiz>{
  final qs=<({String q,List<String> a,int correct,String why})>[
