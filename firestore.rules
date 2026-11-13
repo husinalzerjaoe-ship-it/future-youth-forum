@@ -495,7 +495,7 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/publicProfiles/$(request.resource.data.recipientId))
         && request.resource.data.actorName is string
         && request.resource.data.actorName.size() <= 60
-        && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'story_reply']
+        && request.resource.data.type in ['follow', 'like', 'comment', 'message', 'story_reply', 'mention']
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 180
