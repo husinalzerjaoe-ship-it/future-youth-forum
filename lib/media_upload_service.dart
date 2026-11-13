@@ -71,7 +71,7 @@ Future<String> uploadForumMedia(
   };
   final contentType = mimeTypes[ext];
   if (contentType == null) {
-    throw ArgumentError('صيغة الملف غير مدعومة. استخدم JPG أو PNG أو WEBP أو GIF أو MP4 أو MOV.');
+    throw ArgumentError('صيغة الملف غير مدعومة. استخدم صور JPG/PNG/WEBP/GIF أو فيديو MP4/MOV أو ملفات APK/ZIP/PDF/XAPK.');
   }
 
   final bytes = await file.readAsBytes();
