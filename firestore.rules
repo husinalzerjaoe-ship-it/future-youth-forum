@@ -6,8 +6,8 @@ service cloud.firestore {
         && request.auth.token.email == 'husinalzerjaoe@gmail.com';
     }
     function usersNotBlocked(a, b) {
-      return !exists(/databases/$(database)/documents/userBlocks/$(a)_$(b))
-        && !exists(/databases/$(database)/documents/userBlocks/$(b)_$(a));
+      return !exists(/databases/$(database)/documents/userBlocks/$(a + '_' + b))
+        && !exists(/databases/$(database)/documents/userBlocks/$(b + '_' + a));
     }
     function roomNotBanned(roomId) {
       return !exists(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid))
