@@ -13,6 +13,7 @@ import 'inspiration_hub.dart';
 import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
+import 'local_audio_handler.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -30,6 +31,7 @@ Future<void> main() async {
     // provider and add role=authenticated to Firebase ID tokens.
     accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
+  await initializeLocalAudioService();
   runApp(const FutureYouthApp());
 }
 
