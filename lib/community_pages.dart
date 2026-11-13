@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:gal/gal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -81,6 +83,30 @@ class QuotesPage extends StatelessWidget {const QuotesPage({super.key});@overrid
 class StoriesPage extends StatefulWidget {const StoriesPage({super.key});@override State<StoriesPage> createState()=>_StoriesPageState();}
 class _StoriesPageState extends State<StoriesPage>{
  bool busy=false;
+ Future<void> downloadStory(String url) async {
+  HttpClient? client;
+  File? file;
+  try {
+   if (!await Gal.hasAccess()) {
+    final granted = await Gal.requestAccess();
+    if (!granted) throw Exception('permission');
+   }
+   client = HttpClient();
+   final request = await client.getUrl(Uri.parse(url));
+   final response = await request.close();
+   if (response.statusCode != 200) throw Exception('download');
+   final bytes = await response.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
+   file = File('${Directory.systemTemp.path}/forum_story_${DateTime.now().millisecondsSinceEpoch}.mp4');
+   await file.writeAsBytes(bytes, flush: true);
+   await Gal.putVideo(file.path, album: 'ملتقى شباب المستقبل');
+   if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الفيديو في معرض الجهاز')));
+  } catch (_) {
+   if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر تنزيل الفيديو. تحقق من الصلاحية ومساحة الجهاز.')));
+  } finally {
+   client?.close(force: true);
+   if (file != null && await file.exists()) await file.delete();
+  }
+ }
  Future<void> add()async{
   final pick=ImagePicker();
   final type=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Wrap(children:[
@@ -117,6 +143,7 @@ class _StoriesPageState extends State<StoriesPage>{
      ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو')),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
+     if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
      const Padding(padding:EdgeInsets.all(8),child:Text('تختفي بعد 24 ساعة',style:TextStyle(color:Colors.black54,fontSize:12)))
     ]));
    }).toList());
