@@ -62,6 +62,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
+      final sanction = (await _chatDb.collection('userSanctions').doc(_uid).get()).data() ?? {};
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      final banUntil = sanction['banUntil'] is Timestamp ? (sanction['banUntil'] as Timestamp).millisecondsSinceEpoch : 0;
+      if (sanction['permanentBan'] == true || banUntil > nowMs) {
+        if (mounted) setState(() => _error = 'حسابك محظور من المشاركة حالياً. راجع الإدارة.');
+        return;
+      }
+      if (sanction['permanentMute'] == true || muteUntil > nowMs) {
+        if (mounted) setState(() => _error = 'تم كتم حسابك مؤقتاً أو دائماً، لا يمكنك إرسال الرسائل.');
+        return;
+      }
       final senderName = await _name();
       await _chatDb.collection('messages').add({
         'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
