@@ -22,6 +22,7 @@ Future<String> uploadForumMedia(
     case 'stories':
     case 'private-chat':
     case 'chat-backgrounds':
+    case 'profiles':
       prefix = '$folder/${user.uid}/';
       break;
     case 'regional-chat':
