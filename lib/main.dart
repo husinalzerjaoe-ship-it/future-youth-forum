@@ -478,7 +478,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
         final myId = FirebaseAuth.instance.currentUser!.uid;
         return ListView.builder(reverse: true, padding: const EdgeInsets.fromLTRB(12, 14, 12, 14), itemCount: messages.length,
           itemBuilder: (context, index) { final data = messages[index].data(); return _messageBubble(data, data['senderId'] == myId); });
-      })),
+      }))),
     if (sendError != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Text(sendError!, style: const TextStyle(color: Colors.red, fontSize: 12))),
     Container(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .06), blurRadius: 12, offset: const Offset(0, -3))]),
