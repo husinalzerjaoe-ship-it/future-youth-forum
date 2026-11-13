@@ -43,7 +43,16 @@ class DirectMessagesPage extends StatelessWidget {
             final names = Map<String, dynamic>.from(d['memberNames'] ?? {});
             final name = names[other] as String? ?? 'عضو';
             return ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.person)),
+              leading: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _db.collection('publicProfiles').doc(other).snapshots(),
+                builder: (context, profile) {
+                  final photo = profile.data?.data()?['photoUrl'] as String?;
+                  return CircleAvatar(
+                    backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+                    child: photo == null || !photo.startsWith('https://') ? Text(name.isNotEmpty ? name.characters.first : '؟') : null,
+                  );
+                },
+              ),
               title: Text(name),
               subtitle: Text(d['lastMessage'] as String? ?? 'ابدأ المحادثة'),
               trailing: const Icon(Icons.chevron_left),
@@ -82,7 +91,12 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
             return ListView(children: docs.map((d) {
               final name = d.data()['name'] as String? ?? 'عضو';
               return ListTile(
-                leading: const CircleAvatar(child: Icon(Icons.person)),
+                leading: CircleAvatar(
+                  backgroundImage: (d.data()['photoUrl'] as String?)?.startsWith('https://') == true
+                      ? NetworkImage(d.data()['photoUrl'] as String) : null,
+                  child: (d.data()['photoUrl'] as String?)?.startsWith('https://') == true
+                      ? null : Text(name.isNotEmpty ? name.characters.first : '؟'),
+                ),
                 title: Text(name),
                 subtitle: const Text('ابدأ محادثة خاصة'),
                 onTap: () async {
@@ -187,11 +201,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
     child: Scaffold(
       appBar: AppBar(
         title: Row(children: [
-          CircleAvatar(
-            radius: 17,
-            backgroundColor: const Color(0xFF6554D9).withValues(alpha: .18),
-            child: Text(widget.otherName.isNotEmpty ? widget.otherName.characters.first : '؟',
-                style: const TextStyle(color: _brand, fontWeight: FontWeight.bold)),
+          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _db.collection('publicProfiles').doc(widget.otherUid).snapshots(),
+            builder: (context, profile) {
+              final photo = profile.data?.data()?['photoUrl'] as String?;
+              return CircleAvatar(
+                radius: 18,
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+                child: photo == null || !photo.startsWith('https://')
+                    ? Text(widget.otherName.isNotEmpty ? widget.otherName.characters.first : '؟',
+                        style: TextStyle(color: Theme.of(context).colorScheme.onPrimaryContainer, fontWeight: FontWeight.bold))
+                    : null,
+              );
+            },
           ),
           const SizedBox(width: 10),
           Expanded(child: Text(widget.otherName)),
@@ -241,9 +264,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
               return Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
                 constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
-                decoration: BoxDecoration(color: mine ? const Color(0xFFE9E5FF) : Colors.white, borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface, border: Border.all(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .55)), borderRadius: BorderRadius.circular(14)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  if (!mine && (d['senderId'] as String? ?? '').isNotEmpty)
+                  if ((d['senderId'] as String? ?? '').isNotEmpty)
                     StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                       stream: _db.collection('publicProfiles').doc(d['senderId'] as String).snapshots(),
                       builder: (context, profile) {
@@ -267,7 +290,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
-                  Text(d['text'] as String? ?? ''),
+                  Text(d['text'] as String? ?? '', style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 15, height: 1.45)),
                 ]),
               ));
             }).toList());
