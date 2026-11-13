@@ -323,7 +323,6 @@ class SavedPostsPage extends StatelessWidget {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           if (s.data!.docs.isEmpty) return const Center(child: Text('ما حفظت أي منشور لحد الآن'));
           return ListView(children: s.data!.docs.map((doc) {
-            final d = doc.data();
             return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
               future: _db.collection('posts').doc(doc.id).get(),
               builder: (context, post) {
