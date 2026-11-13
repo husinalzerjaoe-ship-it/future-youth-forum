@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
+final db = FirebaseFirestore.instance;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
