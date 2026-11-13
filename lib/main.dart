@@ -37,7 +37,6 @@ class FutureYouthApp extends StatelessWidget {
       colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
       textTheme: GoogleFonts.notoSansArabicTextTheme(),
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
-      cardTheme: const CardThemeData(elevation: 1, margin: EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
     ),
     darkTheme: ThemeData(
       useMaterial3: true,
