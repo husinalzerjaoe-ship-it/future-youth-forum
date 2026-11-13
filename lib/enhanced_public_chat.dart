@@ -276,6 +276,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           ListTile(leading: const Icon(Icons.block_outlined), title: const Text('حظر العضو عندي'), onTap: () => Navigator.pop(c, 'block')),
           if (staff) ListTile(leading: const Icon(Icons.volume_off_outlined), title: const Text('كتم العضو'), onTap: () => Navigator.pop(c, 'mute')),
           if (staff) ListTile(leading: const Icon(Icons.gavel_outlined), title: const Text('حظر العضو من الملتقى'), onTap: () => Navigator.pop(c, 'ban')),
+          if (staff) ListTile(leading: const Icon(Icons.lock_open_outlined), title: const Text('رفع الكتم والحظر'), onTap: () => Navigator.pop(c, 'clear')),
         ])),
       ),
     );
@@ -309,6 +310,22 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       await _moderateMember(memberUid, memberName, 'mute');
     } else if (action == 'ban' && staff) {
       await _moderateMember(memberUid, memberName, 'ban');
+    } else if (action == 'clear' && staff) {
+      await _chatDb.collection('userSanctions').doc(memberUid).set({
+        'uid': memberUid,
+        'permanentMute': false,
+        'permanentBan': false,
+        'muteUntil': FieldValue.delete(),
+        'banUntil': FieldValue.delete(),
+        'updatedBy': _uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      await _chatDb.collection('adminLogs').add({
+        'actorId': _uid, 'targetId': memberUid, 'targetName': memberName,
+        'action': 'clear_sanctions', 'createdAt': FieldValue.serverTimestamp(),
+        'source': 'public_chat',
+      });
+      _snack('تم رفع الكتم والحظر عن $memberName');
     }
   }
 
