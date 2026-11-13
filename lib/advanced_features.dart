@@ -22,7 +22,7 @@ class DirectMessagesPage extends StatelessWidget {
         icon: const Icon(Icons.edit), label: const Text('محادثة جديدة'),
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('conversations').where('members', arrayContains: _uid).orderBy('updatedAt', descending: true).snapshots(),
+        stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
         builder: (context, s) {
           if (s.hasError) return const Center(child: Text('تعذر تحميل الرسائل. تأكد من نشر قواعد Firestore.'));
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
@@ -169,7 +169,7 @@ class NotificationsPage extends StatelessWidget {
     child: Scaffold(
       appBar: AppBar(title: const Text('الإشعارات')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('notifications').where('recipientId', isEqualTo: _uid).orderBy('createdAt', descending: true).limit(100).snapshots(),
+        stream: _db.collection('notifications').where('recipientId', isEqualTo: _uid).limit(100).snapshots(),
         builder: (context, s) {
           if (s.hasError) return const Center(child: Text('تعذر تحميل الإشعارات'));
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
