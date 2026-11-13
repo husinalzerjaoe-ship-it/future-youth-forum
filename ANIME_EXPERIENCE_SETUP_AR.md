@@ -10,7 +10,7 @@
 
 1. انشر ملف `firestore.rules` كاملاً إلى قاعدة Firestore في Firebase Console. أضيفت صلاحيات قائمة المشاهدة الخاصة بكل مستخدم ومراجعة الخلفيات.
 2. افتح Supabase SQL Editor وشغّل ملف `supabase_public_chat_storage.sql` كاملاً. أضيفت سياسة رفع إلى مجلد `anime-wallpapers/<uid>/` الخاص بصاحب الحساب.
-3. انشر Firebase Cloud Functions بعد التحديث: من مجلد `functions` نفّذ `npm install` ثم `firebase deploy --only functions`. أُضيفت دالة `ensureSupabaseAuthenticatedRole` حتى تحصل الحسابات القديمة أيضاً على مطالبة `role=authenticated` بأمان عند أول محاولة رفع.
+3. من جذر المشروع نفّذ `cd functions && npm install` لتثبيت حزم الخادم، ثم ارجع إلى جذر المشروع ونفّذ `firebase deploy --only functions`. أُضيفت دالة `ensureSupabaseAuthenticatedRole` حتى تحصل الحسابات القديمة أيضاً على مطالبة `role=authenticated` بأمان عند أول محاولة رفع.
 4. تأكد من إعداد Firebase كموفر Third-party Auth في Supabase. بعد نشر الدالة، جرّب رفع صورة؛ التطبيق يطلب الصلاحية من الخادم ويحدّث رمز الدخول تلقائياً.
 5. اختبر رفع صورة من حساب عضو، وتأكد أنها لا تظهر في المعرض قبل موافقة المؤسس، ثم وافق عليها من زر «مراجعة الخلفيات المعلقة» واختبر التنزيل إلى معرض الهاتف.
 
