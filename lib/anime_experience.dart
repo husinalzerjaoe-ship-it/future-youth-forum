@@ -87,6 +87,48 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
     await doc.reference.update({'status': approve ? 'approved' : 'rejected', 'reviewedBy': _uid, 'reviewedAt': FieldValue.serverTimestamp()});
     _snack(approve ? 'تمت الموافقة' : 'تم الرفض');
   }
+  Future<void> mySubmissions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * .7,
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _db.collection('animeWallpapers')
+                .where('uploaderId', isEqualTo: _uid).limit(50).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) return const Center(child: Text('تعذر تحميل مشاركاتك'));
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              if (snapshot.data!.docs.isEmpty) return const Center(child: Text('ما رفعت أي خلفية بعد'));
+              return ListView(
+                padding: const EdgeInsets.all(12),
+                children: snapshot.data!.docs.map((doc) {
+                  final data = doc.data();
+                  final status = data['status'] as String? ?? 'pending';
+                  final label = status == 'approved' ? 'مقبولة' : status == 'rejected' ? 'مرفوضة' : 'بانتظار المراجعة';
+                  final color = status == 'approved' ? Colors.green : status == 'rejected' ? Colors.red : Colors.orange;
+                  return Card(
+                    child: ListTile(
+                      leading: data['imageUrl'] is String
+                          ? ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(data['imageUrl'], width: 54, height: 68, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)))
+                          : const Icon(Icons.image),
+                      title: Text(data['title'] as String? ?? 'خلفية'),
+                      subtitle: Text('${data['anime'] ?? ''} • $label'),
+                      trailing: Icon(Icons.circle, size: 13, color: color),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> pending() async {
     await showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: SizedBox(height: MediaQuery.of(c).size.height * .7,
@@ -147,6 +189,7 @@ class _AnimeWallpaperGalleryState extends State<AnimeWallpaperGallery> {
             });
         },
       )),
+      TextButton.icon(onPressed: mySubmissions, icon: const Icon(Icons.cloud_upload_outlined), label: const Text('مشاركاتي وحالة الرفع')),
       if (_founder) TextButton.icon(onPressed: pending, icon: const Icon(Icons.fact_check), label: const Text('مراجعة الخلفيات المعلقة')),
     ]);
   }
