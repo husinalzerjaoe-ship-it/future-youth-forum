@@ -477,7 +477,6 @@ class MemberSafetyActions extends StatelessWidget {
 
 class ModerationLogPage extends StatelessWidget {
   const ModerationLogPage({super.key});
-  bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
