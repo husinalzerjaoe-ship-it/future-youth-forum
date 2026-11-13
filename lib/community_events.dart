@@ -28,7 +28,7 @@ class CommunityEventsPage extends StatelessWidget {
           final now = Timestamp.now();
           final events = snapshot.data!.docs.where((e) {
             final start = e.data()['startsAt'];
-            return start is Timestamp && start.toDate().isAfter(now.toDate().subtract(const Duration(hours: 2)));
+            return start is Timestamp && start.toDate().isAfter(now.toDate());
           }).toList();
           if (events.isEmpty) return const _NoEvents();
           return ListView.builder(
@@ -184,7 +184,7 @@ class _EventCard extends StatelessWidget {
       } else {
         await ref.set({
           'uid': _eventUid,
-          'name': FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+          'name': (FirebaseAuth.instance.currentUser?.displayName ?? 'عضو').substring(0, (FirebaseAuth.instance.currentUser?.displayName ?? 'عضو').length > 60 ? 60 : (FirebaseAuth.instance.currentUser?.displayName ?? 'عضو').length),
           'joinedAt': FieldValue.serverTimestamp(),
         });
       }
