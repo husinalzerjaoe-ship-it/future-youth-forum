@@ -999,7 +999,7 @@ service cloud.firestore {
             && request.resource.data.turn == request.auth.uid
             && request.resource.data.winner == ''
             && request.resource.data.roomCode is string
-            && request.resource.data.roomCode.matches('^[0-9]{6}
+            && request.resource.data.roomCode.matches('^[0-9]{6}$'))
           ||
           (request.resource.data.game == 'football_quiz'
             && request.resource.data.round == 0
