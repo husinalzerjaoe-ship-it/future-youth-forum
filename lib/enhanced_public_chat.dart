@@ -1,8 +1,12 @@
 
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
@@ -20,6 +24,9 @@ class EnhancedPublicChatPage extends StatefulWidget {
 class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with WidgetsBindingObserver {
   final _text = TextEditingController();
   final _picker = ImagePicker();
+  final AudioRecorder _recorder = AudioRecorder();
+  bool _recording = false;
+  String? _recordPath;
   bool _sending = false;
   DateTime? _lastSuccessfulSend;
   String? _error;
@@ -42,7 +49,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Future<void> _loadBackground() async {
     try { final d=await _chatDb.collection('chatPreferences').doc(_uid).get(); final c=d.data()?['background']; if(mounted && c is int && _backgrounds.contains(c)) setState(()=>_background=c); } catch (_) {}
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); _recorder.dispose(); super.dispose(); }
 
   Future<String> _name() async {
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
@@ -77,7 +84,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       }
       final senderName = await _name();
       await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
+        'text':body.trim(),'type':type,
+        if(mediaUrl!=null && type=='image')'imageUrl':mediaUrl,
+        if(mediaUrl!=null && type=='voice')'audioUrl':mediaUrl,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
@@ -111,6 +120,55 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _toggleVoiceRecording() async {
+    if (_recording) { await _finishVoiceRecording(); return; }
+    try {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) setState(() => _error = 'اسمح للتطبيق باستخدام المايك حتى تسجل رسالة صوتية.');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path = dir.path + '/voice_' + _uid + '_' + DateTime.now().microsecondsSinceEpoch.toString() + '.m4a';
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100),
+        path: path,
+      );
+      if (mounted) setState(() { _recordPath = path; _recording = true; _error = null; });
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر تشغيل تسجيل الصوت: $e');
+    }
+  }
+
+  Future<void> _finishVoiceRecording() async {
+    if (!_recording) return;
+    String? path;
+    try {
+      path = await _recorder.stop();
+      if (mounted) setState(() => _recording = false);
+      final savedPath = path ?? _recordPath;
+      if (savedPath == null || !await File(savedPath).exists()) {
+        if (mounted) setState(() => _error = 'ما تم تسجيل صوت. حاول مرة ثانية.');
+        return;
+      }
+      if (await File(savedPath).length() < 500) {
+        if (mounted) setState(() => _error = 'التسجيل قصير جداً. سجّل مرة ثانية.');
+        return;
+      }
+      if (mounted) setState(() => _sending = true);
+      final url = await uploadForumMedia(XFile(savedPath), folder: 'public-chat');
+      await _send(mediaUrl: url, type: 'voice', uploadInProgress: true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر إرسال الرسالة الصوتية: $e');
+    } finally {
+      final savedPath = path ?? _recordPath;
+      if (savedPath != null) {
+        try { final file = File(savedPath); if (await file.exists()) await file.delete(); } catch (_) {}
+      }
+      _recordPath = null;
+      if (mounted) setState(() { _recording = false; _sending = false; });
+    }
+  }
+
   Future<void> _showStickers() async {
     final v=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('الملصقات',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
@@ -366,6 +424,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         ]),
         const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
+        if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
@@ -384,7 +443,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
     Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:const BoxDecoration(gradient:LinearGradient(colors:[Color(0xFF171936),Color(0xFF5144B8),Color(0xFF8C7CF0)])),child:Row(children:[
       const Icon(Icons.forum,color:Colors.white,size:30),const SizedBox(width:9),
-      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('صور • GIF • ملصقات • مسابقات',style:TextStyle(color:Colors.white70,fontSize:11))])),
+      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('صور • رسائل صوتية • ملصقات • مسابقات',style:TextStyle(color:Colors.white70,fontSize:11))])),
       StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Text((s.data?.docs.length??0).toString()+' متصل',style:const TextStyle(color:Colors.white,fontSize:11))),
       IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
@@ -404,10 +463,12 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       return n>0?const Padding(padding:EdgeInsets.all(3),child:Text('أحد الأعضاء يكتب الآن...',style:TextStyle(fontSize:11,color:_chatBrand))):const SizedBox.shrink();
     }),
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
-    if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
+    if(_recording)const Padding(padding:EdgeInsets.symmetric(vertical:4),child:Text('🔴 جاري تسجيل الرسالة الصوتية — اضغط المايك لإيقافها وإرسالها',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold,fontSize:12))),
+    if(_error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Text(_error!,style:const TextStyle(color:Colors.red,fontSize:12,fontWeight:FontWeight.w600))),
     Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
       IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
+      IconButton(onPressed:_sending?null:_toggleVoiceRecording,icon:Icon(_recording?Icons.stop_circle:Icons.mic,color:_recording?Colors.red:_chatBrand),tooltip:_recording?'إيقاف وإرسال التسجيل':'تسجيل رسالة صوتية'),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
         onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
         onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
@@ -461,4 +522,52 @@ class ChatMemberProfilePage extends StatelessWidget {
       ]);
     }),
   ));
+}
+
+
+class _VoiceMessagePlayer extends StatefulWidget {
+  final String url;
+  const _VoiceMessagePlayer({required this.url});
+  @override State<_VoiceMessagePlayer> createState() => _VoiceMessagePlayerState();
+}
+class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
+  late final AudioPlayer _player;
+  bool _failed = false;
+  @override void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _player.setUrl(widget.url).catchError((_) { if (mounted) setState(() => _failed = true); });
+  }
+  @override void dispose() { _player.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Container(
+    constraints: const BoxConstraints(minWidth: 190),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(color: const Color(0xFFECE8FF), borderRadius: BorderRadius.circular(14)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      StreamBuilder<PlayerState>(
+        stream: _player.playerStateStream,
+        builder: (context, snap) {
+          final playing = snap.data?.playing == true;
+          return IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: _failed ? null : () async {
+              try { if (playing) { await _player.pause(); } else { if (_player.processingState == ProcessingState.completed) await _player.seek(Duration.zero); await _player.play(); } }
+              catch (_) { if (mounted) setState(() => _failed = true); }
+            },
+            icon: Icon(_failed ? Icons.error_outline : playing ? Icons.pause_circle : Icons.play_circle, color: _chatBrand, size: 30),
+          );
+        },
+      ),
+      const Text('رسالة صوتية', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF30265E))),
+      const SizedBox(width: 8),
+      StreamBuilder<Duration>(
+        stream: _player.positionStream,
+        builder: (context, snap) {
+          final seconds = snap.data?.inSeconds ?? 0;
+          final stamp = (seconds ~/ 60).toString() + ':' + (seconds % 60).toString().padLeft(2, '0');
+          return Text(stamp, style: const TextStyle(fontSize: 12, color: Color(0xFF30265E)));
+        },
+      ),
+    ]),
+  );
 }
