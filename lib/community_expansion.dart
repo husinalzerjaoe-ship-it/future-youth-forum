@@ -46,8 +46,8 @@ class _WatchPartiesPageState extends State<WatchPartiesPage> {
         content: Form(key: form, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextFormField(controller: title, maxLength: 60, decoration: const InputDecoration(labelText: 'اسم الجلسة'), validator: (v) => v == null || v.trim().length < 3 ? 'اكتب اسماً من 3 أحرف' : null),
           TextFormField(controller: match, maxLength: 100, decoration: const InputDecoration(labelText: 'المباراة')),
-          TextFormField(controller: stream, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط البث المباشر المرخّص', hintText: 'رابط HLS أو MP4 من مزوّد الحقوق'), validator: (v) { final u = Uri.tryParse((v ?? '').trim()); return u == null || u.scheme != 'https' || u.host.isEmpty ? 'أدخل رابط HTTPS صحيحاً' : null; }),
-          const Text('أدخل رابط تشغيل مباشر يوفّره صاحب الحقوق ويسمح بتضمينه داخل التطبيق (HLS أو MP4). رابط صفحة الموقع وحده قد لا يعمل.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          TextFormField(controller: stream, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الفيديو أو البث المباشر', hintText: 'https://example.com/live.m3u8 أو video.mp4'), validator: (v) { final u = Uri.tryParse((v ?? '').trim()); return u == null || !['https', 'http'].contains(u.scheme) || u.host.isEmpty ? 'أدخل رابط فيديو يبدأ بـ https:// أو http://' : null; }),
+          const Text('الصق رابط ملف فيديو أو بث مباشر بصيغة MP4 أو HLS ‏(.m3u8). رابط صفحة المباراة أو رابط موقع عادي ليس ملف فيديو وقد لا يعمل داخل المشغّل.', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ]))),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')), FilledButton(onPressed: () { if (form.currentState?.validate() ?? false) Navigator.pop(ctx, true); }, child: const Text('إنشاء'))],
       ),
@@ -113,22 +113,22 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     _initializeVideo();
   }
   Future<void> _initializeVideo() async {
-    final raw = widget.party['streamUrl'] as String? ?? '';
+    final raw = (widget.party['streamUrl'] as String? ?? '').trim();
     final uri = Uri.tryParse(raw);
-    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-      if (mounted) setState(() { _videoLoading = false; _videoError = 'رابط البث غير صالح.'; });
+    if (uri == null || !['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
+      if (mounted) setState(() { _videoLoading = false; _videoError = 'الرابط غير صالح. استخدم رابط http أو https.'; });
       return;
     }
     final controller = VideoPlayerController.networkUrl(uri);
     _videoController = controller;
     try {
-      await controller.initialize();
+      await controller.initialize().timeout(const Duration(seconds: 35));
       await controller.setLooping(false);
-      if (mounted) setState(() { _videoLoading = false; });
+      if (mounted) setState(() { _videoLoading = false; _videoError = null; });
     } catch (_) {
       await controller.dispose();
       if (identical(_videoController, controller)) _videoController = null;
-      if (mounted) setState(() { _videoLoading = false; _videoError = 'تعذر تشغيل هذا المصدر. تأكد أنه رابط بث مباشر مرخّص بصيغة مدعومة وليس رابط صفحة ويب.'; });
+      if (mounted) setState(() { _videoLoading = false; _videoError = controller.value.errorDescription?.isNotEmpty == true ? 'تعذر تشغيل الفيديو: ${controller.value.errorDescription}' : 'هذا الرابط لا يقدّم فيديو مباشراً بصيغة يدعمها المشغّل. جرّب رابط MP4 أو HLS ينتهي بـ .m3u8. روابط صفحات المواقع لا تعمل كمصدر فيديو.'; });
     }
   }
   @override
