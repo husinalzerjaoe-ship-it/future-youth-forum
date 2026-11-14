@@ -682,11 +682,11 @@ class _MembershipCard extends StatelessWidget {
         Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.workspace_premium, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
         if (date != null) Text(active ? 'تنتهي: ${date.year}/${date.month}/${date.day}' : 'انتهت العضوية', style: const TextStyle(fontSize: 12)),
         if (active) Padding(padding: const EdgeInsets.only(top: 7), child: Text(switch (tier.toLowerCase()) {
-          'gold' || 'ذهبية' => 'شارة ذهبية • إطار ملف مميز • ألوان رسائل خاصة',
-          'silver' || 'فضية' => 'شارة فضية • إطار ملف • تمييز العضوية',
-          'diamond' || 'ماسية' => 'شارة ماسية • إطار نادر • تمييز الرسائل',
-          'legendary' || 'أسطورية' => 'شارة أسطورية • إطار خاص • هوية مميزة',
-          _ => 'شارة العضوية • إطار الملف • تمييز الاسم',
+          'gold' || 'ذهبية' => 'شارة ذهبية • لون ذهبي للاسم والرسائل',
+          'silver' || 'فضية' => 'شارة فضية • لون فضي لفقاعات الرسائل',
+          'diamond' || 'ماسية' => 'شارة ماسية • لون سماوي للاسم والرسائل',
+          'legendary' || 'أسطورية' => 'شارة أسطورية • لون بنفسجي مميز',
+          _ => 'شارة العضوية • تمييز الاسم والرسائل',
         }, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11))),
       ]),
     );

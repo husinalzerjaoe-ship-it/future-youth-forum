@@ -132,6 +132,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   WebViewController? _webController;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _playbackSubscription;
   bool _usingWebView = false;
+  bool _isYouTube = false;
   bool _videoLoading = true;
   bool _applyingRemotePlayback = false;
   String? _videoError;
@@ -189,8 +190,11 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     try {
       if (_usingWebView && _webController != null) {
         final seconds = (position / 1000).toStringAsFixed(2);
-        final action = playing ? 'playVideo' : 'pauseVideo';
-        await _webController!.runJavaScript("(function(){var f=document.querySelector('iframe');if(f){f.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[$seconds,true]}),'*');f.contentWindow.postMessage(JSON.stringify({event:'command',func:'$action',args:[]}),'*');}var v=document.querySelector('video');if(v){if(Math.abs(v.currentTime-$seconds)>2)v.currentTime=$seconds;if($playing){v.play().catch(function(){});}else{v.pause();}}})();");
+        if (_isYouTube) {
+          await _webController!.runJavaScript("if(window.player){if($position>0)window.player.seekTo($seconds,true);if($playing)window.player.playVideo();else window.player.pauseVideo();}");
+        } else {
+          await _webController!.runJavaScript("(function(){var v=document.querySelector('video');if(v){if($position>0&&Math.abs(v.currentTime-$seconds)>2)v.currentTime=$seconds;if($playing){v.play().catch(function(){});}else{v.pause();}}})();");
+        }
       } else if (_videoController?.value.isInitialized == true) {
         final current = _videoController!.value.position.inMilliseconds;
         if ((current - position).abs() > 2200) await _videoController!.seekTo(Duration(milliseconds: position));
@@ -205,8 +209,14 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     if (_videoController?.value.isInitialized == true) position = _videoController!.value.position.inMilliseconds;
     try {
       if (_usingWebView && _webController != null) {
-        final action = playing ? 'playVideo' : 'pauseVideo';
-        await _webController!.runJavaScript("(function(){var f=document.querySelector('iframe');if(f)f.contentWindow.postMessage(JSON.stringify({event:'command',func:'$action',args:[]}),'*');var v=document.querySelector('video');if(v){if($playing)v.play().catch(function(){});else v.pause();}})();");
+        if (_isYouTube) {
+          final raw = await _webController!.runJavaScriptReturningResult('window.player ? window.player.getCurrentTime() : 0');
+          final seconds = double.tryParse(raw.toString().replaceAll('"', '')) ?? 0;
+          position = (seconds * 1000).round();
+          await _webController!.runJavaScript('if(window.player){if($playing)window.player.playVideo();else window.player.pauseVideo();}');
+        } else {
+          await _webController!.runJavaScript("(function(){var v=document.querySelector('video');if(v){if($playing)v.play().catch(function(){});else v.pause();}})();");
+        }
       } else if (_videoController?.value.isInitialized == true) {
         if (playing) await _videoController!.play(); else await _videoController!.pause();
       }
@@ -218,7 +228,11 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
   Future<void> _seekBy(int seconds) async {
     if (_usingWebView && _webController != null) {
-      await _webController!.runJavaScript("(function(){var f=document.querySelector('iframe');if(f)f.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[Math.max(0,($seconds)),true]}),'*');var v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime+$seconds);})();");
+      if (_isYouTube) {
+        await _webController!.runJavaScript('if(window.player){window.player.seekTo(Math.max(0,window.player.getCurrentTime()+$seconds),true);}');
+      } else {
+        await _webController!.runJavaScript("(function(){var v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime+$seconds);})();");
+      }
       return;
     }
     final controller = _videoController;
@@ -889,8 +903,12 @@ class _EmptyCommunity extends StatelessWidget {
       try { await _applyRemotePlayback(await party.get()); } catch (_) {}
     }));
     if (!mounted) return;
-    setState(() { _webController = controller; _usingWebView = true; _videoLoading = false; _videoError = null; });
-    await controller.loadRequest(target);
+    setState(() { _webController = controller; _usingWebView = true; _isYouTube = youtubeId != null; _videoLoading = false; _videoError = null; });
+    if (youtubeId != null) {
+      await controller.loadHtmlString('''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>html,body,#player{margin:0;width:100%;height:100%;background:#000;overflow:hidden}iframe{width:100%;height:100%;border:0}</style></head><body><div id="player"></div><script>var player;function onYouTubeIframeAPIReady(){player=new YT.Player('player',{videoId:'$youtubeId',playerVars:{playsinline:1,rel:0,enablejsapi:1}});}</script><script src="https://www.youtube.com/iframe_api"></script></body></html>''', baseUrl: 'https://www.youtube.com');
+    } else {
+      await controller.loadRequest(target);
+    }
   }
   Future<void> _initializeVideo() async {
     final raw = (widget.party['streamUrl'] as String? ?? '').trim();

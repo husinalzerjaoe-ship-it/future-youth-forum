@@ -25,4 +25,46 @@ text = manifest.read_text(encoding="utf-8")
 text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/ic_launcher_logo"')
 text = text.replace('android:roundIcon="@mipmap/ic_launcher"', 'android:roundIcon="@drawable/ic_launcher_logo"')
 manifest.write_text(text, encoding="utf-8")
-print("Applied Future Youth Forum launcher icon")
+main_activity = Path("android/app/src/main/kotlin/com/futureyouth/forum/MainActivity.kt")
+main_activity.parent.mkdir(parents=True, exist_ok=True)
+main_activity.write_text("""package com.futureyouth.forum
+
+import android.app.DownloadManager
+import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.futureyouth.forum/downloads")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "downloadFile") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                try {
+                    val url = call.argument<String>("url") ?: throw IllegalArgumentException("Missing URL")
+                    val fileName = (call.argument<String>("fileName") ?: "forum-download")
+                        .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val request = DownloadManager.Request(Uri.parse(url))
+                        .setTitle(fileName)
+                        .setDescription("تنزيل من ملتقى شباب المستقبل")
+                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                        .setAllowedOverMetered(true)
+                        .setAllowedOverRoaming(false)
+                    val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    result.success(manager.enqueue(request))
+                } catch (error: Exception) {
+                    result.error("DOWNLOAD_FAILED", error.message, null)
+                }
+            }
+    }
+}
+""", encoding="utf-8")
+
+print("Applied Future Youth Forum launcher icon and Android Downloads integration")

@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'media_upload_service.dart';
+import 'download_service.dart';
 
 
 class ExtraCommunityFeaturesPage extends StatelessWidget {
@@ -170,10 +171,27 @@ class _SharedFilesPageState extends State<SharedFilesPage> {
  Future<void> review(String id,String status) async {
   await db.collection('sharedFiles').doc(id).update({'status':status,'reviewedBy':uid,'reviewedAt':FieldValue.serverTimestamp()});
  }
+ Future<PlatformFile?> _resolvePickedFile(PlatformFile file) async {
+  if(file.path!=null)return file;
+  final bytes=file.bytes;
+  if(bytes==null||bytes.isEmpty)return null;
+  final dir=await getTemporaryDirectory();
+  final folder=Directory(dir.path+'/future_youth_files');
+  await folder.create(recursive:true);
+  final safeName=file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'),'_');
+  final path=folder.path+'/'+DateTime.now().microsecondsSinceEpoch.toString()+'_'+safeName;
+  await File(path).writeAsBytes(bytes,flush:true);
+  return PlatformFile(name:file.name,size:file.size,path:path);
+ }
+ Future<void> downloadFile(String url,String name) async {
+  try{await ForumDownloadService.download(url,name);if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('بدأ التنزيل. تابع إشعارات الهاتف ومجلد Downloads.')));}
+  catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تنزيل الملف: $e')));}
+ }
  Future<void> upload() async {
-  final picked=await FilePicker.platform.pickFiles(type:FileType.any);
-  if(picked==null||picked.files.isEmpty)return;final f=picked.files.first;
-  if(f.path==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة مسار الملف من الجهاز')));return;}
+  final picked=await FilePicker.platform.pickFiles(type:FileType.any,withData:true);
+  if(picked==null||picked.files.isEmpty)return;
+  final f=await _resolvePickedFile(picked.files.first);
+  if(f==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة الملف من الجهاز')));return;}
   final ext=f.extension?.toLowerCase()??'';
   if(!['apk','zip','pdf','xapk','mp3','m4a','aac','wav','ogg','flac'].contains(ext)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('المسموح APK أو ZIP أو PDF أو XAPK أو صوت MP3/M4A/AAC/WAV/OGG/FLAC')));return;}
   if(f.size>100*1024*1024){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الحد الأقصى 100 ميغابايت')));return;}
@@ -200,7 +218,7 @@ class _SharedFilesPageState extends State<SharedFilesPage> {
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'approved').limit(100).snapshots(),builder:(context,s){
     if(s.hasError)return const Center(child:Text('تعذر تحميل الملفات'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو ملفات منشورة حالياً'));
-    return ListView(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.insert_drive_file),title:Text(x['title'] as String? ?? 'ملف'),subtitle:Text((x['extension']??'').toString()+' • '+(x['size']??0).toString()+' بايت'),trailing:IconButton(icon:const Icon(Icons.download),onPressed:()=>launchUrl(Uri.parse(x['fileUrl'] as String),mode:LaunchMode.externalApplication))));}).toList());
+    return ListView(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.insert_drive_file),title:Text(x['title'] as String? ?? 'ملف'),subtitle:Text((x['extension']??'').toString()+' • '+(x['size']??0).toString()+' بايت'),trailing:IconButton(tooltip:'تنزيل إلى مجلد Downloads',icon:const Icon(Icons.download_for_offline),onPressed:()=>downloadFile(x['fileUrl'] as String,x['fileName'] as String? ?? x['title'] as String? ?? 'forum-file'))));}).toList());
    }))
   ])
  );
