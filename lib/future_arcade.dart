@@ -344,7 +344,7 @@ class _ArcadeTournamentsPageState extends State<ArcadeTournamentsPage> {
       if(s.data!.docs.isEmpty)return const Text('لا توجد بطولات مفتوحة حالياً.');
       return Column(children:s.data!.docs.map((d){final x=d.data();final members=List<String>.from(x['participants']??[]);final joined=members.contains(_uid);return Card(child:ListTile(leading:const Icon(Icons.emoji_events_rounded),title:Text(x['title']??'بطولة'),subtitle:Text((_games[x['gameId']]??'لعبة')+' • '+members.length.toString()+' مشارك'),trailing:joined?const Chip(label:Text('مشترك')):TextButton(onPressed:()=>_join(d),child:const Text('انضم'))));}).toList());
     }),
-  ]))));
+  ])));
 }
 
 class ArcadeRoomsPage extends StatefulWidget { const ArcadeRoomsPage({super.key}); @override State<ArcadeRoomsPage> createState()=>_ArcadeRoomsPageState(); }
@@ -360,7 +360,7 @@ class _ArcadeRoomsPageState extends State<ArcadeRoomsPage> {
     Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[const Text('أنشئ غرفة وادعُ أصدقاءك',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),DropdownButtonFormField<String>(initialValue:_game,items:_options.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);}),FilledButton.icon(onPressed:_busy?null:_create,icon:const Icon(Icons.add),label:const Text('إنشاء غرفة خاصة')),TextField(controller:_code,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'رمز الغرفة',counterText:'')),OutlinedButton.icon(onPressed:_busy?null:_join,icon:const Icon(Icons.login),label:const Text('انضم إلى غرفة'))]))),
     const Text('غرفي',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').where('members',arrayContains:_uid).snapshots(),builder:(context,s){if(s.hasError)return const Text('تعذر تحميل الغرف.');if(!s.hasData)return const Center(child:CircularProgressIndicator());if(s.data!.docs.isEmpty)return const Text('ما عندك غرف بعد.');return Column(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.meeting_room),title:Text(_options[x['gameId']]??'غرفة ألعاب'),subtitle:Text('الرمز: '+(x['roomCode']??'')+' • '+(x['status']??'')),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:d.id,title:_options[x['gameId']]??'غرفة ألعاب',roomCode:x['roomCode']??'')))));}).toList());}),
-  ]))));
+  ])));
 }
 
 class ArcadeRoomChatPage extends StatefulWidget { final String roomId,title,roomCode; const ArcadeRoomChatPage({super.key,required this.roomId,required this.title,required this.roomCode}); @override State<ArcadeRoomChatPage> createState()=>_ArcadeRoomChatPageState(); }
