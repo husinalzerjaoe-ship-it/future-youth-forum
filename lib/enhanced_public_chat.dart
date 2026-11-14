@@ -516,6 +516,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
             return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:11));
           }),
+          if (d['createdAt'] is Timestamp)
+            Padding(padding: const EdgeInsetsDirectional.only(start: 5, end: 2),
+              child: Text(() {
+                final date = (d['createdAt'] as Timestamp).toDate().toLocal();
+                final hour = (date.hour % 12 == 0 ? 12 : date.hour % 12).toString().padLeft(2, '0');
+                final minute = date.minute.toString().padLeft(2, '0');
+                return '$hour:$minute ${date.hour >= 12 ? 'م' : 'ص'}';
+              }(), style: const TextStyle(fontSize: 10, color: Colors.black54))),
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
         ]),
       ]),
