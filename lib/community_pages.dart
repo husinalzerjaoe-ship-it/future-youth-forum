@@ -35,59 +35,102 @@ final db2=FirebaseFirestore.instance;
 const founderEmail='husinalzerjaoe@gmail.com';
 bool get isForumFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase()==founderEmail;
 
-class CommunityHubPage extends StatelessWidget {
+class CommunityHubPage extends StatefulWidget {
  const CommunityHubPage({super.key});
- @override Widget build(BuildContext context) {
+ @override State<CommunityHubPage> createState()=>_CommunityHubPageState();
+}
+
+class _CommunityHubPageState extends State<CommunityHubPage> {
+ final TextEditingController _search=TextEditingController();
+ String _category='الكل';
+
+ late final List<({String title,String subtitle,String category,IconData icon,Widget page})> _items=[
+  (title:'الستوريات',subtitle:'صور وفيديوهات لمدة 24 ساعة',category:'التواصل',icon:Icons.camera_alt,page:const StoriesPage()),
+  (title:'دردشات الدول',subtitle:'العراق وسوريا وثلاث غرف أخرى',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
+  (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
+  (title:'يوتيوب والترفيه',subtitle:'أغانٍ وفيديوهات وروابط أفلام رسمية',category:'الترفيه',icon:Icons.play_circle_fill,page:const YouTubeShelfPage()),
+  (title:'مكالمات الصوت والفيديو',subtitle:'مكالمات جماعية وخاصة عبر LiveKit',category:'التواصل',icon:Icons.video_call_rounded,page:const LiveKitCallsPage()),
+  (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
+  (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
+  (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
+  (title:'مركز المباريات',subtitle:'مواعيد ونتائج ومتابعة أخبار الكرة',category:'الألعاب',icon:Icons.sports_soccer,page:const MatchCenterPage()),
+  (title:'المساعد الذكي',subtitle:'مساعد مجاني داخل التطبيق',category:'المعرفة',icon:Icons.smart_toy,page:const LocalHelperBotPage()),
+  (title:'ركن المعرفة والترفيه',subtitle:'معلومات يومية ونصائح وألغاز وكتابة إبداعية',category:'المعرفة',icon:Icons.auto_stories_rounded,page:const KnowledgeCornerPage()),
+  (title:'عالمك اليومي',subtitle:'تحديات يومية ومزاجك وأدوات مفيدة',category:'المعرفة',icon:Icons.today_rounded,page:const DailyWorldPage()),
+  (title:'إلهام يومي',subtitle:'أفكار واقتباسات ومحتوى إيجابي',category:'المعرفة',icon:Icons.lightbulb_outline,page:const InspirationHubPage()),
+  (title:'الشعر',subtitle:'قصائد الأعضاء',category:'الثقافة',icon:Icons.auto_awesome,page:const PoetryPage()),
+  (title:'الاقتباسات',subtitle:'انسخ أجمل العبارات',category:'الثقافة',icon:Icons.format_quote,page:const QuotesPage()),
+  (title:'مكتبة الأدب والعبارات',subtitle:'شعر وأدعية وأذكار ونكت وبطاقات',category:'الثقافة',icon:Icons.menu_book,page:const CreativeLibraryPage()),
+  (title:'عالم الأنمي',subtitle:'خلفيات مرخّصة وقائمة مشاهدة واختبارات',category:'الترفيه',icon:Icons.animation,page:const AnimeExperiencePage()),
+  (title:'تصويتات الملتقى',subtitle:'استفتاءات وآراء الأعضاء',category:'المجتمع',icon:Icons.poll,page:const CommunityPollsPage()),
+  (title:'فعاليات الملتقى',subtitle:'مسابقات ولقاءات وتسجيل مشاركة',category:'المجتمع',icon:Icons.event_available,page:const CommunityEventsPage()),
+  (title:'أندية الاهتمامات',subtitle:'أنشئ نادياً أو انضم لأصحاب اهتماماتك',category:'المجتمع',icon:Icons.diversity_3_rounded,page:const V6CommunitySuitePage()),
+  (title:'الغرف والملفات والموسيقى',subtitle:'غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',category:'الترفيه',icon:Icons.hub,page:const ExtraCommunityFeaturesPage()),
+  (title:'أبراج وحساب العمر',subtitle:'أدوات خفيفة ومعلومات ترفيهية',category:'المعرفة',icon:Icons.cake_outlined,page:const LifeToolsPage()),
+ ];
+
+ @override void dispose(){_search.dispose();super.dispose();}
+
+ @override Widget build(BuildContext context){
   final cs=Theme.of(context).colorScheme;
-  final items=[
-   ('الشعر','قصائد الأعضاء',Icons.auto_awesome,const PoetryPage()),
-   ('الاقتباسات','انسخ أجمل العبارات',Icons.format_quote,const QuotesPage()),
-   ('الستوريات','صور وفيديوهات لمدة 24 ساعة',Icons.camera_alt,const StoriesPage()),
-   ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
-   ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
-   ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
-   ('المشاهدة الجماعية','شاهدوا يوتيوب والبث المباشر معاً',Icons.groups_rounded,const WatchPartyLobbyPage()),
-   ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
-   ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
-   ('مدينة الألعاب','ألعاب مصغرة وتحديات جماعية وألعاب لوحية',Icons.videogame_asset_rounded,const ArcadeHubPage()),
-   ('مركز المباريات','مواعيد ونتائج ومتابعة أخبار الكرة',Icons.sports_soccer,const MatchCenterPage()),
-   ('أبراج وحساب العمر','احسب عمرك واكتشف برجك ومعلوماته الترفيهية',Icons.cake_outlined,const LifeToolsPage()),
-   ('عالمك اليومي','تحديات يومية ومزاجك ودليل الاستخارة وحساب العمر',Icons.today_rounded,const DailyWorldPage()),
-   ('المجتمع الشامل V6','أندية الاهتمامات والمهام اليومية وجدار الامتنان والسلامة',Icons.diversity_3_rounded,const V6CommunitySuitePage()),
-   ('ركن المعرفة والترفيه','معلومات يومية ونصائح وألغاز وأسئلة وكتابة إبداعية',Icons.auto_stories_rounded,const KnowledgeCornerPage()),
-   ('إلهام يومي','أفكار واقتباسات ومحتوى إيجابي متجدد',Icons.lightbulb_outline,const InspirationHubPage()),
-   ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
-   ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
-   ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
-   ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
-   ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
-   ('مكالمات الصوت والفيديو','مكالمات جماعية وخاصة عبر LiveKit',Icons.video_call_rounded,const LiveKitCallsPage()),
-  ];
-  return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
-   Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
-    gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),borderRadius:BorderRadius.circular(20)),
-    child:const Text('مركز مجتمع ملتقى شباب المستقبل ✨\nتواصل، العب، تعلّم وشارك لحظاتك مع الأصدقاء',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:14),
-   GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
-    gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
-    itemBuilder:(c,i)=>Card(
-     elevation:0,color:cs.surfaceContainerLow,
-     shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.55))),
-     child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
-      child:Padding(padding:const EdgeInsets.all(12),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-       Container(width:58,height:58,decoration:BoxDecoration(
-        gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
-        borderRadius:BorderRadius.circular(18)),
-        child:Icon(items[i].$3,size:30,color:Colors.white)),
-       const SizedBox(height:10),
-       Text(items[i].$1,textAlign:TextAlign.center,style:TextStyle(fontWeight:FontWeight.bold,fontSize:16,color:cs.onSurface)),
-       const SizedBox(height:5),
-       Expanded(child:Center(child:Text(items[i].$2,textAlign:TextAlign.center,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11,color:cs.onSurfaceVariant)))),
-       Align(alignment:Alignment.centerLeft,child:Icon(Icons.arrow_back_rounded,size:18,color:cs.primary)),
-      ])))),
-   ),
+  final q=_search.text.trim().toLowerCase();
+  final visible=_items.where((e)=>(_category=='الكل'||e.category==_category)&&
+    (q.isEmpty||('${e.title} ${e.subtitle} ${e.category}').toLowerCase().contains(q))).toList();
+  const categories=['الكل','التواصل','الألعاب','الترفيه','المجتمع','المعرفة','الثقافة'];
+  return Directionality(textDirection:TextDirection.rtl,child:CustomScrollView(slivers:[
+   SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,14,14,10),child:Container(
+    padding:const EdgeInsets.all(20),
+    decoration:BoxDecoration(
+     gradient:const LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
+     borderRadius:BorderRadius.circular(24),
+     boxShadow:[BoxShadow(color:p.withValues(alpha:.2),blurRadius:18,offset:const Offset(0,8))]),
+    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+     Row(children:[Container(width:48,height:48,decoration:BoxDecoration(color:Colors.white.withValues(alpha:.14),borderRadius:BorderRadius.circular(15)),child:const Icon(Icons.hub_rounded,color:Colors.white,size:28)),const Spacer(),const Text('FUTURE YOUTH • COMMUNITY',style:TextStyle(color:Colors.white70,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:.6))]),
+     const SizedBox(height:14),
+     const Text('كل عالم الملتقى بمكان واحد ✨',style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.w900)),
+     const SizedBox(height:6),
+     const Text('تواصل، العب، شاهد، تعلّم وشارك أصدقاءك لحظاتك.',style:TextStyle(color:Colors.white70,height:1.5)),
+     const SizedBox(height:15),
+     Row(children:[
+      _hubStat(_items.length.toString(),'قسم وخدمة'),
+      const SizedBox(width:9),
+      _hubStat('24/7','مجتمعك'),
+      const SizedBox(width:9),
+      _hubStat('LIVE','مع الأصدقاء'),
+     ]),
+    ]),
+   ))),
+   SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,8),child:TextField(
+    controller:_search,onChanged:(_)=>setState(()=>{}),
+    decoration:InputDecoration(hintText:'ابحث عن قسم أو ميزة...',prefixIcon:const Icon(Icons.search_rounded),filled:true,fillColor:cs.surfaceContainerLow,
+     border:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide.none),
+     suffixIcon:_search.text.isEmpty?null:IconButton(onPressed:()=>setState(_search.clear),icon:const Icon(Icons.close_rounded))),
+   ))),
+   SliverToBoxAdapter(child:SizedBox(height:52,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10,vertical:5),children:categories.map((c)=>Padding(
+    padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(c),selected:_category==c,onSelected:(_)=>setState(()=>_category=c)),
+   )).toList()))),
+   SliverPadding(padding:const EdgeInsets.fromLTRB(12,8,12,24),sliver:visible.isEmpty
+    ?SliverToBoxAdapter(child(Padding(padding:const EdgeInsets.all(30),child:Center(child:Text('ما لقينا قسم بهذا الاسم. جرّب كلمة ثانية.',style:TextStyle(color:cs.onSurfaceVariant))))))
+    :SliverGrid(delegate:SliverChildBuilderDelegate((c,i){
+      final item=visible[i];
+      final colors=[p,const Color(0xFF168E9B),const Color(0xFFB65BC8),const Color(0xFF2878C7)];
+      final accent=colors[i%colors.length];
+      return Card(elevation:0,color:cs.surfaceContainerLow,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.5))),
+       child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>item.page)),
+        child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+         Container(width:48,height:48,decoration:BoxDecoration(color:accent.withValues(alpha:.13),borderRadius:BorderRadius.circular(15)),child:Icon(item.icon,color:accent,size:27)),
+         const Spacer(),
+         Text(item.title,style:TextStyle(fontWeight:FontWeight.w900,fontSize:14,color:cs.onSurface),maxLines:2,overflow:TextOverflow.ellipsis),
+         const SizedBox(height:5),
+         Text(item.subtitle,style:TextStyle(fontSize:11,height:1.35,color:cs.onSurfaceVariant),maxLines:2,overflow:TextOverflow.ellipsis),
+         const SizedBox(height:7),
+         Row(children:[Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:3),decoration:BoxDecoration(color:accent.withValues(alpha:.1),borderRadius:BorderRadius.circular(20)),child:Text(item.category,style:TextStyle(color:accent,fontSize:10,fontWeight:FontWeight.bold))),const Spacer(),Icon(Icons.arrow_back_rounded,size:17,color:accent)]),
+        ]))),
+      );
+    },childCount:visible.length),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:.93,crossAxisSpacing:10,mainAxisSpacing:10))),
   ]));
  }
+ Widget _hubStat(String value,String label)=>Expanded(child:Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:9),decoration:BoxDecoration(color:Colors.white.withValues(alpha:.12),borderRadius:BorderRadius.circular(13)),child:Column(children:[Text(value,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:15)),const SizedBox(height:2),Text(label,style:const TextStyle(color:Colors.white70,fontSize:10))])));
 }
 
 class TextShelf extends StatefulWidget {
