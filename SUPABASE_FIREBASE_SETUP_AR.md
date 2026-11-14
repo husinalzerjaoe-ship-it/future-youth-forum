@@ -7,10 +7,11 @@
 1. افتح مشروع Supabase: `xwfzdiftlzrjsprnbwpf`.
 2. اذهب إلى **Authentication → Sign In / Providers → Third-Party Auth**.
 3. أضف Firebase كمزود Third-party Auth، واستخدم Firebase Project ID: `futureyouth-69f8a`.
-4. احفظ الإعداد.
+4. احفظ الإعداد، وتأكد أن Firebase Third-party Auth يظهر كمزوّد مفعّل للمشروع الصحيح.
 5. افتح **SQL Editor** وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً.
+6. تأكد أن إعداد Firebase في Supabase يستخدم Project ID `futureyouth-69f8a` نفسه، وليس اسم التطبيق أو رابط Firebase Console.
 
-الـbucket `forum-media` مضبوط كـPublic لأن صور الدردشة العامة تُعرض عبر public URL. لا ترفع إليه ملفات خاصة أو مستندات شخصية. حد الرفع 10MB والأنواع المسموحة JPEG/PNG/WebP/GIF.
+الـbucket `forum-media` مضبوط كـPublic لأن الصور والستوريات والوسائط العامة تُعرض عبر public URL. لا ترفع إليه ملفات خاصة أو مستندات شخصية. حد الرفع 100MB، وتُقيد الأنواع المسموحة في SQL.
 
 ## تفعيل claim للمستخدمين
 Supabase يحتاج claim باسم `role: authenticated` داخل Firebase ID token حتى يعامل المستخدم كـauthenticated. أُضيفت Cloud Function في `functions/index.js` للحسابات الجديدة.
@@ -35,7 +36,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json node scripts/set_ex
 
 استبدل المسار بمكان ملف Service Account الذي نزلته من Firebase Console، ولا ترفعه إلى المستودع. السكربت يحافظ على custom claims الحالية ويضيف role فقط.
 
-بعد منح claim للحساب، سجّل خروج/دخول أو جدّد Firebase ID token حتى يصل claim الجديد إلى التطبيق.
+بعد منح claim للحساب، افتح التطبيق وسجّل خروجاً ثم دخولاً. التطبيق يستدعي الوظيفة الموثوقة للحسابات القديمة ويجدد Firebase ID token قبل الرفع. إذا ظهر خطأ `third-party auth` فالمشكلة في إعداد مزود Firebase داخل Supabase أو في نشر Cloud Function، وليست في اختيار الصورة.
 
 ## نظام نقاط التفاعل والترتيب الأسبوعي
 أُضيفت Cloud Functions لاحتساب النقاط من الخادم حتى لا يستطيع العضو منح نفسه نقاطاً من التطبيق:
