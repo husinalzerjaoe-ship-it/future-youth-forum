@@ -27,7 +27,7 @@ class GameCenterPage extends StatelessWidget {
    _GameTile(icon:Icons.quiz,title:'تحدي المعلومات',subtitle:'أسئلة متنوعة بمستويات مختلفة',page:const _QuizGame(category:'general')),
    _GameTile(icon:Icons.sports_soccer,title:'تحدي كرة القدم',subtitle:'أندية وبطولات ومنتخبات',page:const _QuizGame(category:'football')),
    _GameTile(icon:Icons.person_search,title:'من هو اللاعب؟',subtitle:'خمن اللاعب من التلميحات',page:const _QuizGame(category:'player')),
-   _GameTile(icon:Icons.people_alt,title:'دعوات وتحديات الأصدقاء',subtitle:'أرسل دعوة لعضو وتابع تحدياتك',page:const GameInvitesPage()),
+   _GameTile(icon:Icons.people_alt,title:'دعوات الأصدقاء والغرف',subtitle:'استقبل دعوة مباشرة أو انضم برمز الغرفة',page:const MultiplayerArcadePage()),
    _GameTile(icon:Icons.bolt,title:'تحدي السرعة',subtitle:'جاوب بأسرع ما يمكن',page:const _QuizGame(category:'speed')),
    _GameTile(icon:Icons.flag_outlined,title:'تحدي الأعلام',subtitle:'خمن الدولة من العلم',page:const _QuizGame(category:'flags')),
    _GameTile(icon:Icons.movie_outlined,title:'تحدي الأنمي',subtitle:'شخصيات وأحداث الأنمي',page:const _QuizGame(category:'anime')),
