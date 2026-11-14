@@ -251,15 +251,46 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
 
 class ArcadeAchievementsPage extends StatelessWidget {
   const ArcadeAchievementsPage({super.key});
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('الإنجازات والمكافآت')),body:ListView(padding:const EdgeInsets.all(16),children:[
-    Card(child:ListTile(leading:const Icon(Icons.stars_rounded,color:Colors.amber,size:34),title:const Text('جامع النقاط'),subtitle:const Text('اجمع النقاط من الألعاب والتحديات'),trailing:const Text('0 XP'))),
-    Card(child:ListTile(leading:const Icon(Icons.military_tech_rounded,color:Colors.amber,size:34),title:const Text('بداية الأسطورة'),subtitle:const Text('أكمل أول لعبة'),trailing:const Text('مقفل'))),
-    Card(child:ListTile(leading:const Icon(Icons.local_fire_department_rounded,color:Colors.deepOrange,size:34),title:const Text('سلسلة الفوز'),subtitle:const Text('حقق 3 انتصارات متتالية'),trailing:const Text('مقفل'))),
-    const Padding(padding:EdgeInsets.all(12),child:Text('لوحة الإنجازات مع حفظ الحساب والمتجر والجوائز الموثقة تحتاج ربط خدمة المكافآت الموثوقة قبل إتاحة العملات القابلة للصرف.')),
-    OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeLeaderboardPage())),icon:const Icon(Icons.leaderboard_rounded),label:const Text('لوحة المتصدرين')),
-    OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeTournamentsPage())),icon:const Icon(Icons.emoji_events_rounded),label:const Text('البطولات')),
-    OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeRoomsPage())),icon:const Icon(Icons.groups_rounded),label:const Text('الغرف الخاصة والدردشة')),
-  ])));
+  @override Widget build(BuildContext context){
+    final uid=FirebaseAuth.instance.currentUser!.uid;
+    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('الإنجازات والمكافآت')),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:FirebaseFirestore.instance.collection('arcadeProfiles').doc(uid).snapshots(),builder:(c,s){
+      final p=s.data?.data()??{};
+      return ListView(padding:const EdgeInsets.all(16),children:[
+        Card(child:ListTile(leading:const Icon(Icons.stars_rounded,color:Colors.amber,size:34),title:const Text('رصيد الخبرة'),subtitle:Text('المستوى '+(p['level']??1).toString()),trailing:Text((p['xp']??0).toString()+' XP'))),
+        Card(child:ListTile(leading:const Icon(Icons.monetization_on_rounded,color:Colors.amber,size:34),title:const Text('عملات Future Arcade'),subtitle:const Text('مكافآت اللعب اليومية محدودة'),trailing:Text((p['coins']??0).toString()))),
+        Card(child:ListTile(leading:const Icon(Icons.sports_esports_rounded),title:const Text('الألعاب المكتملة'),trailing:Text((p['gamesPlayed']??0).toString()))),
+        Card(child:ListTile(leading:const Icon(Icons.military_tech_rounded,color:Colors.amber,size:34),title:const Text('أوسمة المتجر'),subtitle:Text('تملك '+((p['inventory'] as List?)?.length??0).toString()+' أوسمة'),trailing:Text(p['equippedBadge']??'بدون'))),
+        const SizedBox(height:10),
+        OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeStorePage())),icon:const Icon(Icons.storefront_rounded),label:const Text('متجر الأوسمة')),
+        OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeLeaderboardPage())),icon:const Icon(Icons.leaderboard_rounded),label:const Text('لوحة المتصدرين')),
+        OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeTournamentsPage())),icon:const Icon(Icons.emoji_events_rounded),label:const Text('البطولات')),
+        OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeRoomsPage())),icon:const Icon(Icons.groups_rounded),label:const Text('الغرف الخاصة والدردشة')),
+      ]);
+    })));
+  }
+}
+
+class ArcadeStorePage extends StatelessWidget {
+  const ArcadeStorePage({super.key});
+  static const _items=[
+    ('bronze_star','نجمة برونزية','⭐',20),('flame','وسام اللهب','🔥',45),('crown','التاج الذهبي','👑',80),('rocket','وسام الصاروخ','🚀',65)
+  ];
+  @override Widget build(BuildContext context){
+    final uid=FirebaseAuth.instance.currentUser!.uid;
+    final ref=FirebaseFirestore.instance.collection('arcadeProfiles').doc(uid);
+    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('متجر الأوسمة')),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:ref.snapshots(),builder:(c,s){
+      final p=s.data?.data()??{};final coins=p['coins']??0;final inventory=List<String>.from(p['inventory']??[]);
+      return ListView(padding:const EdgeInsets.all(14),children:[
+        Card(child:ListTile(leading:const Icon(Icons.monetization_on_rounded,color:Colors.amber),title:const Text('رصيدك'),trailing:Text(coins.toString()+' عملة',style:const TextStyle(fontWeight:FontWeight.w900)))),
+        ..._items.map((item){final owned=inventory.contains(item.$1);return Card(child:ListTile(leading:Text(item.$3,style:const TextStyle(fontSize:30)),title:Text(item.$2),subtitle:Text(item.$4.toString()+' عملة'),trailing:owned?FilledButton.tonal(onPressed:()=>ref.update({'equippedBadge':item.$1}),child:Text(p['equippedBadge']==item.$1?'مفعّل':'استخدم')):FilledButton(onPressed:()=>_buy(context,item.$1),child:const Text('شراء'))));}),
+        if(!s.hasData||!s.data!.exists)const Padding(padding:EdgeInsets.all(12),child:Text('العب أولاً لتحصل على محفظة العملات.')),
+      ]);
+    })));
+  }
+  Future<void> _buy(BuildContext context,String badge) async {
+    try{await FirebaseFunctions.instance.httpsCallable('purchaseArcadeBadge').call({'badgeId':badge});if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم شراء الوسام!')));}
+    catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الشراء: '+e.toString())));}
+  }
 }
 
 class ArcadeLeaderboardPage extends StatelessWidget {
