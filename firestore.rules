@@ -1050,7 +1050,7 @@ service cloud.firestore {
         && request.resource.data.members.size() == 1
         && request.resource.data.members[0] == request.auth.uid
         && request.resource.data.status == 'waiting'
-        && request.resource.data.visibility == 'private';
+        && (
         && (
           (request.resource.data.game == 'xo'
             && request.resource.data.board is list
@@ -1291,6 +1291,7 @@ service cloud.firestore {
         && request.resource.data.roomCode is string
         && request.resource.data.roomCode.matches('^[0-9]{6}$')
         && request.resource.data.status == 'waiting'
+        && request.resource.data.visibility == 'private';
       allow update: if request.auth != null && (
         (request.auth.uid == resource.data.hostId
           && request.resource.data.hostId == resource.data.hostId
