@@ -461,7 +461,7 @@ class MemberSafetyPage extends StatelessWidget {
             return ListTile(
               leading: const CircleAvatar(child: Icon(Icons.block)),
               title: Text(d['blockedName'] as String? ?? 'عضو'),
-              subtitle: const Text('الحظر الحالي يمنع الرسائل الخاصة بينكما فقط'),
+              subtitle: const Text('يمنع الرسائل الخاصة ويخفي رسائله من الدردشة العامة عندك'),
               trailing: TextButton(
                 onPressed: () => doc.reference.delete(),
                 child: const Text('إلغاء الحظر'),
