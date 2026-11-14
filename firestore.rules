@@ -1050,16 +1050,16 @@ service cloud.firestore {
             && request.resource.data.turn == request.auth.uid
             && request.resource.data.winner == ''
             && request.resource.data.roomCode is string
-            && request.resource.data.roomCode.matches('^[0-9]{6}$'))
-          ||
-          (request.resource.data.game == 'football_quiz'
-            && request.resource.data.round == 0
-            && request.resource.data.answers is map
-            && request.resource.data.scores is map)
-          ||
-          (request.resource.data.game == 'treasure_duel'
-            && request.resource.data.roomCode is string
-            && request.resource.data.roomCode.matches('^[0-9]{6}
+            && request.resource.data.roomCode.matches('^[0-9]{6}$')
+            && request.resource.data.positions is list
+            && request.resource.data.positions.size() == 2
+            && request.resource.data.treasures is list
+            && request.resource.data.treasures.size() == 6
+            && request.resource.data.scores is map
+            && request.resource.data.turn == request.auth.uid
+            && request.resource.data.winner == ''
+            && request.resource.data.moves == 0)
+        );
       allow update: if request.auth != null && (
         // Add a player to a waiting XO or football quiz room.
         (!(request.auth.uid in resource.data.members)
