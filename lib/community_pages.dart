@@ -11,7 +11,6 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 import 'engagement_features.dart';
 import 'game_center.dart';
@@ -524,7 +523,7 @@ class _RegionVoicePlayer extends StatefulWidget {
 }
 class _RegionVoicePlayerState extends State<_RegionVoicePlayer>{
  late final AudioPlayer player;
- @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _){});}
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _) => Duration.zero);}
  @override void dispose(){player.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>SizedBox(width:220,child:Row(children:[
   StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){
