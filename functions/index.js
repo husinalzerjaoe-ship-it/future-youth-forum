@@ -123,3 +123,74 @@ exports.trackPostLike = onDocumentCreated("posts/{postId}/likes/{userId}", async
   if (!authorId || authorId === liker) return;
   await awardPoints("like_" + event.params.postId + "_" + liker, authorId, 1, "receivedLikes");
 });
+
+
+// Future Arcade rewards: server-side wallet updates, unique claims and a strict
+// daily cap. Scores are client-reported, so awards are rate-limited and capped;
+// this is not a competitive anti-cheat verifier for authoritative tournaments.
+exports.claimArcadeReward = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
+  const uid = request.auth.uid;
+  const gameId = request.data?.gameId;
+  const resultId = request.data?.resultId;
+  const score = request.data?.score;
+  const allowedGames = [
+    "arcade_ludo", "arcade_jackaroo", "arcade_chess", "arcade_mafia",
+    "arcade_racing", "arcade_snake", "arcade_space", "arcade_platform",
+    "arcade_tower", "arcade_fishing", "arcade_millionaire", "arcade_sudoku",
+    "arcade_wordsearch", "arcade_bomb",
+  ];
+  if (!allowedGames.includes(gameId)
+      || typeof resultId !== "string"
+      || !/^[A-Za-z0-9_-]{8,100}$/.test(resultId)
+      || !Number.isInteger(score) || score < 0 || score > 500) {
+    throw new HttpsError("invalid-argument", "Invalid arcade result.");
+  }
+
+  const day = new Date().toISOString().slice(0, 10);
+  const claimRef = adminDb.collection("arcadeRewardClaims").doc(uid + "_" + resultId);
+  const dailyRef = adminDb.collection("arcadeRewardDaily").doc(uid + "_" + day);
+  const profileRef = adminDb.collection("arcadeProfiles").doc(uid);
+  const xp = 8 + Math.min(12, Math.floor(score / 10));
+  const coins = 3 + Math.min(7, Math.floor(score / 15));
+
+  return adminDb.runTransaction(async (tx) => {
+    const claimSnap = await tx.get(claimRef);
+    const dailySnap = await tx.get(dailyRef);
+    const profileSnap = await tx.get(profileRef);
+    if (claimSnap.exists) {
+      return { alreadyClaimed: true, xp: 0, coins: 0 };
+    }
+    const dailyCount = dailySnap.exists ? Number(dailySnap.data().count || 0) : 0;
+    if (dailyCount >= 8) {
+      throw new HttpsError("resource-exhausted", "Daily arcade reward limit reached.");
+    }
+    const current = profileSnap.exists ? profileSnap.data() : {};
+    const totalXp = Number(current.xp || 0) + xp;
+    const totalCoins = Number(current.coins || 0) + coins;
+    const gamesPlayed = Number(current.gamesPlayed || 0) + 1;
+    const tokenName = request.auth.token.name || "لاعب";
+    const tokenPhoto = request.auth.token.picture || "";
+    tx.create(claimRef, {
+      uid, gameId, resultId, score, xp, coins,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(dailyRef, {
+      uid, day, count: dailyCount + 1,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    tx.set(profileRef, {
+      displayName: current.displayName || tokenName,
+      photoUrl: current.photoUrl || tokenPhoto,
+      equippedBadge: current.equippedBadge || "",
+      xp: totalXp,
+      coins: totalCoins,
+      level: Math.floor(totalXp / 100) + 1,
+      gamesPlayed,
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return { alreadyClaimed: false, xp, coins, totalXp, totalCoins, level: Math.floor(totalXp / 100) + 1 };
+  });
+});
