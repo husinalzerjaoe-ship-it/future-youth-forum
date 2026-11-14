@@ -55,8 +55,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
     return p.data()?['name'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
   }
-  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
-    if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
+  Future<void> _send({String body='',String? mediaUrl,String? audioUrl,String type='text',bool uploadInProgress=false}) async {
+    if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null && audioUrl==null)) return;
     final now = DateTime.now();
     final last = _lastSuccessfulSend;
     if (last != null && now.difference(last) < const Duration(seconds: 5)) {
