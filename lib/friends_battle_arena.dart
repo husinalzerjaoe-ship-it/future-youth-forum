@@ -286,27 +286,6 @@ class _TreasureLobbyPageState extends State<TreasureLobbyPage> {
     }
   }
 
-  Future<void> _invite(String roomId) async {
-    try {
-      final profiles = await _db.collection('publicProfiles').limit(100).get();
-      if (!mounted) return;
-      final selected = await showModalBottomSheet<String>(context: context, showDragHandle: true, builder: (c) => Directionality(
-        textDirection: TextDirection.rtl, child: SafeArea(child: ListView(shrinkWrap: true, children: [
-          const Padding(padding: EdgeInsets.all(16), child: Text('اختَر صديقاً لدعوته', style: TextStyle(fontWeight: FontWeight.bold))),
-          ...profiles.docs.where((p) => p.id != _uid).map((p) => ListTile(title: Text(p.data()['name']?.toString() ?? 'عضو'), onTap: () => Navigator.pop(c, p.id))),
-        ])),
-      ));
-      if (selected == null) return;
-      final me = await _db.collection('publicProfiles').doc(_uid).get();
-      await _db.collection('gameInvites').add({
-        'from': _uid, 'to': selected, 'fromName': me.data()?['name'] ?? _name,
-        'game': 'treasure', 'roomId': roomId, 'roomCode': roomId,
-        'status': 'pending', 'createdAt': FieldValue.serverTimestamp(),
-      });
-      _toast('تم إرسال الدعوة 🎮');
-    } catch (e) { _toast('تعذر إرسال الدعوة: $e'); }
-  }
-
   void _toast(String s) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
 
   @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
