@@ -8,6 +8,7 @@ import 'arcade_minigames.dart';
 import 'arcade_penalty.dart';
 import 'social_party_games.dart';
 import 'board_games.dart';
+import 'game_center.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -170,6 +171,16 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
           subtitle: const Text('الدومينو • الدامة • لاعبان على نفس الجهاز'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardGamesPage())),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.flag_circle_rounded)),
+          title: const Text('تحديات الأعلام والأنمي والأندية'),
+          subtitle: const Text('خمن العلم • شخصيات الأنمي • شعارات الأندية • دعوات الأصدقاء'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage())),
         ),
       ),
       const SizedBox(height: 10),
