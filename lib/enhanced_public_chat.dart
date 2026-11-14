@@ -530,7 +530,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
     ])),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).orderBy('createdAt',descending:true).limit(5).snapshots(),
+      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
       builder:(context,s){
         if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
         final pinned=s.data!.docs;
