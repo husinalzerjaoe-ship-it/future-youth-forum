@@ -44,7 +44,7 @@ class DirectMessagesPage extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Text('تحقق من اتصال الإنترنت وصلاحيات Firestore، ثم أعد المحاولة.', textAlign: TextAlign.center),
                 const SizedBox(height: 10),
-                OutlinedButton.icon(onPressed: () { (context as Element).markNeedsBuild(); },
+                OutlinedButton.icon(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DirectMessagesPage())),
                   icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
               ]),
             ));
