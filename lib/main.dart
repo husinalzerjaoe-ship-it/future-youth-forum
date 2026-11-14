@@ -20,6 +20,7 @@ import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
 import 'match_center.dart';
+import 'game_center.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -326,6 +327,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'games':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage()));
+                  break;
                 case 'communityPlus':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage()));
                   break;
@@ -353,6 +357,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'games', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مركز الألعاب والتحديات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityPlus', child: ListTile(leading: Icon(Icons.forum_outlined), title: Text('مجتمع الأوتاكو والنقاشات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'saved', child: ListTile(leading: Icon(Icons.bookmarks_outlined), title: Text('المحفوظات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'inspiration', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('مكتبة العبارات والأدعية'), contentPadding: EdgeInsets.zero)),
