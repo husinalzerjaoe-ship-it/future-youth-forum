@@ -1316,8 +1316,12 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && (request.auth.uid == resource.data.hostId || isChatStaff());
       match /chat/{messageId} {
-        allow read: if arcadeMember();
-        allow create: if arcadeMember() && accountNotBanned() && chatNotMuted()
+        function parentArcadeMember() {
+          return request.auth != null
+            && request.auth.uid in get(/databases/$(database)/documents/arcadeRooms/$(roomId)).data.members;
+        }
+        allow read: if parentArcadeMember();
+        allow create: if parentArcadeMember() && accountNotBanned() && chatNotMuted()
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.text is string
           && request.resource.data.text.size() > 0
