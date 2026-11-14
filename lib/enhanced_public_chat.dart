@@ -395,7 +395,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         _snack('وصل بلاغك للإدارة');
       }
     } else if (action == 'block') {
-      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
+      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'blockedName': memberName, 'createdAt': FieldValue.serverTimestamp()});
       _snack('تم حظر العضو عندك');
     } else if (action == 'mute' && staff) {
       await _moderateMember(memberUid, memberName, 'mute');
