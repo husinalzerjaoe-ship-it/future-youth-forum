@@ -290,10 +290,81 @@ class CommunityDirectoryPage extends StatelessWidget {
       title: Text(_interestNames[i]),
       subtitle: const Text('منشورات ونقاشات وأصدقاء بنفس الاهتمام'),
       trailing: const Icon(Icons.arrow_forward_ios, size: 15),
-      onTap: () => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تجد منشورات هذا الاهتمام ضمن تبويب المنشورات والأقسام.'))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => InterestCommunityPage(category: _interestNames[i]))),
     ))),
     const _WritingAssistantCard(),
   ]);
+}
+
+
+class InterestCommunityPage extends StatefulWidget {
+  const InterestCommunityPage({super.key, required this.category});
+  final String category;
+  @override
+  State<InterestCommunityPage> createState() => _InterestCommunityPageState();
+}
+
+class _InterestCommunityPageState extends State<InterestCommunityPage> {
+  final db = FirebaseFirestore.instance;
+  String get uid => FirebaseAuth.instance.currentUser!.uid;
+
+  Future<void> addPost() async {
+    final text = TextEditingController();
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: Text('منشور • ' + widget.category),
+        content: TextField(controller: text, maxLines: 5, maxLength: 1000, decoration: const InputDecoration(hintText: 'شارك فكرة أو سؤالاً...', border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, text.text.trim().isNotEmpty), child: const Text('نشر')),
+        ],
+      ),
+    ));
+    if (ok == true) {
+      try {
+        await db.collection('interestPosts').add({
+          'category': widget.category, 'authorId': uid,
+          'authorName': FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+          'text': text.text.trim(), 'createdAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر نشر المشاركة. تحقق من قواعد Firestore.')));
+      }
+    }
+    text.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: Text(widget.category)),
+      floatingActionButton: FloatingActionButton.extended(onPressed: addPost, icon: const Icon(Icons.add), label: const Text('منشور جديد')),
+      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: db.collection('interestPosts').where('category', isEqualTo: widget.category).limit(80).snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const Center(child: Text('تعذر تحميل منشورات المجتمع.'));
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final docs = snapshot.data!.docs.toList();
+          docs.sort((a, b) {
+            final aa = (a.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+            final bb = (b.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+            return bb.compareTo(aa);
+          });
+          if (docs.isEmpty) return const _EmptyCommunity(icon: Icons.forum_outlined, text: 'هذا المجتمع جديد. كن أول من يشارك منشوراً!');
+          return ListView(padding: const EdgeInsets.all(12), children: docs.map((doc) {
+            final data = doc.data();
+            return Card(child: ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+              title: Text(data['authorName'] ?? 'عضو'),
+              subtitle: Padding(padding: const EdgeInsets.only(top: 6), child: Text(data['text'] ?? '')),
+            ));
+          }).toList());
+        },
+      ),
+    ),
+  );
 }
 
 class _WritingAssistantCard extends StatefulWidget {
