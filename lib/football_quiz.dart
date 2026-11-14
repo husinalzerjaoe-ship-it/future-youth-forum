@@ -203,7 +203,7 @@ class _FootballQuizMatchPageState extends State<_FootballQuizMatchPage>{
    if(!s.hasData)return const Center(child:CircularProgressIndicator());
    if(!s.data!.exists)return const Center(child:Text('الغرفة غير موجودة.'));
    final d=s.data!.data()!;final members=List<String>.from(d['members']??[]);final names=Map<String,dynamic>.from(d['memberNames']??{});final scores=Map<String,dynamic>.from(d['scores']??{});final answers=Map<String,dynamic>.from(d['answers']??{});
-   final round=(d['round'] as num? ??0).toInt();final fact=_facts[round%_facts.length];final opts=<String>[fact.a,...fact.w]..shuffle(Random(fact.a.hashCode+round*97));
+   final round=(d['round'] as num? ??0).toInt();final fact=_facts[round%_facts.length];final opts=<String>[fact.a,...fact.w]..shuffle(Random(fact.a.length*997+round*97));
    final mine=answers.containsKey(_uid);final status=d['status'];
    return ListView(padding:const EdgeInsets.all(16),children:[
     Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
