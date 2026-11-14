@@ -14,35 +14,91 @@ const gameInk=Color(0xFF171936), gameViolet=Color(0xFF6554D9);
 final gameDb=FirebaseFirestore.instance;
 String get gameUid=>FirebaseAuth.instance.currentUser!.uid;
 
-class GameCenterPage extends StatelessWidget {
- const GameCenterPage({super.key});
- @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-  appBar:AppBar(title:const Text('مركز الألعاب والتحديات')),
-  body:ListView(padding:const EdgeInsets.all(14),children:[
-   _GameTile(icon:Icons.quiz_rounded,title:'مسابقة أسئلة مباشرة للأصدقاء',subtitle:'2–4 لاعبين • رمز غرفة • دعوات • ترتيب ونقاط مباشرة',page:const FriendsQuizPage()),
-   _GameTile(icon:Icons.emoji_events_rounded,title:'ساحة منافسات الأصدقاء الجديدة',subtitle:'12 تحدياً متنوعاً + مغامرة كنز 2D أونلاين بدعوات',page:const FriendsBattleArenaPage()),
-   _GameTile(icon:Icons.public,title:'صالة اللعب أونلاين',subtitle:'إكس أو مباشر • رمز غرفة من 6 أرقام • دعوات الأصدقاء',page:const MultiplayerArcadePage()),
-   _GameTile(icon:Icons.groups_rounded,title:'ألعاب السهرة الجماعية',subtitle:'الجاسوس والذئب والرسم والخداع والنرد',page:const SocialPartyGamesPage()),
-   _GameTile(icon:Icons.grid_4x4,title:'ألعاب الطاولة',subtitle:'الدومينو والدامة لشخصين',page:const BoardGamesPage()),
-   _GameTile(icon:Icons.psychology_alt,title:'ألعاب الذكاء السريعة',subtitle:'الذاكرة وترتيب الحروف والتحديات',page:const ArcadeMiniGamesPage()),
-   _GameTile(icon:Icons.sports_soccer,title:'ضربات الجزاء',subtitle:'تحدي التسديد والحارس',page:const PenaltyShootoutPage()),
-   Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(gradient:const LinearGradient(colors:[gameInk,gameViolet,Color(0xFF16A6A0)]),borderRadius:BorderRadius.circular(20)),child:const Text('تحدّى نفسك وأصدقاءك 🎮\nمعلومات عامة • كرة قدم • تخمين لاعبين',style:TextStyle(color:Colors.white,fontSize:21,fontWeight:FontWeight.bold))),
-   const SizedBox(height:12),
-   _GameTile(icon:Icons.quiz,title:'تحدي المعلومات',subtitle:'أسئلة متنوعة بمستويات مختلفة',page:const _QuizGame(category:'general')),
-   _GameTile(icon:Icons.sports_soccer,title:'تحدي كرة القدم',subtitle:'أندية وبطولات ومنتخبات',page:const _QuizGame(category:'football')),
-   _GameTile(icon:Icons.person_search,title:'من هو اللاعب؟',subtitle:'خمن اللاعب من التلميحات',page:const _QuizGame(category:'player')),
-   _GameTile(icon:Icons.people_alt,title:'دعوات الأصدقاء والغرف',subtitle:'استقبل دعوة مباشرة أو انضم برمز الغرفة',page:const MultiplayerArcadePage()),
-   _GameTile(icon:Icons.bolt,title:'تحدي السرعة',subtitle:'جاوب بأسرع ما يمكن',page:const _QuizGame(category:'speed')),
-   _GameTile(icon:Icons.flag_outlined,title:'تحدي الأعلام',subtitle:'خمن الدولة من العلم',page:const _QuizGame(category:'flags')),
-   _GameTile(icon:Icons.movie_outlined,title:'تحدي الأنمي',subtitle:'شخصيات وأحداث الأنمي',page:const _QuizGame(category:'anime')),
-   _GameTile(icon:Icons.shield_outlined,title:'شعارات الأندية',subtitle:'ألقاب وألوان وأندية عالمية',page:const _QuizGame(category:'clubs')),
-  ]),
- ));
+class _GameEntry {
+  final String title, subtitle, tag;
+  final IconData icon;
+  final Widget page;
+  final Color color;
+  const _GameEntry(this.title, this.subtitle, this.tag, this.icon, this.page, this.color);
 }
-class _GameTile extends StatelessWidget{
- final IconData icon;final String title,subtitle;final Widget page;
- const _GameTile({required this.icon,required this.title,required this.subtitle,required this.page});
- @override Widget build(BuildContext c)=>Card(child:ListTile(leading:CircleAvatar(backgroundColor:gameViolet.withValues(alpha:.12),child:Icon(icon,color:gameViolet)),title:Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:Text(subtitle),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>page))));
+class GameCenterPage extends StatefulWidget {
+  const GameCenterPage({super.key});
+  @override State<GameCenterPage> createState() => _GameCenterPageState();
+}
+class _GameCenterPageState extends State<GameCenterPage> {
+  final TextEditingController _search = TextEditingController();
+  String _filter = 'الكل';
+  late final List<_GameEntry> _games = [
+    _GameEntry('كنز الأصدقاء 2D','خريطة مباشرة • جواهر • غرف ودعوات','2D أونلاين',Icons.map_rounded,const TreasureLobbyPage(),const Color(0xFF13A89E)),
+    _GameEntry('ساحة منافسات الأصدقاء','12 تصنيف أسئلة • نقاط • جولات','تحديات',Icons.emoji_events_rounded,const FriendsBattleArenaPage(),const Color(0xFF6554D9)),
+    _GameEntry('مسابقة الأصدقاء المباشرة','2–4 لاعبين • رمز غرفة • ترتيب','أونلاين',Icons.groups_rounded,const FriendsQuizPage(),const Color(0xFF2878C7)),
+    _GameEntry('إكس أو أونلاين','تحدّ صديقك بغرفة خاصة','أونلاين',Icons.grid_3x3_rounded,const MultiplayerArcadePage(),const Color(0xFF0C9C8B)),
+    _GameEntry('ألعاب السهرة','الجاسوس • الذئب • الرسم • الخداع','جماعية',Icons.nightlife_rounded,const SocialPartyGamesPage(),const Color(0xFFB65BC8)),
+    _GameEntry('ألعاب الطاولة','الدومينو والدامة لشخصين','جماعية',Icons.extension_rounded,const BoardGamesPage(),const Color(0xFFB77A32)),
+    _GameEntry('ألعاب الذكاء','ذاكرة • حروف • تحديات سريعة','فردية',Icons.psychology_alt_rounded,const ArcadeMiniGamesPage(),const Color(0xFF4779B8)),
+    _GameEntry('ضربات الجزاء','سدّد وتغلّب على الحارس','فردية',Icons.sports_soccer_rounded,const PenaltyShootoutPage(),const Color(0xFF27956C)),
+    _GameEntry('معلومات عامة','اختبر معلوماتك بمراحل متنوعة','أسئلة',Icons.public_rounded,const _QuizGame(category:'general'),const Color(0xFF4779B8)),
+    _GameEntry('تحدي كرة القدم','أندية • بطولات • منتخبات','أسئلة',Icons.sports_soccer_rounded,const _QuizGame(category:'football'),const Color(0xFF27956C)),
+    _GameEntry('من هو اللاعب؟','خمن اللاعب من التلميحات','أسئلة',Icons.person_search_rounded,const _QuizGame(category:'player'),const Color(0xFFB77A32)),
+    _GameEntry('تحدي السرعة','جاوب قبل انتهاء الوقت','أسئلة',Icons.bolt_rounded,const _QuizGame(category:'speed'),const Color(0xFFD17A32)),
+    _GameEntry('تحدي الأعلام','اعرف الدولة من علمها','أسئلة',Icons.flag_rounded,const _QuizGame(category:'flags'),const Color(0xFF0C9C8B)),
+    _GameEntry('عالم الأنمي','شخصيات وأحداث وأنميات','أسئلة',Icons.animation_rounded,const _QuizGame(category:'anime'),const Color(0xFFB65BC8)),
+    _GameEntry('شعارات الأندية','الألوان والألقاب والفرق','أسئلة',Icons.shield_rounded,const _QuizGame(category:'clubs'),const Color(0xFF2878C7)),
+  ];
+  @override void dispose() { _search.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) {
+    final query = _search.text.trim().toLowerCase();
+    final games = _games.where((g) {
+      final matchesText = query.isEmpty || (g.title + ' ' + g.subtitle + ' ' + g.tag).toLowerCase().contains(query);
+      final matchesFilter = _filter == 'الكل' ||
+        (_filter == 'أونلاين' && (g.tag.contains('أونلاين') || g.tag == 'جماعية')) ||
+        (_filter == '2D' && g.tag.contains('2D')) ||
+        (_filter == 'أسئلة' && g.tag == 'أسئلة') ||
+        (_filter == 'فردية' && g.tag == 'فردية');
+      return matchesText && matchesFilter;
+    }).toList();
+    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+      appBar:AppBar(title:const Text('مركز الألعاب'),centerTitle:true),
+      body:CustomScrollView(slivers:[
+        SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,8,14,8),child:Container(
+          padding:const EdgeInsets.all(20),
+          decoration:BoxDecoration(borderRadius:BorderRadius.circular(26),gradient:const LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF171936),Color(0xFF6554D9),Color(0xFF13A89E)]),boxShadow:[BoxShadow(color:gameViolet.withValues(alpha:.22),blurRadius:18,offset:const Offset(0,8))]),
+          child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Row(children:[Container(width:52,height:52,decoration:BoxDecoration(color:Colors.white.withValues(alpha:.16),borderRadius:BorderRadius.circular(17)),child:const Icon(Icons.sports_esports_rounded,color:Colors.white,size:30)),const Spacer(),const Text('PLAY • COMPETE • WIN',style:TextStyle(color:Colors.white70,fontWeight:FontWeight.w800,letterSpacing:1))]),
+            const SizedBox(height:15),
+            const Text('اللعب أحلى ويّا الأصدقاء 🎮',style:TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900)),
+            const SizedBox(height:5),
+            const Text('تحديات، ألعاب جماعية، أسئلة ومغامرات ثنائية الأبعاد',style:TextStyle(color:Colors.white70,height:1.5)),
+            const SizedBox(height:16),
+            Row(children:[_HeroStat(value:_games.length.toString(),label:'لعبة'),const SizedBox(width:9),const _HeroStat(value:'12',label:'تصنيف أسئلة'),const SizedBox(width:9),const _HeroStat(value:'2D',label:'مغامرات')]),
+            const SizedBox(height:16),
+            SizedBox(width:double.infinity,child:FilledButton.icon(style:FilledButton.styleFrom(backgroundColor:Colors.white,foregroundColor:gameInk,padding:const EdgeInsets.symmetric(vertical:13)),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const TreasureLobbyPage())),icon:const Icon(Icons.map_rounded),label:const Text('ابدأ مغامرة الكنز 2D',style:TextStyle(fontWeight:FontWeight.w900)))),
+          ]),
+        ))),
+        SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,8,14,4),child:TextField(controller:_search,onChanged:(_)=>setState((){}),decoration:InputDecoration(hintText:'ابحث عن لعبة أو تحدٍّ...',prefixIcon:const Icon(Icons.search_rounded),suffixIcon:_search.text.isEmpty?null:IconButton(icon:const Icon(Icons.close),onPressed:(){_search.clear();setState((){});}),filled:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(17),borderSide:BorderSide.none))))),
+        SliverToBoxAdapter(child:SizedBox(height:54,child:ListView(padding:const EdgeInsets.symmetric(horizontal:14,vertical:5),scrollDirection:Axis.horizontal,children:['الكل','أونلاين','2D','أسئلة','فردية'].map((f)=>Padding(padding:const EdgeInsets.only(left:8),child:ChoiceChip(label:Text(f),selected:_filter==f,onSelected:(_)=>setState(()=>_filter=f))).toList()))),
+        SliverPadding(padding:const EdgeInsets.fromLTRB(14,8,14,24),sliver:games.isEmpty?const SliverToBoxAdapter(child:Padding(padding:EdgeInsets.all(35),child:Center(child:Text('ما لقينا لعبة بهذا الاسم. جرّب كلمة ثانية.')))):SliverGrid(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,mainAxisSpacing:11,crossAxisSpacing:11,childAspectRatio:.91),delegate:SliverChildBuilderDelegate((context,index)=>_GameCard(game:games[index]),childCount:games.length))),
+      ]),
+    ));
+  }
+}
+class _HeroStat extends StatelessWidget {
+  final String value,label;
+  const _HeroStat({required this.value,required this.label});
+  @override Widget build(BuildContext context)=>Expanded(child:Container(padding:const EdgeInsets.symmetric(vertical:9,horizontal:7),decoration:BoxDecoration(color:Colors.white.withValues(alpha:.13),borderRadius:BorderRadius.circular(13)),child:Column(children:[Text(value,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:17)),Text(label,style:const TextStyle(color:Colors.white70,fontSize:11))])));
+}
+class _GameCard extends StatelessWidget {
+  final _GameEntry game;
+  const _GameCard({required this.game});
+  @override Widget build(BuildContext context)=>Material(color:Theme.of(context).colorScheme.surface,borderRadius:BorderRadius.circular(21),child:InkWell(borderRadius:BorderRadius.circular(21),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>game.page)),child:Container(padding:const EdgeInsets.all(13),decoration:BoxDecoration(borderRadius:BorderRadius.circular(21),border:Border.all(color:Theme.of(context).dividerColor.withValues(alpha:.35)),boxShadow:[BoxShadow(color:game.color.withValues(alpha:.07),blurRadius:12,offset:const Offset(0,5))]),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Row(children:[Container(width:45,height:45,decoration:BoxDecoration(color:game.color.withValues(alpha:.13),borderRadius:BorderRadius.circular(15)),child:Icon(game.icon,color:game.color,size:25)),const Spacer(),Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),decoration:BoxDecoration(color:game.color.withValues(alpha:.11),borderRadius:BorderRadius.circular(20)),child:Text(game.tag,style:TextStyle(color:game.color,fontSize:10,fontWeight:FontWeight.w800)))]),
+    const Spacer(),
+    Text(game.title,maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w900,fontSize:14.5)),
+    const SizedBox(height:5),
+    Text(game.subtitle,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11.5,color:Theme.of(context).colorScheme.onSurfaceVariant,height:1.3)),
+    const SizedBox(height:7),
+    Row(children:[Text('العب الآن',style:TextStyle(color:game.color,fontWeight:FontWeight.w900,fontSize:12)),const Spacer(),Icon(Icons.arrow_back_rounded,color:game.color,size:17)]),
+  ]))));
 }
 class _Question {final String q;final List<String> a;final int correct;final String why;const _Question(this.q,this.a,this.correct,this.why);}
 const _general=[
