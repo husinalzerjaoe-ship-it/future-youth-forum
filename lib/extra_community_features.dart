@@ -110,15 +110,25 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الرمز غير صحيح أو أنك لست ضمن المدعوين')));}
   code.dispose();
  }
- Future<void> send({String? audioUrl}) async {
-  final value=text.text.trim();if((value.isEmpty&&audioUrl==null)||busy)return;setState(()=>busy=true);
+ Future<void> send({String? audioUrl,String? imageUrl}) async {
+  final value=text.text.trim();if((value.isEmpty&&audioUrl==null&&imageUrl==null)||busy)return;setState(()=>busy=true);
   try{
    final profile=await db.collection('publicProfiles').doc(uid).get();
-   await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'senderName':profile.data()?['name']??FirebaseAuth.instance.currentUser?.displayName??'عضو','text':value,'type':audioUrl==null?'text':'voice',if(audioUrl!=null)'audioUrl':audioUrl,'createdAt':FieldValue.serverTimestamp()});
-   final last=audioUrl==null?value:'🎤 رسالة صوتية';
+   await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'senderName':profile.data()?['name']??FirebaseAuth.instance.currentUser?.displayName??'عضو','text':value,'type':audioUrl!=null?'voice':imageUrl!=null?'image':'text',if(audioUrl!=null)'audioUrl':audioUrl,if(imageUrl!=null)'imageUrl':imageUrl,'createdAt':FieldValue.serverTimestamp()});
+   final last=audioUrl!=null?'🎤 رسالة صوتية':imageUrl!=null?'📷 صورة':value;
    await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':last.length>200?last.substring(0,200):last,'updatedAt':FieldValue.serverTimestamp()});text.clear();
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الإرسال: '+e.toString())));}
   finally{if(mounted)setState(()=>busy=false);}
+ }
+ Future<void> sendImage() async {
+  final picked=await ImagePicker().pickImage(source:ImageSource.gallery,imageQuality:85,maxWidth:1600);
+  if(picked==null||!mounted)return;
+  setState(()=>busy=true);
+  try{
+   final url=await uploadForumMedia(picked,folder:'private-chat');
+   if(mounted)setState(()=>busy=false);
+   await send(imageUrl:url);
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر رفع الصورة: $e')));if(mounted)setState(()=>busy=false);}
  }
  Future<void> toggleVoice() async {
   if(recording){await finishVoice();return;}
@@ -154,10 +164,10 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName)),body:!unlocked?Center(child:FilledButton.icon(onPressed:unlock,icon:const Icon(Icons.lock_open),label:const Text('إدخال رمز الغرفة'))):Column(children:[
   Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
    if(s.hasError)return const Center(child:Text('تعذر تحميل الرسائل'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
-   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;final sender=(x['senderId']??'').toString();return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(sender.isNotEmpty)StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:db.collection('publicProfiles').doc(sender).snapshots(),builder:(ctx,p){final data=p.data?.data()??{};final name=data['name'] as String? ?? x['senderName'] as String? ?? 'عضو';final photo=data['photoUrl'] as String? ?? '';return Row(mainAxisSize:MainAxisSize.min,children:[CircleAvatar(radius:13,backgroundImage:photo.startsWith('https://')?NetworkImage(photo):null,child:photo.startsWith('https://')?null:Text(name.isEmpty?'؟':name.characters.first,style:const TextStyle(fontSize:10))),const SizedBox(width:6),Text(name,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:Color(0xFF6554D9)))]);}),if(x['type']=='voice'&&x['audioUrl'] is String)_PrivateRoomVoicePlayer(url:x['audioUrl'] as String),if((x['text'] as String? ?? '').isNotEmpty)Text(x['text'] as String,style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))])));}).toList());
+   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;final sender=(x['senderId']??'').toString();return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(sender.isNotEmpty)StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:db.collection('publicProfiles').doc(sender).snapshots(),builder:(ctx,p){final data=p.data?.data()??{};final name=data['name'] as String? ?? x['senderName'] as String? ?? 'عضو';final photo=data['photoUrl'] as String? ?? '';return Row(mainAxisSize:MainAxisSize.min,children:[CircleAvatar(radius:13,backgroundImage:photo.startsWith('https://')?NetworkImage(photo):null,child:photo.startsWith('https://')?null:Text(name.isEmpty?'؟':name.characters.first,style:const TextStyle(fontSize:10))),const SizedBox(width:6),Text(name,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:Color(0xFF6554D9)))]);}),if(x['type']=='image'&&x['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(x['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),if(x['type']=='voice'&&x['audioUrl'] is String)_PrivateRoomVoicePlayer(url:x['audioUrl'] as String),if((x['text'] as String? ?? '').isNotEmpty)Text(x['text'] as String,style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))])));}).toList());
   })),
   if(recording)const Padding(padding:EdgeInsets.symmetric(horizontal:12,vertical:4),child:Text('🔴 جاري تسجيل الفويس — اضغط المايك للإيقاف والإرسال',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold))),
-  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[IconButton(onPressed:busy?null:toggleVoice,icon:Icon(recording?Icons.stop_circle:Icons.mic,color:recording?Colors.red:const Color(0xFF6554D9))),Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
+  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[IconButton(onPressed:busy?null:sendImage,icon:const Icon(Icons.image_outlined,color:Color(0xFF6554D9))),IconButton(onPressed:busy?null:toggleVoice,icon:Icon(recording?Icons.stop_circle:Icons.mic,color:recording?Colors.red:const Color(0xFF6554D9))),Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ]));
 }
 
