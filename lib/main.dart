@@ -57,7 +57,7 @@ Future<void> main() async {
     anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
     // Forward the signed-in Firebase ID token so Supabase Storage RLS can
     // identify the same user. Configure Firebase as a Supabase Third-party Auth
-    // provider and add role=authenticated to Firebase ID tokens.
+    // provider; the current storage policies validate Firebase issuer, audience and UID.
     accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
   await initializeLocalAudioService();
