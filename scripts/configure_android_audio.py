@@ -36,4 +36,19 @@ service = """
 """
 if "com.ryanheise.audioservice.AudioService\"" not in text:
     text = text.replace("</application>", service + "\n    </application>")
+
+    # LiveKit audio/video calling permissions (idempotent).
+    livekit_permissions = [
+        '<uses-permission android:name="android.permission.CAMERA" />',
+        '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
+        '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+        '<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />',
+        '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />',
+        '<uses-feature android:name="android.hardware.camera" android:required="false" />',
+        '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />',
+    ]
+    for permission in livekit_permissions:
+        if permission.split(' android:')[0] not in text:
+            text = text.replace("<application", f"    {permission}\\n    <application", 1)
+
 path.write_text(text, encoding="utf-8")
