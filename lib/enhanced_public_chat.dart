@@ -529,6 +529,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
     ])),
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).orderBy('createdAt',descending:true).limit(5).snapshots(),
+      builder:(context,s){
+        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
+        final pinned=s.data!.docs;
+        return Container(margin:const EdgeInsets.fromLTRB(10,6,10,4),decoration:BoxDecoration(color:const Color(0xFFEDE8FF),borderRadius:BorderRadius.circular(13),border:Border.all(color:_chatBrand.withValues(alpha:.35))),child:ExpansionTile(
+          dense:true,leading:const Icon(Icons.push_pin_rounded,color:_chatBrand),title:Text('الرسائل المثبتة (${pinned.length})',style:const TextStyle(color:Color(0xFF34266F),fontWeight:FontWeight.w900)),
+          subtitle:const Text('اضغط لعرض الإعلانات والرسائل المهمة',style:TextStyle(fontSize:10,color:Color(0xFF6554A8))),
+          children:pinned.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.bookmark,color:_chatBrand,size:18),title:Text(d['senderName'] as String? ?? 'عضو',style:const TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF34266F))),subtitle:Text(d['text'] as String? ?? (d['type']=='image'?'📷 صورة':d['type']=='voice'?'🎙️ رسالة صوتية':'مرفق'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Color(0xFF34266F))),onTap:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('رسالة مثبتة'),content:Text(d['text'] as String? ?? 'رسالة مرفقة'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))])));}).toList(),
+        ));
+      },
+    ),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
