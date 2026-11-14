@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import 'youtube_video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -257,6 +260,9 @@ class RegionChatPage extends StatefulWidget {
 class _RegionChatPageState extends State<RegionChatPage> {
  final t=TextEditingController();
  final picker=ImagePicker();
+ final voiceRecorder=AudioRecorder();
+ bool recordingVoice=false;
+ DateTime? voiceStartedAt;
  bool busy=false;
  String? error;
  int backgroundIndex=0;
@@ -294,15 +300,15 @@ class _RegionChatPageState extends State<RegionChatPage> {
   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(choice=='unban'?'تم رفع الحظر':choice=='kick'?'تم الطرد المؤقت':'تم تطبيق الحظر')));
  }
 
- Future<void> send({String text='',String? imageUrl,String type='text'}) async {
-  if((text.trim().isEmpty&&imageUrl==null)||busy)return;
+ Future<void> send({String text='',String? imageUrl,String? audioUrl,int? durationSeconds,String type='text'}) async {
+  if((text.trim().isEmpty&&imageUrl==null&&audioUrl==null)||busy)return;
   final me=FirebaseAuth.instance.currentUser!;
   if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}
   setState(()=>busy=true);
   try{
    final profile=await db2.collection('publicProfiles').doc(me.uid).get();
    await db2.collection('regionalChats').doc(widget.id).collection('messages').add({
-    'text':text.trim(),'type':type,if(imageUrl!=null)'imageUrl':imageUrl,
+    'text':text.trim(),'type':type,if(imageUrl!=null)'imageUrl':imageUrl,if(audioUrl!=null)'audioUrl':audioUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
     'senderId':me.uid,'senderRole':founder?'founder':'member',
     'senderName':profile.data()?['name']??me.displayName??'عضو',
     'senderPhoto':profile.data()?['photoUrl']??'',
@@ -319,6 +325,34 @@ class _RegionChatPageState extends State<RegionChatPage> {
    final url=await uploadForumMedia(file,folder:'regional-chat',roomId:widget.id);
    await send(imageUrl:url,type:'image');
   }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
+ }
+
+ Future<void> toggleVoiceRecording() async {
+  if(busy)return;
+  if(!recordingVoice){
+   try{
+    if(!await voiceRecorder.hasPermission()){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اسمح للتطبيق باستخدام المايكروفون أولاً.')));return;}
+    final dir=await getTemporaryDirectory();
+    final path=dir.path+'/regional_voice_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
+    await voiceRecorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:64000,sampleRate:44100),path:path);
+    if(mounted)setState((){recordingVoice=true;voiceStartedAt=DateTime.now();});
+   }catch(e){if(mounted)setState(()=>error='تعذر بدء التسجيل: '+e.toString());}
+   return;
+  }
+  try{
+   final started=voiceStartedAt;
+   final path=await voiceRecorder.stop();
+   if(mounted)setState((){recordingVoice=false;voiceStartedAt=null;});
+   if(path==null||started==null)return;
+   final elapsed=DateTime.now().difference(started).inSeconds;
+   final seconds=elapsed.clamp(1,180).toInt();
+   if(mounted)setState(()=>busy=true);
+   final url=await uploadForumMedia(XFile(path,name:'regional_voice_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a'),folder:'regional-chat',roomId:widget.id);
+   if(mounted)setState(()=>busy=false);
+   await send(text:'رسالة صوتية',audioUrl:url,durationSeconds:seconds,type:'voice');
+  }catch(e){
+   if(mounted)setState(()=>error='تعذر إرسال الفويس: '+e.toString());
+  }finally{if(mounted)setState(()=>busy=false);}
  }
 
  void showStickers()=>showModalBottomSheet<void>(context:context,showDragHandle:true,
@@ -346,6 +380,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
   final type=d['type'] as String? ?? 'text';
   final txt=d['text'] as String? ?? '';
   final url=d['imageUrl'] as String?;
+  final audio=d['audioUrl'] as String?;
   final senderPhoto=d['senderPhoto'] as String?;
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
@@ -361,13 +396,14 @@ class _RegionChatPageState extends State<RegionChatPage> {
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
      if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
     ]),
+    if(type=='voice'&&audio!=null)_RegionVoicePlayer(url:audio,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
     if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
     if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
     if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
    ])));
  }
 
- @override void dispose(){t.dispose();super.dispose();}
+ @override void dispose(){t.dispose();voiceRecorder.dispose();super.dispose();}
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
   appBar:AppBar(title:Text(widget.title),actions:[
    IconButton(tooltip:'خلفية الغرفة',icon:const Icon(Icons.wallpaper),onPressed:chooseBackground),
@@ -388,6 +424,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
    if(error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text(error!,style:const TextStyle(color:Colors.red,fontSize:11))),
    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:6,vertical:6),child:SafeArea(top:false,child:Row(children:[
     IconButton(onPressed:busy?null:sendImage,tooltip:'صورة أو GIF',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:toggleVoiceRecording,tooltip:recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(recordingVoice?Icons.stop_circle:Icons.mic,color:recordingVoice?Colors.red:p)),
     IconButton(onPressed:busy?null:showStickers,tooltip:'ملصقات',icon:const Icon(Icons.emoji_emotions,color:Color(0xFFE6A52C))),
     Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(text:t.text),
      decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),
@@ -476,4 +513,33 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    ),
   ),
  );
+}
+
+
+class _RegionVoicePlayer extends StatefulWidget {
+ final String url;
+ final int durationSeconds;
+ const _RegionVoicePlayer({required this.url,required this.durationSeconds});
+ @override State<_RegionVoicePlayer> createState()=>_RegionVoicePlayerState();
+}
+class _RegionVoicePlayerState extends State<_RegionVoicePlayer>{
+ late final AudioPlayer player;
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _){});}
+ @override void dispose(){player.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>SizedBox(width:220,child:Row(children:[
+  StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){
+   final playing=s.data?.playing??false;
+   return IconButton(onPressed:()async{if(playing){await player.pause();}else{await player.play();}},icon:Icon(playing?Icons.pause_circle:Icons.play_circle,color:p,size:30));
+  }),
+  Expanded(child:StreamBuilder<Duration?>(stream:player.durationStream,builder:(c,d){
+   final total=d.data??Duration(seconds:widget.durationSeconds);
+   return StreamBuilder<Duration>(stream:player.positionStream,builder:(c,pos){
+    final current=pos.data??Duration.zero,maximum=total.inMilliseconds;
+    return Column(mainAxisSize:MainAxisSize.min,children:[
+     Slider(value:maximum<=0?0:current.inMilliseconds.clamp(0,maximum).toDouble(),max:maximum<=0?1:maximum.toDouble(),onChanged:maximum<=0?null:(v)=>player.seek(Duration(milliseconds:v.round()))),
+     Text(current.inSeconds.toString()+'s / '+total.inSeconds.toString()+'s',style:const TextStyle(fontSize:10)),
+    ]);
+   });
+  })),
+ ]));
 }
