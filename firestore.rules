@@ -476,7 +476,6 @@ service cloud.firestore {
       // that query, which otherwise makes the entire inbox query fail.
       allow read: if request.auth != null
         && resource.data.members is list
-        && resource.data.members.size() == 2
         && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.members is list
@@ -498,7 +497,6 @@ service cloud.firestore {
         function isMember() {
           let parent = get(/databases/$(database)/documents/conversations/$(conversationId));
           return parent.data.members is list
-            && parent.data.members.size() == 2
             && request.auth.uid in parent.data.members;
         }
         function members() {
