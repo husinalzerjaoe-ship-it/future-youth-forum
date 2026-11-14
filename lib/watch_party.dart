@@ -125,6 +125,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   bool _applyingRemote = false;
   bool _busy = false;
   Map<String, dynamic> _room = {};
+  final _chatText = TextEditingController();
+  bool _sendingChat = false;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool get _isHost => _room['hostUid'] == _uid;
   bool get _isYoutube => _room['sourceType'] == 'youtube';
@@ -299,10 +301,34 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
 
+  Future<void> _sendRoomMessage() async {
+    final text = _chatText.text.trim();
+    if (text.isEmpty || _sendingChat) return;
+    setState(() => _sendingChat = true);
+    try {
+      final profile = await _watchDb.collection('publicProfiles').doc(_uid).get();
+      final name = (profile.data()?['name'] as String?) ??
+          FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
+      await _watchDb.collection('watchRooms').doc(widget.roomId)
+          .collection('messages').add({
+        'senderUid': _uid,
+        'senderName': name,
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _chatText.clear();
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر إرسال رسالة الغرفة. تأكد من نشر قواعد Firestore المحدّثة.');
+    } finally {
+      if (mounted) setState(() => _sendingChat = false);
+    }
+  }
+
   @override
   void dispose() {
     _syncTimer?.cancel();
     _roomSub?.cancel();
+    _chatText.dispose();
     _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').doc(_uid).delete().catchError((_) {});
     _ytSub?.cancel();
     _youtube?.close();
@@ -371,6 +397,72 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             IconButton(onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10), tooltip: 'تقديم 10 ثوانٍ'),
           ]) else const Padding(padding: EdgeInsets.only(top: 8), child: Text('المضيف وحده يتحكم بالتشغيل والتقديم حتى تبقون على نفس المقطع.')),
         ]))),
+        const SizedBox(height: 8),
+        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(children: [
+              Icon(Icons.forum_rounded, color: _watchBrand),
+              SizedBox(width: 8),
+              Text('دردشة غرفة المشاهدة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ]),
+            const SizedBox(height: 8),
+            SizedBox(height: 220, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _watchDb.collection('watchRooms').doc(widget.roomId)
+                  .collection('messages').orderBy('createdAt', descending: true).limit(60).snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) return const Center(child: Text('تعذر تحميل دردشة الغرفة.'));
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                final messages = snapshot.data!.docs;
+                if (messages.isEmpty) return const Center(child: Text('ابدأوا الحديث أثناء المشاهدة 🎬'));
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final item = messages[index].data();
+                    final mine = item['senderUid'] == _uid;
+                    return Align(
+                      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 7),
+                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        decoration: BoxDecoration(
+                          color: mine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          if (!mine) Text(item['senderName'] as String? ?? 'عضو',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          Text(item['text'] as String? ?? ''),
+                        ]),
+                      ),
+                    );
+                  },
+                );
+              },
+            )),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: TextField(
+                controller: _chatText,
+                minLines: 1,
+                maxLines: 3,
+                maxLength: 500,
+                decoration: const InputDecoration(hintText: 'اكتب رسالة لأعضاء الغرفة...', counterText: '', border: OutlineInputBorder()),
+                onSubmitted: (_) => _sendRoomMessage(),
+              )),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                tooltip: 'إرسال الرسالة',
+                onPressed: _sendingChat ? null : _sendRoomMessage,
+                icon: _sendingChat
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.send_rounded),
+              ),
+            ]),
+          ],
+        ))),
         const Padding(padding: EdgeInsets.all(8), child: Text('ملاحظة: المزامنة تعتمد على سرعة الإنترنت، وقد يظهر فرق بسيط بين الأجهزة. بعض مقاطع YouTube تمنع التضمين، وروابط البث يجب أن تكون مباشرة ومصرّحاً بمشاركتها.', style: TextStyle(fontSize: 12))),
       ]),
     ),
