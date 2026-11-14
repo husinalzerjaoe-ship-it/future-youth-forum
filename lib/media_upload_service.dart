@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Uploads media to a user's own folder after obtaining the Supabase-compatible
-/// Firebase custom claim on the trusted server.
+/// Uploads media to the signed-in Firebase user's own Supabase Storage folder.
+/// Storage RLS verifies the Firebase JWT issuer, audience and UID.
 Future<String> uploadForumMedia(
   XFile file, {
   required String folder,
@@ -37,8 +37,7 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Claims are provisioned with the local Firebase Admin SDK migration script.
-  // Uploads therefore do not depend on a billable Cloud Function deployment.
+  // Refresh the Firebase ID token before sending it to Supabase Third-party Auth.
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
     throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
@@ -56,9 +55,9 @@ Future<String> uploadForumMedia(
       || claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8a') {
     throw StateError('هوية Firebase لا تطابق مشروع التطبيق. راجع إعداد Firebase Third-party Auth في Supabase.');
   }
-  if (claims['role'] != 'authenticated') {
-    throw StateError('حسابك يحتاج صلاحية رفع الوسائط. شغّل سكربت منح الصلاحية من Cloud Shell (بدون نشر Functions أو تفعيل Blaze)، ثم سجّل خروج وادخل من جديد.');
-  }
+  // Firebase ID tokens do not contain Supabase's role claim by default.
+  // Storage RLS accepts the verified Firebase JWT under the anon DB role,
+  // but still checks the Firebase issuer, audience and owner UID in SQL.
 
   final name = file.name.toLowerCase();
   final ext = name.contains('.') ? name.split('.').last : 'jpg';
