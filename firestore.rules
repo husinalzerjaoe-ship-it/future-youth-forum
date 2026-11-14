@@ -1051,7 +1051,6 @@ service cloud.firestore {
         && request.resource.data.members[0] == request.auth.uid
         && request.resource.data.status == 'waiting'
         && (
-        && (
           (request.resource.data.game == 'xo'
             && request.resource.data.board is list
             && request.resource.data.board.size() == 9
