@@ -328,7 +328,29 @@ class _ArcadeTournamentsPageState extends State<ArcadeTournamentsPage> {
       const SizedBox(height:8),FilledButton(onPressed:_busy?null:_create,child:const Text('إنشاء البطولة')),
     ]))),
     const SizedBox(height:12),const Text('البطولات المفتوحة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeTournaments').where('status',isEqualTo:'open').snapshots(),builder:(c,s){if(s.hasError)return const Text('تعذر تحميل البطولات.');if(!s.hasData)return const Center(child:CircularProgressIndicator());return Column(children:s.data!.docs.map((d){final x=d.data();final joined=List<String>.from(x['participants']??[]).contains(_uid);return Card(child:ListTile(title:Text(x['title']??'بطولة'),subtitle:Text((_games[x['gameId']]??'لعبة')+' • '+List<String>.from(x['participants']??[]).length.toString()+' مشاركين'),trailing:joined?const Icon(Icons.check_circle,color:Colors.green):TextButton(onPressed:()=>_join(d),child:const Text('انضم'))));}).toList());}),
+        return Column(
+          children: s.data!.docs.map((d) {
+            final x = d.data();
+            return Card(
+              child: ListTile(
+                leading: const Icon(Icons.meeting_room_rounded),
+                title: Text(_options[x['gameId']] ?? 'غرفة ألعاب'),
+                subtitle: Text('الرمز: ' + (x['roomCode'] ?? '') + ' • ' + (x['status'] ?? '')),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ArcadeRoomChatPage(
+                      roomId: d.id,
+                      title: _options[x['gameId']] ?? 'غرفة ألعاب',
+                      roomCode: x['roomCode'] ?? '',
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        );
   ])));
 }
 
