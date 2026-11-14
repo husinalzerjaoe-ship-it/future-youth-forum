@@ -1375,7 +1375,7 @@ class _AnimeNightPainter extends CustomPainter {
       final y = random.nextDouble() * size.height;
       final radius = .45 + random.nextDouble() * 1.25;
       final wave = (math.sin((phase * math.pi * 2) + i * .71) + 1) / 2;
-      final alpha = (.12 + wave * .48).clamp(0.0, .62);
+      final alpha = (.12 + wave * .48).clamp(0.0, .62).toDouble();
       final paint = Paint()
         ..color = Color.lerp(
           const Color(0xFFB9C9FF),
