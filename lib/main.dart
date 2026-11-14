@@ -17,6 +17,7 @@ import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
+import 'match_center.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -398,6 +399,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('آخر الأخبار والانتقالات والعراق والدوريات والمنتخبات'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootballNewsPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFEAF7EF), child: Icon(Icons.scoreboard_rounded, color: Color(0xFF16834A))),
+                title: const Text('مركز المباريات والنتائج', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('مواعيد ونتائج بطولات كرة القدم'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchCenterPage())),
               ),
             ),
             Card(
