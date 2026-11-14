@@ -70,7 +70,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
             const SizedBox(height:5),
             const Text('تحديات، ألعاب جماعية، أسئلة ومغامرات ثنائية الأبعاد',style:TextStyle(color:Colors.white70,height:1.5)),
             const SizedBox(height:16),
-            Row(children:[_HeroStat(value:_games.length.toString(),label:'لعبة'),const SizedBox(width:9),const _HeroStat(value:'12',label:'تصنيف أسئلة'),const SizedBox(width:9),const _HeroStat(value:'2D',label:'مغامرات')]),
+            Row(children:[_HeroStat(value:_games.length.toString(),label:'لعبة'),const SizedBox(width:9),const _HeroStat(value:'18',label:'تصنيف أسئلة'),const SizedBox(width:9),const _HeroStat(value:'2D',label:'مغامرات')]),
             const SizedBox(height:16),
             SizedBox(width:double.infinity,child:FilledButton.icon(style:FilledButton.styleFrom(backgroundColor:Colors.white,foregroundColor:gameInk,padding:const EdgeInsets.symmetric(vertical:13)),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const TreasureLobbyPage())),icon:const Icon(Icons.map_rounded),label:const Text('ابدأ مغامرة الكنز 2D',style:TextStyle(fontWeight:FontWeight.w900)))),
           ]),
