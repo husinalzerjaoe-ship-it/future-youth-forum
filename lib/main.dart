@@ -414,7 +414,7 @@ class PostsPage extends StatelessWidget {
               child: ListTile(
                 leading: const CircleAvatar(backgroundColor: Color(0xFFEDE9FF), child: Icon(Icons.live_tv_rounded, color: Color(0xFF6554D9))),
                 title: const Text('غرف يوتيوب والمشاهدة الجماعية', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('شاهدوا الفيديو معاً وتحدثوا داخل الغرفة مباشرة'),
+                subtitle: const Text('يوتيوب وروابط فيديو وأفلام ومسلسلات متاحة للتضمين مع مزامنة ودردشة'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
               ),
