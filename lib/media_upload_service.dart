@@ -56,9 +56,9 @@ Future<String> uploadForumMedia(
       || claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8a') {
     throw StateError('هوية Firebase لا تطابق مشروع التطبيق. راجع إعداد Firebase Third-party Auth في Supabase.');
   }
-  if (claims['role'] != 'authenticated') {
-    throw StateError('حسابك يحتاج صلاحية رفع الوسائط. شغّل سكربت منح الصلاحية من Cloud Shell (بدون نشر Functions أو تفعيل Blaze)، ثم سجّل خروج وادخل من جديد.');
-  }
+  // Firebase ID tokens do not contain Supabase's role claim by default.
+  // Storage RLS accepts the verified Firebase JWT under the anon DB role,
+  // but still checks the Firebase issuer, audience and owner UID in SQL.
 
   final name = file.name.toLowerCase();
   final ext = name.contains('.') ? name.split('.').last : 'jpg';
