@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
@@ -260,7 +261,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       _applyRemoteState(data);
       _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) => _publishCurrentPosition());
     } catch (_) {
-      if (mounted) setState(() => _error = 'تعذر تشغيل الرابط. تأكد أنه فيديو مباشر أو أن ناشر YouTube يسمح بالتضمين.');
+      if (mounted) setState(() => _error = data['sourceType'] == 'youtube' ? 'تعذر تضمين هذا المقطع. قد يكون خاصاً أو مقيّداً أو أن صاحبه منع التشغيل داخل التطبيقات.' : 'تعذر تشغيل رابط الفيديو المباشر. تأكد من صلاحية الرابط واتصال الإنترنت.');
     }
   }
 
@@ -426,7 +427,24 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     child: Scaffold(
       appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة')),
       body: ListView(padding: const EdgeInsets.all(12), children: [
-        if (_error != null) Card(color: Theme.of(context).colorScheme.errorContainer, child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!))),
+        if (_error != null) Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: Padding(padding: const EdgeInsets.all(12), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_error!),
+              if (_isYoutube && (_room['url'] as String? ?? '').isNotEmpty)
+                Align(alignment: AlignmentDirectional.centerStart, child: TextButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.tryParse(_room['url'] as String? ?? '');
+                    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('فتح المقطع في تطبيق YouTube'),
+                )),
+            ],
+          )),
+        ),
         Stack(children: [
           if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
           else if (_video?.value.isInitialized == true)
