@@ -12,10 +12,10 @@ const _arcadeGames = <_ArcadeGame>[
   _ArcadeGame('platform','مغامرة المنصات','اقفز فوق العقبات واجمع النجوم',Icons.sports_martial_arts_rounded,'2D'),
   _ArcadeGame('tower','الدفاع عن القلعة','ابنِ الأبراج وصد موجات الأعداء',Icons.castle_rounded,'استراتيجية'),
   _ArcadeGame('fishing','صيد السمك','ارمِ السنارة وحاول صيد الأسماك النادرة',Icons.phishing_rounded,'خفيفة'),
-  _ArcadeGame('millionaire','من سيربح المليون؟','أجب عن الأسئلة وتصاعد إلى الجائزة الكبرى',Icons.millionaires_rounded,'أسئلة'),
+  _ArcadeGame('millionaire','من سيربح المليون؟','أجب عن الأسئلة وتصاعد إلى الجائزة الكبرى',Icons.workspace_premium_rounded,'أسئلة'),
   _ArcadeGame('sudoku','سودوكو','املأ الشبكة بالأرقام دون تكرار',Icons.numbers_rounded,'ذكاء'),
   _ArcadeGame('wordsearch','البحث عن الكلمات','اكتشف الكلمات المخفية داخل الشبكة',Icons.search_rounded,'ذكاء'),
-  _ArcadeGame('bomb','ساحة القنابل','تحرك بذكاء وضع القنابل لتفتح الطريق',Icons.bomb_rounded,'2D'),
+  _ArcadeGame('bomb','ساحة القنابل','تحرك بذكاء وضع القنابل لتفتح الطريق',Icons.whatshot_rounded,'2D'),
 ];
 
 class _ArcadeGame {
