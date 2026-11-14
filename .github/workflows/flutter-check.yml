@@ -7,8 +7,8 @@ on:
     branches: [main, fix/media-private-chat-reactions, free-tier-private-rooms, comprehensive-community-upgrade]
 
 concurrency:
-  group: flutter-apk-${{ github.ref }}
-  cancel-in-progress: true
+  group: flutter-apk-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
 jobs:
   analyze-and-build:
     runs-on: ubuntu-latest
