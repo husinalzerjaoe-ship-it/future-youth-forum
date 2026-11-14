@@ -219,6 +219,23 @@ service cloud.firestore {
           && request.resource.data.photoUrl is string;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Watch-room chat must follow the same public/private membership rules.
+      match /messages/{messageId} {
+        allow read: if canAccessRoom();
+        allow create: if canAccessRoom()
+          && request.auth != null
+          && request.resource.data.senderUid == request.auth.uid
+          && request.resource.data.senderName is string
+          && request.resource.data.senderName.size() <= 60
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500;
+        allow update: if false;
+        allow delete: if canAccessRoom()
+          && request.auth != null
+          && (resource.data.senderUid == request.auth.uid || isChatStaff());
+      }
     }
 
     match /reports/{reportId} {
