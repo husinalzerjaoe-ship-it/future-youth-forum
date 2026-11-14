@@ -19,6 +19,7 @@ Future<String> uploadForumMedia(
   switch (folder) {
     case 'anime-wallpapers':
     case 'public-chat':
+    case 'posts':
     case 'voice-messages':
     case 'stories':
     case 'private-chat':
