@@ -186,10 +186,11 @@ service cloud.firestore {
 
     match /watchRooms/{roomId} {
       function canAccessRoom() {
+        let room = get(/databases/$(database)/documents/watchRooms/$(roomId)).data;
         return request.auth != null && (
-          resource.data.visibility != 'private'
-          || resource.data.hostUid == request.auth.uid
-          || (resource.data.invitedUids is list && request.auth.uid in resource.data.invitedUids)
+          room.visibility != 'private'
+          || room.hostUid == request.auth.uid
+          || (room.invitedUids is list && request.auth.uid in room.invitedUids)
         );
       }
       allow read: if canAccessRoom();
