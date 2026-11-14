@@ -235,7 +235,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
       final result=await FirebaseFunctions.instance.httpsCallable('claimArcadeReward').call({
         'gameId':'arcade_'+id,
         'resultId':DateTime.now().microsecondsSinceEpoch.toString()+'_'+Random().nextInt(999999).toString(),
-        'score':_score,
+        'score':min(_score,500),
       });
       final data=Map<String,dynamic>.from(result.data as Map);
       if(!mounted)return;
@@ -364,7 +364,7 @@ class _ArcadeRoomsPageState extends State<ArcadeRoomsPage> {
     if(!RegExp(r'^\d{6}).hasMatch(code)){_show('أدخل رمزاً من 6 أرقام.');return;}
     setState(()=>_busy=true);
     try{
-      final found=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).where('status',isEqualTo:'waiting').limit(1).get();
+      final found=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).limit(1).get();
       if(found.docs.isEmpty){_show('الغرفة غير موجودة أو بدأت بالفعل.');return;}
       final doc=found.docs.first;final data=doc.data();final members=List<String>.from(data['members']??[]);
       if(members.contains(_uid)){if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[data['gameId']]??'غرفة ألعاب',roomCode:code)));return;}
