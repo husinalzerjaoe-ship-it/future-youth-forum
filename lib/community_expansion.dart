@@ -235,7 +235,7 @@ class _CommunityEventsPageState extends State<CommunityEventsPage> {
               catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث المشاركة.'))); }
             }, icon: Icon(joined ? Icons.check_circle : Icons.add_circle_outline), label: Text(joined ? 'إلغاء المشاركة' : 'سأشارك'))),
           ])));
-        }).toList()),
+        }).toList());
       },
     ),
   );
