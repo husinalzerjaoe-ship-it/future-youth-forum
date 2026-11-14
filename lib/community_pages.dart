@@ -569,7 +569,7 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
      if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
           return ListView(padding:const EdgeInsets.all(12),children:[
-     Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 50 اختياراً من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
+     Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 51 اختياراً من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
      ...featuredTracks.map((track)=>Card(child:ListTile(
       leading:const CircleAvatar(child:Icon(Icons.music_note)),
       title:Text(track['title']!),
@@ -667,11 +667,11 @@ class _LifeToolsPageState extends State<LifeToolsPage> {
     const Text('حاسبة العمر',textAlign:TextAlign.center,style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
     const Text('اعرف عمرك بالسنوات والأشهر والأيام',textAlign:TextAlign.center),
     const SizedBox(height:16),
-    OutlinedButton.icon(onPressed:chooseBirthday,icon:const Icon(Icons.calendar_month),label:Text(birthday==null?'اختيار تاريخ الميلاد':'تاريخ الميلاد: \${birthday!.year}/\${birthday!.month}/\${birthday!.day}')),
+    OutlinedButton.icon(onPressed:chooseBirthday,icon:const Icon(Icons.calendar_month),label:Text(birthday==null?'اختيار تاريخ الميلاد':'تاريخ الميلاد: ${birthday!.year}/${birthday!.month}/${birthday!.day}')),
     if(birthday!=null)...[
      const SizedBox(height:12),
      Text(ageDetail,textAlign:TextAlign.center,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:p)),
-     Text('عمرك بالأيام تقريباً: \${DateTime.now().difference(birthday!).inDays} يوم',textAlign:TextAlign.center),
+     Text('عمرك بالأيام تقريباً: ${DateTime.now().difference(birthday!).inDays} يوم',textAlign:TextAlign.center),
      const Divider(height:28),
      Text('برجك: $zodiac',textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),
     ]
