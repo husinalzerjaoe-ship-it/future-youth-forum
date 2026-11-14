@@ -776,5 +776,35 @@ service cloud.firestore {
       }
     }
 
+
+    // Sports news is published by the founder; signed-in members can read it.
+    match /sportsNews/{newsId} {
+      allow read: if request.auth != null;
+      allow create: if isFounder()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.author == 'Alfredo'
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 1500
+        && request.resource.data.sourceUrl is string
+        && (request.resource.data.sourceUrl == ''
+          || request.resource.data.sourceUrl.matches('https://.*'));
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'body', 'sourceUrl'])
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 1500
+        && request.resource.data.sourceUrl is string
+        && (request.resource.data.sourceUrl == ''
+          || request.resource.data.sourceUrl.matches('https://.*'));
+      allow delete: if isFounder();
+    }
+
   }
 }
