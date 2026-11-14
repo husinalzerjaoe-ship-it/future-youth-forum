@@ -185,6 +185,7 @@ exports.claimArcadeReward = onCall(async (request) => {
       displayName: current.displayName || tokenName,
       photoUrl: current.photoUrl || tokenPhoto,
       equippedBadge: current.equippedBadge || "",
+      equippedFrame: current.equippedFrame || "",
       xp: totalXp,
       coins: totalCoins,
       level: Math.floor(totalXp / 100) + 1,
