@@ -300,222 +300,63 @@ class ArcadeLeaderboardPage extends StatelessWidget {
 
 class ArcadeTournamentsPage extends StatefulWidget {
   const ArcadeTournamentsPage({super.key});
-  @override State<ArcadeTournamentsPage> createState()=>_ArcadeTournamentsPageState();
+  @override State<ArcadeTournamentsPage> createState() => _ArcadeTournamentsPageState();
 }
 class _ArcadeTournamentsPageState extends State<ArcadeTournamentsPage> {
-  final _db=FirebaseFirestore.instance;final _title=TextEditingController();String _game='arcade_ludo';bool _busy=false;
-  String get _uid=>FirebaseAuth.instance.currentUser!.uid;
-  static const _games={'arcade_ludo':'لودو 2D','arcade_jackaroo':'جاكارو','arcade_chess':'الشطرنج','arcade_mafia':'المافيا','arcade_racing':'سباق السيارات','arcade_snake':'الثعبان','arcade_space':'حرب الفضاء','arcade_platform':'مغامرة المنصات','arcade_tower':'الدفاع عن القلعة','arcade_fishing':'صيد السمك','arcade_millionaire':'من سيربح المليون؟','arcade_sudoku':'سودوكو','arcade_wordsearch':'البحث عن الكلمات','arcade_bomb':'ساحة القنابل'};
+  final _db = FirebaseFirestore.instance; final _title = TextEditingController();
+  String _game = 'arcade_ludo'; bool _busy = false;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  static const _games = <String,String>{'arcade_ludo':'لودو 2D','arcade_jackaroo':'جاكارو','arcade_chess':'الشطرنج','arcade_mafia':'المافيا','arcade_racing':'سباق السيارات','arcade_snake':'الثعبان','arcade_space':'حرب الفضاء','arcade_platform':'مغامرة المنصات','arcade_tower':'الدفاع عن القلعة','arcade_fishing':'صيد السمك','arcade_millionaire':'من سيربح المليون؟','arcade_sudoku':'سودوكو','arcade_wordsearch':'البحث عن الكلمات','arcade_bomb':'ساحة القنابل'};
   Future<void> _create() async {
-    if(_title.text.trim().length<3)return;
-    setState(()=>_busy=true);
-    try{await _db.collection('arcadeTournaments').add({'creatorId':_uid,'title':_title.text.trim(),'gameId':_game,'participants':[_uid],'status':'open','createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()});_title.clear();}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إنشاء البطولة: '+e.toString())));}
-    finally{if(mounted)setState(()=>_busy=false);}
+    final title = _title.text.trim(); if (title.length < 3) return;
+    setState(() => _busy = true);
+    try { await _db.collection('arcadeTournaments').add({'creatorId':_uid,'title':title,'gameId':_game,'participants':[_uid],'status':'open','createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()}); _title.clear(); }
+    catch(e) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إنشاء البطولة: '+e.toString()))); }
+    finally { if(mounted) setState(() => _busy = false); }
   }
   Future<void> _join(DocumentSnapshot<Map<String,dynamic>> doc) async {
-    final x=doc.data()??{};final p=List<String>.from(x['participants']??[]);
-    if(p.contains(_uid))return;
-    try{await doc.reference.update({'participants':[...p,_uid],'updatedAt':FieldValue.serverTimestamp()});}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الانضمام: '+e.toString())));}
+    try { await _db.runTransaction((tx) async { final fresh=await tx.get(doc.reference); final data=fresh.data()??{}; final members=List<String>.from(data['participants']??[]); if(data['status']=='open'&&!members.contains(_uid)) tx.update(doc.reference,{'participants':[...members,_uid],'updatedAt':FieldValue.serverTimestamp()}); }); }
+    catch(e) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الانضمام: '+e.toString()))); }
   }
   @override void dispose(){_title.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('بطولات الألعاب')),body:ListView(padding:const EdgeInsets.all(14),children:[
-    Card(child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-      const Text('أنشئ بطولة جديدة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:17)),
+    Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Text('أنشئ بطولة جديدة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
       TextField(controller:_title,decoration:const InputDecoration(labelText:'اسم البطولة')),
-      const SizedBox(height:8),DropdownButtonFormField<String>(value:_game,items:_games.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);},decoration:const InputDecoration(labelText:'اللعبة')),
-      const SizedBox(height:8),FilledButton(onPressed:_busy?null:_create,child:const Text('إنشاء البطولة')),
+      DropdownButtonFormField<String>(initialValue:_game,items:_games.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);},decoration:const InputDecoration(labelText:'اللعبة')),
+      FilledButton(onPressed:_busy?null:_create,child:const Text('إنشاء البطولة')),
     ]))),
     const SizedBox(height:12),const Text('البطولات المفتوحة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-        return Column(
-          children: s.data!.docs.map((d) {
-            final x = d.data();
-            return Card(
-              child: ListTile(
-                leading: const Icon(Icons.meeting_room_rounded),
-                title: Text(_options[x['gameId']] ?? 'غرفة ألعاب'),
-                subtitle: Text('الرمز: ' + (x['roomCode'] ?? '') + ' • ' + (x['status'] ?? '')),
-                trailing: const Icon(Icons.chevron_left),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ArcadeRoomChatPage(
-                      roomId: d.id,
-                      title: _options[x['gameId']] ?? 'غرفة ألعاب',
-                      roomCode: x['roomCode'] ?? '',
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        );
-  ])));
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeTournaments').where('status',isEqualTo:'open').snapshots(),builder:(context,s){
+      if(s.hasError)return const Text('تعذر تحميل البطولات. تحقق من قواعد Firestore.');
+      if(!s.hasData)return const Center(child:CircularProgressIndicator());
+      if(s.data!.docs.isEmpty)return const Text('لا توجد بطولات مفتوحة حالياً.');
+      return Column(children:s.data!.docs.map((d){final x=d.data();final members=List<String>.from(x['participants']??[]);final joined=members.contains(_uid);return Card(child:ListTile(leading:const Icon(Icons.emoji_events_rounded),title:Text(x['title']??'بطولة'),subtitle:Text((_games[x['gameId']]??'لعبة')+' • '+members.length.toString()+' مشارك'),trailing:joined?const Chip(label:Text('مشترك')):TextButton(onPressed:()=>_join(d),child:const Text('انضم'))));}).toList());
+    }),
+  ]))));
 }
 
-class ArcadeRoomsPage extends StatefulWidget {
-  const ArcadeRoomsPage({super.key});
-  @override State<ArcadeRoomsPage> createState()=>_ArcadeRoomsPageState();
-}
+class ArcadeRoomsPage extends StatefulWidget { const ArcadeRoomsPage({super.key}); @override State<ArcadeRoomsPage> createState()=>_ArcadeRoomsPageState(); }
 class _ArcadeRoomsPageState extends State<ArcadeRoomsPage> {
-  final _db=FirebaseFirestore.instance;
-  final _code=TextEditingController();
-  String _game='arcade_ludo';
-  bool _busy=false;
+  final _db=FirebaseFirestore.instance; final _code=TextEditingController(); String _game='arcade_ludo'; bool _busy=false;
   String get _uid=>FirebaseAuth.instance.currentUser!.uid;
-  static const _options={
-    'arcade_ludo':'لودو 2D','arcade_jackaroo':'جاكارو','arcade_chess':'الشطرنج','arcade_mafia':'المافيا',
-    'arcade_racing':'سباق السيارات','arcade_snake':'الثعبان','arcade_space':'حرب الفضاء','arcade_platform':'مغامرة المنصات',
-    'arcade_tower':'الدفاع عن القلعة','arcade_fishing':'صيد السمك','arcade_millionaire':'من سيربح المليون؟',
-    'arcade_sudoku':'سودوكو','arcade_wordsearch':'البحث عن الكلمات','arcade_bomb':'ساحة القنابل'
-  };
+  static const _options=<String,String>{'arcade_ludo':'لودو 2D','arcade_jackaroo':'جاكارو','arcade_chess':'الشطرنج','arcade_mafia':'المافيا','arcade_racing':'سباق السيارات','arcade_snake':'الثعبان','arcade_space':'حرب الفضاء','arcade_platform':'مغامرة المنصات','arcade_tower':'الدفاع عن القلعة','arcade_fishing':'صيد السمك','arcade_millionaire':'من سيربح المليون؟','arcade_sudoku':'سودوكو','arcade_wordsearch':'البحث عن الكلمات','arcade_bomb':'ساحة القنابل'};
   @override void dispose(){_code.dispose();super.dispose();}
-  Future<void> _create() async {
-    setState(()=>_busy=true);
-    try{
-      final room=_db.collection('arcadeRooms').doc();
-      final code=(Random().nextInt(900000)+100000).toString();
-      await room.set({'hostId':_uid,'gameId':_game,'members':[_uid],'roomCode':code,'status':'waiting','visibility':'private','state':{},'createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()});
-      if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:room.id,title:_options[_game]??'غرفة ألعاب',roomCode:code)));
-    }catch(e){_show('تعذر إنشاء الغرفة: '+e.toString());}
-    finally{if(mounted)setState(()=>_busy=false);}
-  }
-  Future<void> _join() async {
-    final code=_code.text.trim();
-    if(!RegExp('^[0-9]{6}$').hasMatch(code)){_show('أدخل رمزاً من 6 أرقام.');return;}
-    setState(()=>_busy=true);
-    try{
-      final found=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).limit(1).get();
-      if(found.docs.isEmpty){_show('الغرفة غير موجودة أو بدأت بالفعل.');return;}
-      final doc=found.docs.first;final data=doc.data();final members=List<String>.from(data['members']??[]);
-      if(members.contains(_uid)){if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[data['gameId']]??'غرفة ألعاب',roomCode:code)));return;}
-      if(members.length>=4){_show('الغرفة مكتملة.');return;}
-      members.add(_uid);
-      await doc.reference.update({'members':members,'status':'playing','updatedAt':FieldValue.serverTimestamp()});
-      if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[data['gameId']]??'غرفة ألعاب',roomCode:code)));
-    }catch(e){_show('تعذر الانضمام: '+e.toString());}
-    finally{if(mounted)setState(()=>_busy=false);}
-  }
-  void _show(String value){if(!mounted)return;ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(value)));}
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-    appBar:AppBar(title:const Text('الغرف الخاصة')),
-    body:ListView(padding:const EdgeInsets.all(16),children:[
-      Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-        const Text('أنشئ غرفة وادعُ أصدقاءك',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-        const SizedBox(height:12),
-        DropdownButtonFormField<String>(value:_game,decoration:const InputDecoration(labelText:'اختر اللعبة'),items:_options.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);}),
-        const SizedBox(height:10),FilledButton.icon(onPressed:_busy?null:_create,icon:const Icon(Icons.add_circle_outline),label:const Text('إنشاء غرفة خاصة')),
-        const Divider(height:26),TextField(controller:_code,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'رمز الغرفة',counterText:'',prefixIcon:Icon(Icons.key_rounded))),
-        OutlinedButton.icon(onPressed:_busy?null:_join,icon:const Icon(Icons.login_rounded),label:const Text('انضم إلى غرفة')),
-      ]))),
-      const SizedBox(height:8),const Text('غرفي',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').where('members',arrayContains:_uid).snapshots(),builder:(context,s){
-        if(s.hasError)return const Padding(padding:EdgeInsets.all(18),child:Text('تعذر تحميل الغرف. تأكد من نشر قواعد Firestore الجديدة.'));
-        if(!s.hasData)return const Center(child:CircularProgressIndicator());
-        if(s.data!.docs.isEmpty)return const Padding(padding:EdgeInsets.all(18),child:Text('ما عندك غرف بعد. أنشئ غرفة وشارك الرمز.'));
-        return Column(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.meeting_room_rounded),title:Text(_options[x['gameId']]??'غرفة ألعاب'),subtitle:Text('الرمز: '+(x['roomCode']??'')+' • '+(x['status']??'')),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:d.id,title:_options[x['gameId']]??'غرفة ألعاب',roomCode:x['roomCode']??''))));}).toList());
-      }),
-    ]),
-  ));
+  Future<void> _create() async { setState(()=>_busy=true); try { final room=_db.collection('arcadeRooms').doc(); final code=(Random().nextInt(900000)+100000).toString(); await room.set({'hostId':_uid,'gameId':_game,'members':[_uid],'roomCode':code,'status':'waiting','visibility':'private','state':{},'createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()}); if(mounted){await Clipboard.setData(ClipboardData(text:code));Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:room.id,title:_options[_game]!,roomCode:code)));} } catch(e){_show('تعذر إنشاء الغرفة: '+e.toString());} finally{if(mounted)setState(()=>_busy=false);} }
+  Future<void> _join() async { final code=_code.text.trim(); if(!RegExp(r'^[0-9]{6}$').hasMatch(code)){_show('أدخل رمزاً من 6 أرقام.');return;} setState(()=>_busy=true); try { final q=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).limit(1).get(); if(q.docs.isEmpty){_show('الغرفة غير موجودة.');return;} final doc=q.docs.first; await _db.runTransaction((tx)async{final snap=await tx.get(doc.reference);final x=snap.data()??{};final members=List<String>.from(x['members']??[]);if(members.contains(_uid))return;if(x['status']!='waiting'||members.length>=4)throw StateError('الغرفة مكتملة أو بدأت بالفعل.');tx.update(doc.reference,{'members':[...members,_uid],'status':'playing','updatedAt':FieldValue.serverTimestamp()});}); if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[doc.data()['gameId']]??'غرفة ألعاب',roomCode:code))); } catch(e){_show('تعذر الانضمام: '+e.toString());} finally{if(mounted)setState(()=>_busy=false);} }
+  void _show(String m){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(m)));}
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('الغرف الخاصة')),body:ListView(padding:const EdgeInsets.all(16),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[const Text('أنشئ غرفة وادعُ أصدقاءك',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),DropdownButtonFormField<String>(initialValue:_game,items:_options.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);}),FilledButton.icon(onPressed:_busy?null:_create,icon:const Icon(Icons.add),label:const Text('إنشاء غرفة خاصة')),TextField(controller:_code,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'رمز الغرفة',counterText:'')),OutlinedButton.icon(onPressed:_busy?null:_join,icon:const Icon(Icons.login),label:const Text('انضم إلى غرفة'))]))),
+    const Text('غرفي',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').where('members',arrayContains:_uid).snapshots(),builder:(context,s){if(s.hasError)return const Text('تعذر تحميل الغرف.');if(!s.hasData)return const Center(child:CircularProgressIndicator());if(s.data!.docs.isEmpty)return const Text('ما عندك غرف بعد.');return Column(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.meeting_room),title:Text(_options[x['gameId']]??'غرفة ألعاب'),subtitle:Text('الرمز: '+(x['roomCode']??'')+' • '+(x['status']??'')),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:d.id,title:_options[x['gameId']]??'غرفة ألعاب',roomCode:x['roomCode']??'')))));}).toList());}),
+  ]))));
 }
 
-class ArcadeRoomChatPage extends StatefulWidget {
-  final String roomId,title,roomCode;
-  const ArcadeRoomChatPage({super.key,required this.roomId,required this.title,required this.roomCode});
-  @override State<ArcadeRoomChatPage> createState()=>_ArcadeRoomChatPageState();
-}
+class ArcadeRoomChatPage extends StatefulWidget { final String roomId,title,roomCode; const ArcadeRoomChatPage({super.key,required this.roomId,required this.title,required this.roomCode}); @override State<ArcadeRoomChatPage> createState()=>_ArcadeRoomChatPageState(); }
 class _ArcadeRoomChatPageState extends State<ArcadeRoomChatPage> {
-  final _db=FirebaseFirestore.instance;final _text=TextEditingController();
-  String get _uid=>FirebaseAuth.instance.currentUser!.uid;
-  Future<void> _send() async {
-    final value=_text.text.trim();if(value.isEmpty)return;
-    _text.clear();
-    try{await _db.collection('arcadeRooms').doc(widget.roomId).collection('chat').add({'uid':_uid,'text':value,'createdAt':FieldValue.serverTimestamp()});}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الرسالة: '+e.toString())));}
-  }
-  Future<void> _invite() async {
-    final controller=TextEditingController();
-    final id=await showDialog<String>(context:context,builder:(c)=>AlertDialog(title:const Text('دعوة صديق'),content:TextField(controller:controller,decoration:const InputDecoration(hintText:'معرّف حساب الصديق UID')),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,controller.text.trim()),child:const Text('إرسال'))]));
-    if(id==null||id.isEmpty||id==_uid)return;
-    try{final room=(await _db.collection('arcadeRooms').doc(widget.roomId).get()).data()??{};await _db.collection('gameInvites').add({'from':_uid,'fromName':FirebaseAuth.instance.currentUser?.displayName??'عضو','to':id,'game':room['gameId'],'roomId':widget.roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال الدعوة.')));}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الدعوة: '+e.toString())));}
-  }
+  final _db=FirebaseFirestore.instance; final _text=TextEditingController(); String get _uid=>FirebaseAuth.instance.currentUser!.uid;
+  Future<void> _send() async {final value=_text.text.trim();if(value.isEmpty)return;_text.clear();try{await _db.collection('arcadeRooms').doc(widget.roomId).collection('chat').add({'uid':_uid,'text':value,'createdAt':FieldValue.serverTimestamp()});}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الرسالة: '+e.toString())));}}
+  Future<void> _invite() async {final controller=TextEditingController();final id=await showDialog<String>(context:context,builder:(c)=>AlertDialog(title:const Text('دعوة صديق'),content:TextField(controller:controller,decoration:const InputDecoration(hintText:'معرّف حساب الصديق UID')),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,controller.text.trim()),child:const Text('إرسال'))]));final friend=id?.trim()??'';if(friend.isEmpty||friend==_uid){controller.dispose();return;}try{final room=(await _db.collection('arcadeRooms').doc(widget.roomId).get()).data()??{};await _db.collection('gameInvites').add({'from':_uid,'fromName':FirebaseAuth.instance.currentUser?.displayName??'عضو','to':friend,'game':room['gameId'],'roomId':widget.roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال الدعوة.')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الدعوة: '+e.toString())));}finally{controller.dispose();}}
   @override void dispose(){_text.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-    appBar:AppBar(title:Text(widget.title),actions:[IconButton(onPressed:_invite,icon:const Icon(Icons.person_add_alt_1_rounded)),IconButton(onPressed:()=>Clipboard.setData(ClipboardData(text:widget.roomCode)),icon:const Icon(Icons.copy_rounded))]),
-    body:Column(children:[
-      Container(width:double.infinity,padding:const EdgeInsets.all(12),color:Theme.of(context).colorScheme.surfaceContainer,child:Text('رمز الغرفة: '+widget.roomCode,style:const TextStyle(fontWeight:FontWeight.w900))),
-      Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').doc(widget.roomId).collection('chat').orderBy('createdAt').limit(100).snapshots(),builder:(c,s){if(!s.hasData)return const Center(child:CircularProgressIndicator());return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['uid']==_uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(11),constraints:const BoxConstraints(maxWidth:300),decoration:BoxDecoration(color:mine?Theme.of(context).colorScheme.primaryContainer:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(14)),child:Text(x['text']??'')));}).toList());})),
-      SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:_text,onSubmitted:(_)=>_send(),decoration:const InputDecoration(hintText:'اكتب رسالة للغرفة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:_send,icon:const Icon(Icons.send_rounded))]))),
-    ]),
-  ));
-}
-).hasMatch(code)){_show('أدخل رمزاً من 6 أرقام.');return;}
-    setState(()=>_busy=true);
-    try{
-      final found=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).limit(1).get();
-      if(found.docs.isEmpty){_show('الغرفة غير موجودة أو بدأت بالفعل.');return;}
-      final doc=found.docs.first;final data=doc.data();final members=List<String>.from(data['members']??[]);
-      if(members.contains(_uid)){if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[data['gameId']]??'غرفة ألعاب',roomCode:code)));return;}
-      if(members.length>=4){_show('الغرفة مكتملة.');return;}
-      members.add(_uid);
-      await doc.reference.update({'members':members,'status':'playing','updatedAt':FieldValue.serverTimestamp()});
-      if(mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:doc.id,title:_options[data['gameId']]??'غرفة ألعاب',roomCode:code)));
-    }catch(e){_show('تعذر الانضمام: '+e.toString());}
-    finally{if(mounted)setState(()=>_busy=false);}
-  }
-  void _show(String value){if(!mounted)return;ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(value)));}
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-    appBar:AppBar(title:const Text('الغرف الخاصة')),
-    body:ListView(padding:const EdgeInsets.all(16),children:[
-      Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
-        const Text('أنشئ غرفة وادعُ أصدقاءك',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-        const SizedBox(height:12),
-        DropdownButtonFormField<String>(value:_game,decoration:const InputDecoration(labelText:'اختر اللعبة'),items:_options.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);}),
-        const SizedBox(height:10),FilledButton.icon(onPressed:_busy?null:_create,icon:const Icon(Icons.add_circle_outline),label:const Text('إنشاء غرفة خاصة')),
-        const Divider(height:26),TextField(controller:_code,keyboardType:TextInputType.number,maxLength:6,decoration:const InputDecoration(labelText:'رمز الغرفة',counterText:'',prefixIcon:Icon(Icons.key_rounded))),
-        OutlinedButton.icon(onPressed:_busy?null:_join,icon:const Icon(Icons.login_rounded),label:const Text('انضم إلى غرفة')),
-      ]))),
-      const SizedBox(height:8),const Text('غرفي',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').where('members',arrayContains:_uid).snapshots(),builder:(context,s){
-        if(s.hasError)return const Padding(padding:EdgeInsets.all(18),child:Text('تعذر تحميل الغرف. تأكد من نشر قواعد Firestore الجديدة.'));
-        if(!s.hasData)return const Center(child:CircularProgressIndicator());
-        if(s.data!.docs.isEmpty)return const Padding(padding:EdgeInsets.all(18),child:Text('ما عندك غرف بعد. أنشئ غرفة وشارك الرمز.'));
-        return Column(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(leading:const Icon(Icons.meeting_room_rounded),title:Text(_options[x['gameId']]??'غرفة ألعاب'),subtitle:Text('الرمز: '+(x['roomCode']??'')+' • '+(x['status']??'')),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>ArcadeRoomChatPage(roomId:d.id,title:_options[x['gameId']]??'غرفة ألعاب',roomCode:x['roomCode']??''))));}).toList());
-      }),
-    ]),
-  ));
-}
-
-class ArcadeRoomChatPage extends StatefulWidget {
-  final String roomId,title,roomCode;
-  const ArcadeRoomChatPage({super.key,required this.roomId,required this.title,required this.roomCode});
-  @override State<ArcadeRoomChatPage> createState()=>_ArcadeRoomChatPageState();
-}
-class _ArcadeRoomChatPageState extends State<ArcadeRoomChatPage> {
-  final _db=FirebaseFirestore.instance;final _text=TextEditingController();
-  String get _uid=>FirebaseAuth.instance.currentUser!.uid;
-  Future<void> _send() async {
-    final value=_text.text.trim();if(value.isEmpty)return;
-    _text.clear();
-    try{await _db.collection('arcadeRooms').doc(widget.roomId).collection('chat').add({'uid':_uid,'text':value,'createdAt':FieldValue.serverTimestamp()});}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الرسالة: '+e.toString())));}
-  }
-  Future<void> _invite() async {
-    final controller=TextEditingController();
-    final id=await showDialog<String>(context:context,builder:(c)=>AlertDialog(title:const Text('دعوة صديق'),content:TextField(controller:controller,decoration:const InputDecoration(hintText:'معرّف حساب الصديق UID')),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,controller.text.trim()),child:const Text('إرسال'))]));
-    if(id==null||id.isEmpty||id==_uid)return;
-    try{final room=(await _db.collection('arcadeRooms').doc(widget.roomId).get()).data()??{};await _db.collection('gameInvites').add({'from':_uid,'fromName':FirebaseAuth.instance.currentUser?.displayName??'عضو','to':id,'game':room['gameId'],'roomId':widget.roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال الدعوة.')));}
-    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الدعوة: '+e.toString())));}
-  }
-  @override void dispose(){_text.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-    appBar:AppBar(title:Text(widget.title),actions:[IconButton(onPressed:_invite,icon:const Icon(Icons.person_add_alt_1_rounded)),IconButton(onPressed:()=>Clipboard.setData(ClipboardData(text:widget.roomCode)),icon:const Icon(Icons.copy_rounded))]),
-    body:Column(children:[
-      Container(width:double.infinity,padding:const EdgeInsets.all(12),color:Theme.of(context).colorScheme.surfaceContainer,child:Text('رمز الغرفة: '+widget.roomCode,style:const TextStyle(fontWeight:FontWeight.w900))),
-      Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').doc(widget.roomId).collection('chat').orderBy('createdAt').limit(100).snapshots(),builder:(c,s){if(!s.hasData)return const Center(child:CircularProgressIndicator());return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['uid']==_uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(11),constraints:const BoxConstraints(maxWidth:300),decoration:BoxDecoration(color:mine?Theme.of(context).colorScheme.primaryContainer:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(14)),child:Text(x['text']??'')));}).toList());})),
-      SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:_text,onSubmitted:(_)=>_send(),decoration:const InputDecoration(hintText:'اكتب رسالة للغرفة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:_send,icon:const Icon(Icons.send_rounded))]))),
-    ]),
-  ));
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text(widget.title),actions:[IconButton(onPressed:_invite,icon:const Icon(Icons.person_add_alt_1)),IconButton(onPressed:()=>Clipboard.setData(ClipboardData(text:widget.roomCode)),icon:const Icon(Icons.copy))]),body:Column(children:[Container(width:double.infinity,padding:const EdgeInsets.all(12),color:Theme.of(context).colorScheme.surfaceContainer,child:Text('رمز الغرفة: '+widget.roomCode,style:const TextStyle(fontWeight:FontWeight.w900))),Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeRooms').doc(widget.roomId).collection('chat').orderBy('createdAt').limit(100).snapshots(),builder:(c,s){if(s.hasError)return const Center(child:Text('تعذر تحميل المحادثة.'));if(!s.hasData)return const Center(child:CircularProgressIndicator());if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ المحادثة مع أصدقائك 👋'));return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['uid']==_uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(11),constraints:const BoxConstraints(maxWidth:300),decoration:BoxDecoration(color:mine?Theme.of(context).colorScheme.primaryContainer:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(14)),child:Text(x['text']??'')));}).toList());})),SafeArea(top:false,child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:_text,onSubmitted:(_)=>_send(),decoration:const InputDecoration(hintText:'اكتب رسالة للغرفة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:_send,icon:const Icon(Icons.send))])))])));
 }
