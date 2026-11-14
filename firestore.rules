@@ -882,5 +882,20 @@ service cloud.firestore {
         || (request.auth != null && resource.data.authorId == request.auth.uid);
     }
 
+    match /interestPosts/{postId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && accountNotBanned()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 60
+        && request.resource.data.category in ['الأنمي والمانغا','كرة القدم','الشعر والأدب','الألعاب','التقنية','التصوير والفن']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 1000;
+      allow update: if false;
+      allow delete: if request.auth != null
+        && (resource.data.authorId == request.auth.uid || isChatStaff());
+    }
+
   }
 }
