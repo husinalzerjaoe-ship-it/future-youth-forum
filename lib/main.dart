@@ -1247,8 +1247,8 @@ class PostsPage extends StatelessWidget {
                   title: Text(d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
                 if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(fontSize: 16)),
-                if ((d['videoUrl'] as String? ?? '').startsWith('https://'))
-                  Padding(padding: const EdgeInsets.only(top: 8), child: SelectableText('🎬 رابط الفيديو: ${d['videoUrl']}')),
+                if ((d['videoUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: d['videoUrl'] as String)),
                 PostSocialActions(postId: doc.id, authorId: d['authorId'] as String? ?? ''),
               ])));
             }),
@@ -1643,10 +1643,8 @@ class MemberPosts extends StatelessWidget {
         return Card(clipBehavior: Clip.antiAlias, margin: const EdgeInsets.symmetric(vertical: 7),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if ((data['text'] as String? ?? '').isNotEmpty) Text(data['text'] as String, style: const TextStyle(fontSize: 16)),
-            if (videoUrl.startsWith('https://'))
-              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.play_circle_fill, color: brand, size: 34),
-                title: const Text('فيديو منشور'), subtitle: const Text('افتح رابط الفيديو'),
-                onTap: () async { final uri = Uri.tryParse(videoUrl); if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication); }),
+            if (videoUrl.trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: videoUrl)),
             PostSocialActions(postId: post.id, authorId: data['authorId'] as String? ?? ''),
           ])));
       }).toList());
