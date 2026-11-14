@@ -516,13 +516,83 @@ class NotificationsPage extends StatelessWidget {
               title: Text(d['text'] as String? ?? 'إشعار جديد'),
               subtitle: Text(d['actorName'] as String? ?? 'الملتقى'),
               trailing: d['read'] == true ? const Icon(Icons.done, color: Colors.green) : const Icon(Icons.circle, size: 9, color: _brand),
-              onTap: () => doc.reference.update({'read': true}),
+              onTap: () async {
+                await doc.reference.update({'read': true});
+                final targetType = (d['targetType'] ?? '').toString();
+                final targetId = (d['targetId'] ?? d['messageId'] ?? '').toString();
+                if (targetId.isNotEmpty && (targetType == 'publicMessage' || targetType == 'post')) {
+                  if (!context.mounted) return;
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationTargetPage(
+                    targetId: targetId, isPost: targetType == 'post',
+                    title: targetType == 'post' ? 'المنشور الذي أشار إليك' : 'الرسالة التي أشار إليك بها',
+                  )));
+                }
+              },
             );
           }).toList());
         },
       ),
     ),
   );
+}
+
+
+class NotificationTargetPage extends StatelessWidget {
+  final String targetId;
+  final bool isPost;
+  final String title;
+  const NotificationTargetPage({super.key, required this.targetId, required this.isPost, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final collection = isPost ? 'posts' : 'messages';
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _db.collection(collection).doc(targetId).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Center(child: Text('تعذر فتح المحتوى'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snapshot.data!.exists) return const Center(child: Text('هذا المحتوى لم يعد متاحاً أو تم حذفه'));
+            final data = snapshot.data!.data() ?? {};
+            final author = (data['authorName'] ?? data['senderName'] ?? 'عضو').toString();
+            final body = (data['text'] ?? data['caption'] ?? 'محتوى بدون نص').toString();
+            final photo = (data['authorPhoto'] ?? '').toString();
+            return ListView(padding: const EdgeInsets.all(18), children: [
+              Card(
+                elevation: 2,
+                child: Padding(padding: const EdgeInsets.all(18), child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                        child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(author, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      const Icon(Icons.alternate_email, color: _brand),
+                    ]),
+                    const SizedBox(height: 18),
+                    SelectableText(body, style: const TextStyle(fontSize: 17, height: 1.6)),
+                    if ((data['imageUrl'] ?? '').toString().startsWith('http')) ...[
+                      const SizedBox(height: 14),
+                      ClipRRect(borderRadius: BorderRadius.circular(14),
+                        child: Image.network(data['imageUrl'].toString(), fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(isPost ? 'المنشور المشار إليه' : 'الرسالة المشار إليها',
+                      style: const TextStyle(color: _brand, fontWeight: FontWeight.w700)),
+                  ],
+                )),
+              ),
+            ]);
+          },
+        ),
+      ),
+    );
+  }
 }
 
 
