@@ -287,6 +287,7 @@ class _WordScrambleGameState extends State<_WordScrambleGame> {
  late String word;
  late String mixed;
  int points=0;
+ bool solved=false;
  String message='رتّب الحروف واكتب الكلمة الصحيحة';
  @override void initState(){super.initState();_next();}
  void _next(){
@@ -295,10 +296,12 @@ class _WordScrambleGameState extends State<_WordScrambleGame> {
   mixed=chars.join(' • ');
   answer.clear();
   message='رتّب الحروف واكتب الكلمة الصحيحة';
+  solved=false;
   setState((){});
  }
  void _check(){
-  if(answer.text.trim().replaceAll(' ','')==word){
+  if(answer.text.trim().replaceAll(' ','')==word&&!solved){
+   solved=true;
    points+=3;
    setState(()=>message='صحيح! ربحت 3 نقاط 🎉');
   }else{
