@@ -11,6 +11,7 @@
 3. من مجلد المشروع نفّذ:
 
 ```bash
+gcloud config set project futureyouth-69f8a
 npm --prefix functions install
 gcloud auth application-default login
 node functions/scripts/set_existing_users_role.js
