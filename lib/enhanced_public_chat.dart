@@ -452,9 +452,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       return n>0?const Padding(padding:EdgeInsets.all(3),child:Text('أحد الأعضاء يكتب الآن...',style:TextStyle(fontSize:11,color:_chatBrand))):const SizedBox.shrink();
     }),
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
+    if(_recordingVoice)const Padding(padding:EdgeInsets.symmetric(horizontal:12,vertical:3),child:Text('🔴 جاري تسجيل الفويس — اضغط إيقاف للإرسال',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold,fontSize:11))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
     Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
       IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
+      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
         onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
