@@ -26,6 +26,7 @@ import 'arcade_hub.dart';
 import 'inspiration_hub.dart';
 import 'match_center.dart';
 import 'livekit_calls.dart';
+import 'daily_world.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -49,6 +50,7 @@ class CommunityHubPage extends StatelessWidget {
    ('مدينة الألعاب','ألعاب مصغرة وتحديات جماعية وألعاب لوحية',Icons.videogame_asset_rounded,const ArcadeHubPage()),
    ('مركز المباريات','مواعيد ونتائج ومتابعة أخبار الكرة',Icons.sports_soccer,const MatchCenterPage()),
    ('أبراج وحساب العمر','احسب عمرك واكتشف برجك ومعلوماته الترفيهية',Icons.cake_outlined,const LifeToolsPage()),
+   ('عالمك اليومي','تحديات يومية ومزاجك ودليل الاستخارة وحساب العمر',Icons.today_rounded,const DailyWorldPage()),
    ('إلهام يومي','أفكار واقتباسات ومحتوى إيجابي متجدد',Icons.lightbulb_outline,const InspirationHubPage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
@@ -60,7 +62,7 @@ class CommunityHubPage extends StatelessWidget {
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
     gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),borderRadius:BorderRadius.circular(20)),
-    child:const Text('مساحات ملتقى الأنمي ✨\nشارك إبداعك وتواصل مع عشّاق الأنمي',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
+    child:const Text('مركز مجتمع ملتقى شباب المستقبل ✨\nتواصل، العب، تعلّم وشارك لحظاتك مع الأصدقاء',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
    const SizedBox(height:14),
    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
     gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
