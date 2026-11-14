@@ -25,6 +25,7 @@ import 'watch_party.dart';
 import 'arcade_hub.dart';
 import 'inspiration_hub.dart';
 import 'match_center.dart';
+import 'livekit_calls.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -54,6 +55,7 @@ class CommunityHubPage extends StatelessWidget {
    ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
    ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
    ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
+   ('مكالمات الصوت والفيديو','مكالمات جماعية وخاصة عبر LiveKit',Icons.video_call_rounded,const LiveKitCallsPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
