@@ -372,7 +372,7 @@ service cloud.firestore {
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 120
         && request.resource.data.url is string
-        && request.resource.data.url.matches('https://(www\\.|m\\.)?youtube\\.com/.*|https://(www\\.)?youtu\\.be/.*')
+        && request.resource.data.url.matches('https://(www\\.|m\\.|music\\.)?youtube\\.com/.*|https://(www\\.)?youtu\\.be/.*|https://(www\\.)?youtube-nocookie\\.com/.*')
         && request.resource.data.category in ['أغاني', 'فيديوهات', 'أفلام ومقاطع رسمية', 'تعليم', 'متنوع'];
       allow update: if request.auth != null
         && resource.data.authorId == request.auth.uid
