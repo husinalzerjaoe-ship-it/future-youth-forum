@@ -8,6 +8,7 @@ import 'board_games.dart';
 import 'arcade_minigames.dart';
 import 'arcade_penalty.dart';
 import 'friends_quiz.dart';
+import 'friends_battle_arena.dart';
 
 const gameInk=Color(0xFF171936), gameViolet=Color(0xFF6554D9);
 final gameDb=FirebaseFirestore.instance;
@@ -19,6 +20,7 @@ class GameCenterPage extends StatelessWidget {
   appBar:AppBar(title:const Text('مركز الألعاب والتحديات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
    _GameTile(icon:Icons.quiz_rounded,title:'مسابقة أسئلة مباشرة للأصدقاء',subtitle:'2–4 لاعبين • رمز غرفة • دعوات • ترتيب ونقاط مباشرة',page:const FriendsQuizPage()),
+   _GameTile(icon:Icons.emoji_events_rounded,title:'ساحة منافسات الأصدقاء الجديدة',subtitle:'12 تحدياً متنوعاً + مغامرة كنز 2D أونلاين بدعوات',page:const FriendsBattleArenaPage()),
    _GameTile(icon:Icons.public,title:'صالة اللعب أونلاين',subtitle:'إكس أو مباشر • رمز غرفة من 6 أرقام • دعوات الأصدقاء',page:const MultiplayerArcadePage()),
    _GameTile(icon:Icons.groups_rounded,title:'ألعاب السهرة الجماعية',subtitle:'الجاسوس والذئب والرسم والخداع والنرد',page:const SocialPartyGamesPage()),
    _GameTile(icon:Icons.grid_4x4,title:'ألعاب الطاولة',subtitle:'الدومينو والدامة لشخصين',page:const BoardGamesPage()),
