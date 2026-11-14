@@ -1,64 +1,35 @@
-# إعداد ربط Firebase Auth مع Supabase Storage
+# ربط Firebase Authentication مع Supabase Storage
 
-## لماذا هذا الربط مطلوب؟
-التطبيق يسجل دخول المستخدمين عبر Firebase Authentication، ويرفع صور الدردشة إلى Supabase Storage. لذلك يرسل التطبيق Firebase ID token إلى Supabase. معرّف Firebase الصحيح في إعدادات التطبيق هو `futureyouth-69f8a`؛ يجب أن يطابق Issuer وAudience في SQL. سياسة التخزين تستخدم claim `sub` كنص لأن Firebase UID ليس مضموناً أن يكون UUID.
+## الإعداد المطلوب مرة واحدة
 
-## إعداد Supabase مرة واحدة
-1. افتح مشروع Supabase: `xwfzdiftlzrjsprnbwpf`.
+التطبيق يسجل دخول الأعضاء بواسطة Firebase Authentication، ويستخدم Supabase Storage لرفع صور الدردشة والملفات الصوتية. لذلك يجب أن يتعرف Supabase على رمز Firebase ID Token كمزوّد مصادقة خارجي.
+
+1. افتح مشروع Supabase: https://supabase.com/dashboard/project/xwfzdiftlzrjsprnbwpf
 2. اذهب إلى **Authentication → Sign In / Providers → Third-Party Auth**.
-3. أضف Firebase كمزود Third-party Auth، واستخدم Firebase Project ID المطابق لإعدادات التطبيق: `futureyouth-69f8a` (انتبه لحرف a الأخير).
-4. احفظ الإعداد.
-5. افتح **SQL Editor** وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً.
+3. أضف **Firebase** كمزوّد خارجي، واكتب Project ID التالي حرفياً: `futureyouth-69f8a` (انتبه لحرف a الأخير).
+4. احفظ إعدادات المزوّد.
+5. افتح SQL Editor وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً.
+6. تأكد أن Storage يحتوي Bucket باسم `forum-media` وأنه Public لعرض روابط الصور والصوت والفيديوهات العامة.
 
-الـbucket `forum-media` مضبوط كـPublic لأن صور الدردشة العامة تُعرض عبر public URL. لا ترفع إليه ملفات خاصة أو مستندات شخصية. حد الرفع 10MB والأنواع المسموحة JPEG/PNG/WebP/GIF.
+## ما الذي تسمح به السياسات؟
 
-## تفعيل claim للمستخدمين
-Supabase يحتاج claim باسم `role: authenticated` داخل Firebase ID token حتى يعامل المستخدم كـauthenticated. أُضيفت Cloud Function في `functions/index.js` للحسابات الجديدة.
+- قراءة الوسائط العامة من Bucket `forum-media`.
+- رفع كل عضو إلى مجلده الخاص فقط.
+- دعم مجلدات `public-chat`, `private-chat`, `regional-chat`, `profiles`, `stories`, `chat-backgrounds`, `anime-wallpapers`, و`shared-files`.
+- التحقق من Firebase issuer وaudience وUID داخل JWT قبل قبول الرفع.
+- لا تضع Service Account JSON أو Private Key أو مفاتيح Admin داخل المستودع أو داخل التطبيق.
 
-من مجلد المشروع، بعد تسجيل الدخول إلى Firebase CLI واختيار المشروع الصحيح:
+**مهم:** رفع الصور والفويس لا يحتاج نشر Cloud Functions أو تفعيل خطة Blaze؛ التحقق الحالي يتم عبر Firebase Third-Party Auth وسياسات Storage. لا تشغّل أو تنشر Cloud Functions لهذا الغرض.
 
-```bash
-firebase use futureyouth-69f8a
-firebase deploy --only functions
-```
+## بعد ضبط الإعداد
 
-قد تتطلب Cloud Functions تفعيل خطة Blaze والفوترة. لا تضع Service Account JSON أو مفاتيح Admin داخل GitHub.
+1. ثبّت أحدث APK بعد نجاح GitHub Actions.
+2. سجّل الخروج من التطبيق ثم ادخل من جديد حتى يحصل التطبيق على رمز دخول حديث.
+3. اختبر إرسال صورة وفويس في المحادثة العامة، ثم صورة وفويس في محادثة خاصة.
+4. إذا فشل الرفع، أرسل نص الخطأ ورمز الخطأ فقط، ولا ترسل Firebase ID Token أو أي مفتاح خاص.
 
-### الحسابات الموجودة مسبقاً
-نفّذ سكربت التحديث مرة واحدة من جهاز موثوق لديه Firebase Admin credentials:
+## ميزات أخرى لا تعتمد على هذا الربط
 
-```bash
-cd functions
-npm install
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json node scripts/set_existing_users_role.js
-```
-
-استبدل المسار بمكان ملف Service Account الذي نزلته من Firebase Console، ولا ترفعه إلى المستودع. السكربت يحافظ على custom claims الحالية ويضيف role فقط.
-
-بعد منح claim للحساب، سجّل خروج/دخول أو جدّد Firebase ID token حتى يصل claim الجديد إلى التطبيق.
-
-## نظام نقاط التفاعل والترتيب الأسبوعي
-أُضيفت Cloud Functions لاحتساب النقاط من الخادم حتى لا يستطيع العضو منح نفسه نقاطاً من التطبيق:
-- الرسالة العامة: نقطتان مع زيادة عدّاد الرسائل.
-- المنشور الجديد: 5 نقاط.
-- الإعجاب الذي يصل إلى منشور العضو: نقطة واحدة (لا تُحتسب إعجابات العضو لنفسه).
-- تُحفظ نقاط الأسبوع بمفتاح تاريخ يوم الاثنين UTC، ويعرض التطبيق ترتيب الأسبوع.
-
-هذه الوظائف لا تعمل بمجرد رفع الكود إلى GitHub. بعد مراجعة المشروع وتسجيل الدخول إلى Firebase CLI، نفّذ من مجلد المشروع:
-
-```bash
-cd functions
-npm install
-cd ..
-firebase deploy --only functions
-```
-
-قد تتطلب Cloud Functions خطة Blaze والفوترة. لا تمنح نقاطاً يدوياً من واجهة العميل؛ المصدر الموثوق هو أحداث Firestore التي تعالجها الوظائف.
-
-## بناء APK
-كل push إلى main يشغّل GitHub Actions لتحليل Flutter وبناء APK. ويمكن تشغيله يدوياً من **Actions → Flutter quality check and Android APK → Run workflow**. بعد نجاحه، افتح workflow run ونزّل artifact باسم `future-youth-forum-release-apk`.
-
-## ملاحظات مهمة
-- إضافة الملفات إلى GitHub لا تعني أن Cloud Function أو SQL نُشرا تلقائياً؛ نفّذ الخطوات أعلاه في حسابات Firebase وSupabase.
-- سجل العضوية الحالي يدعم منح العضوية من المؤسس فقط؛ تحصيل اشتراك 1 دولار يحتاج بوابة دفع متاحة في بلد التشغيل والتحقق من webhooks على خادم موثوق. لا توجد عملية تحصيل أموال فعلية مضافة بعد.
-- حظر الجهاز الحقيقي لا يُنفذ عبر IMEI أو الرقم التسلسلي. يحتاج معرف تثبيت خاص بالتطبيق مع تحقق backend وApp Check.
+- نقاط التفاعل الأسبوعية وبعض المهام الآلية قد تعتمد على Cloud Functions منفصلة.
+- لا توجد بوابة دفع فعلية للاشتراك الشهري حتى الآن؛ منح العضويات المجانية يتم من حساب المؤسس، أما تحصيل 1 دولار فيحتاج بوابة دفع وخادماً موثوقاً لمعالجة الإشعارات.
+- قواعد Firestore الموجودة في `firestore.rules` يجب نشرها يدوياً من Firebase Console أو Firebase CLI؛ تحديث الملف في GitHub لا ينشر القواعد تلقائياً.
