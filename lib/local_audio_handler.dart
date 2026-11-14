@@ -40,21 +40,24 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     }
   }
 
-  Future<void> loadLocalQueue(List<MediaItem> items) async {
+  Future<void> loadLocalQueue(List<MediaItem> items, {int initialIndex = 0}) async {
     queue.add(items);
     if (items.isEmpty) {
       await _player.stop();
       return;
     }
-    await _player.setAudioSource(ConcatenatingAudioSource(children: items.map((item) =>
-      AudioSource.uri(Uri.file(item.id), tag: item)
-    ).toList()));
+    if (initialIndex < 0 || initialIndex >= items.length) throw RangeError.index(initialIndex, items);
+    await _player.setAudioSource(
+      ConcatenatingAudioSource(children: items.map((item) => AudioSource.uri(Uri.file(item.id), tag: item)).toList()),
+      initialIndex: initialIndex,
+      initialPosition: Duration.zero,
+    );
   }
 
   Future<void> loadRemoteTrack(String url, String title) async {
     final uri = Uri.tryParse(url);
-    if (uri == null || uri.scheme != 'https') {
-      throw ArgumentError('رابط الأغنية غير صالح.');
+    if (uri == null || !['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
+      throw ArgumentError('رابط الأغنية غير صالح أو ليس رابط ملف صوتي مباشر.');
     }
     final item = MediaItem(id: url, title: title, album: 'مكتبة المجتمع');
     queue.add([item]);
@@ -67,6 +70,8 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override Future<void> pause() => _player.pause();
   @override Future<void> stop() async {
     await _player.stop();
+    queue.add([]);
+    mediaItem.add(null);
     await super.stop();
   }
   @override Future<void> seek(Duration position) => _player.seek(position);

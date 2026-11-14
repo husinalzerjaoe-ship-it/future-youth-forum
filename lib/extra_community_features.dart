@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +7,7 @@ import 'package:audio_service/audio_service.dart';
 import 'local_audio_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'media_upload_service.dart';
 
 
@@ -214,15 +216,42 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
  bool loading=false,uploading=false;
  final db=FirebaseFirestore.instance;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
+ Future<PlatformFile?> _resolveAudioFile(PlatformFile file) async {
+  if(file.path!=null)return file;
+  final bytes=file.bytes;
+  if(bytes==null||bytes.isEmpty)return null;
+  final dir=await getTemporaryDirectory();
+  final folder=Directory(dir.path+'/future_youth_audio');
+  await folder.create(recursive:true);
+  final safeName=file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'),'_');
+  final path=folder.path+'/'+DateTime.now().microsecondsSinceEpoch.toString()+'_'+safeName;
+  await File(path).writeAsBytes(bytes,flush:true);
+  return PlatformFile(name:file.name,size:file.size,path:path);
+ }
  Future<void> addTracks() async {
-  final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true);
+  final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true,withData:true);
   if(result==null)return;
-  setState(()=>tracks.addAll(result.files.where((f)=>f.path!=null)));
+  final resolved=<PlatformFile>[];
+  for(final file in result.files){
+   final ext=(file.extension??'').toLowerCase();
+   if(!['mp3','m4a','aac','wav','ogg','flac'].contains(ext))continue;
+   final local=await _resolveAudioFile(file);
+   if(local!=null)resolved.add(local);
+  }
+  if(!mounted)return;
+  if(resolved.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('ما قدرنا نقرأ ملفات صوت مدعومة من الجهاز')));return;}
+  setState(()=>tracks.addAll(resolved));
  }
  Future<void> uploadTracks() async {
-  final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true);
+  final result=await FilePicker.platform.pickFiles(type:FileType.audio,allowMultiple:true,withData:true);
   if(result==null||result.files.isEmpty)return;
-  final chosen=result.files.where((f)=>f.path!=null).toList();
+  final chosen=<PlatformFile>[];
+  for(final file in result.files){
+   final ext=(file.extension??'').toLowerCase();
+   if(!['mp3','m4a','aac','wav','ogg','flac'].contains(ext))continue;
+   final local=await _resolveAudioFile(file);
+   if(local!=null)chosen.add(local);
+  }
   if(chosen.isEmpty){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر قراءة ملفات الصوت من الجهاز')));return;}
   if(chosen.any((f)=>f.size>100*1024*1024)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حجم الأغنية يتجاوز 100 ميغابايت')));return;}
   setState(()=>uploading=true);
@@ -248,8 +277,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
   if(index<0||index>=tracks.length)return;
   setState(()=>loading=true);
   try{
-   await appAudioHandler.loadLocalQueue(tracks.map((f)=>MediaItem(id:f.path!,title:f.name,album:'مكتبتي المحلية')).toList());
-   await appAudioHandler.skipToQueueItem(index);
+   await appAudioHandler.loadLocalQueue(tracks.map((f)=>MediaItem(id:f.path!,title:f.name,album:'مكتبتي المحلية')).toList(),initialIndex:index);
    await appAudioHandler.play();
    if(mounted)setState(()=>current=index);
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الملف: '+e.toString())));}
@@ -270,7 +298,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
   body:Column(children:[
    Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlaybackState>(stream:appAudioHandler.playbackState,builder:(context,s){
     final playing=s.data?.playing??false;
-    return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
+    return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:StreamBuilder<MediaItem?>(stream:appAudioHandler.mediaItem,builder:(context,m)=>Text(m.data?.title??(current>=0?tracks[current].name:'مشغل الموسيقى'),maxLines:1,overflow:TextOverflow.ellipsis)),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
    })),
    const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • الملفات المنشورة بعد موافقة الإدارة'))),
    // Pending tracks remain visible to their uploader; the founder can review them here.
@@ -295,6 +323,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
        final founder=FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com';
        return ListTile(
         dense:true,
+        onTap:()=>playShared((x['fileUrl']??'').toString(),x['title'] as String? ?? 'ملف صوتي'),
         leading:const Icon(Icons.hourglass_top,color:Colors.orange),
         title:Text(x['title'] as String? ?? 'ملف صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
         subtitle:Text(founder?'بانتظار مراجعتك':'بانتظار موافقة الإدارة'),
