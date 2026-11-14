@@ -76,7 +76,25 @@ class _GameCenterPageState extends State<GameCenterPage> {
           ]),
         ))),
         SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,8,14,4),child:TextField(controller:_search,onChanged:(_)=>setState((){}),decoration:InputDecoration(hintText:'ابحث عن لعبة أو تحدٍّ...',prefixIcon:const Icon(Icons.search_rounded),suffixIcon:_search.text.isEmpty?null:IconButton(icon:const Icon(Icons.close),onPressed:(){_search.clear();setState((){});}),filled:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(17),borderSide:BorderSide.none))))),
-        SliverToBoxAdapter(child:SizedBox(height:54,child:ListView(padding:const EdgeInsets.symmetric(horizontal:14,vertical:5),scrollDirection:Axis.horizontal,children:['الكل','أونلاين','2D','أسئلة','فردية'].map((f)=>Padding(padding:const EdgeInsets.only(left:8),child:ChoiceChip(label:Text(f),selected:_filter==f,onSelected:(_)=>setState(()=>_filter=f))).toList()))),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 54,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              scrollDirection: Axis.horizontal,
+              children: ['الكل', 'أونلاين', '2D', 'أسئلة', 'فردية']
+                  .map((f) => Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: ChoiceChip(
+                      label: Text(f),
+                      selected: _filter == f,
+                      onSelected: (_) => setState(() => _filter = f),
+                    ),
+                  ))
+                  .toList(),
+            ),
+          ),
+        ),
         SliverPadding(padding:const EdgeInsets.fromLTRB(14,8,14,24),sliver:games.isEmpty?const SliverToBoxAdapter(child:Padding(padding:EdgeInsets.all(35),child:Center(child:Text('ما لقينا لعبة بهذا الاسم. جرّب كلمة ثانية.')))):SliverGrid(gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,mainAxisSpacing:11,crossAxisSpacing:11,childAspectRatio:.91),delegate:SliverChildBuilderDelegate((context,index)=>_GameCard(game:games[index]),childCount:games.length))),
       ]),
     ));
