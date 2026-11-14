@@ -26,7 +26,34 @@ class PrivateRoomsPage extends StatefulWidget {
 class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
  final db=FirebaseFirestore.instance;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
- Future<void> createRoom() async {
+ Future<void> manageRoom(String roomId, Map<String,dynamic> room) async {
+   final owner=room['ownerId']==uid;
+   final admins=List<String>.from(room['roomAdmins']??[]);
+   if(!owner&&!admins.contains(uid))return;
+   final members=List<String>.from(room['members']??[]);
+   final profiles=await db.collection('publicProfiles').get();
+   if(!mounted)return;
+   await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
+    title:Text('إدارة الأعضاء • '+(room['name']??'الغرفة')),
+    content:SizedBox(width:420,height:420,child:ListView(children:members.map((id){
+     final data=profiles.docs.where((p)=>p.id==id).map((p)=>p.data()).firstOrNull??{};
+     final isOwner=id==room['ownerId'], isAdmin=admins.contains(id);
+     return ListTile(title:Text(data['name']??'عضو'),subtitle:Text(isOwner?'مالك الغرفة':isAdmin?'مشرف غرفة':'عضو'),
+      trailing:isOwner?const Icon(Icons.workspace_premium):PopupMenuButton<String>(
+       onSelected:(action)async{try{
+        final ref=db.collection('privateRooms').doc(roomId);
+        if(action=='promote')await ref.update({'roomAdmins':FieldValue.arrayUnion([id])});
+        if(action=='demote')await ref.update({'roomAdmins':FieldValue.arrayRemove([id])});
+        if(action=='kick')await ref.update({'members':FieldValue.arrayRemove([id]),'invitedUids':FieldValue.arrayRemove([id]),'roomAdmins':FieldValue.arrayRemove([id])});
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تحديث صلاحيات العضو')));
+       }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تنفيذ العملية: '+e.toString())));}},
+       itemBuilder:(_)=>[if(owner&&!isAdmin)const PopupMenuItem(value:'promote',child:Text('ترقية إلى مشرف')),if(owner&&isAdmin)const PopupMenuItem(value:'demote',child:Text('تنزيل من الإشراف')),if(owner)const PopupMenuItem(value:'kick',child:Text('طرد من الغرفة'))],
+      ));
+    }).toList())),
+    actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('إغلاق'))],
+   ));
+  }
+  Future<void> createRoom() async {
   final name=TextEditingController();
   final meetUrl=TextEditingController();
   final selected=<String>{uid};
@@ -65,7 +92,7 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
   }
   try{
    await db.collection('privateRooms').add({
-    'name':name.text.trim(),'ownerId':uid,'members':selected.toList(),'invitedUids':selected.toList(),
+    'name':name.text.trim(),'ownerId':uid,'roomAdmins':<String>[],'members':selected.toList(),'invitedUids':selected.toList(),
     'roomType':roomType,'meetUrl':roomType=='voice'?meetUrl.text.trim():'',
     'createdAt':FieldValue.serverTimestamp(),'lastMessage':roomType=='voice'?'غرفة صوتية خاصة جاهزة':'الغرفة جاهزة'
    });
@@ -87,7 +114,12 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
      leading:CircleAvatar(child:Icon(voice?Icons.mic:Icons.lock_outline)),
      title:Text(x['name'] as String? ?? 'غرفة خاصة'),
      subtitle:Text((voice?'غرفة صوتية • ':'محادثة كتابية • ')+'الأعضاء: '+((x['members'] as List? ?? []).length).toString()+' • '+(x['lastMessage'] ?? ''),maxLines:1,overflow:TextOverflow.ellipsis),
-     trailing:voice?IconButton(tooltip:'انضم للمكالمة',icon:const Icon(Icons.call,color:Colors.green),onPressed:meet.isEmpty?null:()=>launchUrl(Uri.parse(meet),mode:LaunchMode.externalApplication)):const Icon(Icons.chevron_left),
+     trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+       if(x['ownerId']==uid||List<String>.from(x['roomAdmins']??[]).contains(uid))
+        IconButton(tooltip:'إدارة الأعضاء',icon:const Icon(Icons.groups_2_outlined),onPressed:()=>manageRoom(d.id,x)),
+       if(voice)IconButton(tooltip:'انضم للمكالمة الصوتية',icon:const Icon(Icons.call,color:Colors.green),onPressed:meet.isEmpty?null:()=>launchUrl(Uri.parse(meet),mode:LaunchMode.externalApplication))
+       else const Icon(Icons.chevron_left),
+      ]),
      onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>PrivateRoomChatPage(roomId:d.id,roomName:x['name'] as String? ?? 'غرفة خاصة'))),
     ));
    }).toList());
