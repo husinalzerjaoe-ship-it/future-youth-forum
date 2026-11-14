@@ -30,7 +30,7 @@ with check (
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','private-chat','voice-messages',
+        'public-chat','profiles','stories','private-chat','voice-messages','voice-messages',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
