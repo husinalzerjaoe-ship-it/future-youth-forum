@@ -193,9 +193,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
     if ((value.isEmpty && imageUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
       final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
-      final theirBlock = await _db.collection('userBlocks').doc('${widget.otherUid}_${_uid}').get();
-      if (myBlock.exists || theirBlock.exists) {
+      if (myBlock.exists) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن إرسال الرسائل: يوجد حظر بين الحسابين.')));
         return;
       }
@@ -223,6 +223,13 @@ class _DirectChatPageState extends State<DirectChatPage> {
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        final message = e.code == 'permission-denied'
+            ? 'تعذر الإرسال: قد يكون أحدكما حظر الآخر أو أن صلاحية المحادثة غير متاحة.'
+            : 'تعذر إرسال الرسالة (' + e.code + '). تحقق من الاتصال وحاول مجدداً.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
