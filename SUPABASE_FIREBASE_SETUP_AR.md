@@ -20,10 +20,12 @@ Supabase يحتاج claim باسم `role: authenticated` داخل Firebase ID to
 
 ```bash
 firebase use futureyouth-69f8a
-firebase deploy --only functions
+firebase deploy --only functions,firestore:rules
 ```
 
 قد تتطلب Cloud Functions تفعيل خطة Blaze والفوترة. لا تضع Service Account JSON أو مفاتيح Admin داخل GitHub.
+
+بعد إضافة دعم الرسائل الصوتية في الدردشة العامة والخاصة وغرف الدول والغرف الخاصة، تأكد أن نشر `firestore.rules` تم أيضاً؛ وإلا قد تظهر رسائل `permission-denied` عند إرسال الفويس أو الصور داخل بعض الغرف.
 
 ### الحسابات الموجودة مسبقاً
 نفّذ سكربت التحديث مرة واحدة من جهاز موثوق لديه Firebase Admin credentials:
