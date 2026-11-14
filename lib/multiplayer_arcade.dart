@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -23,9 +24,11 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final ref = _db.collection('gameRooms').doc();
+      final code = (100000 + Random.secure().nextInt(900000)).toString();
+      final ref = _db.collection('gameRooms').doc(code);
+      if ((await ref.get()).exists) throw Exception('تعذر توليد رمز جديد، حاول مرة ثانية');
       await ref.set({
-        'game': 'xo', 'hostId': _uid, 'members': [_uid],
+        'game': 'xo', 'hostId': _uid, 'roomCode': code, 'members': [_uid],
         'memberNames': {_uid: _name}, 'status': 'waiting',
         'board': List<String>.filled(9, ''), 'turn': _uid, 'winner': '',
         'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
@@ -96,10 +99,37 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: _busy ? null : _createRoom, icon: const Icon(Icons.add_circle_outline), label: const Text('إنشاء غرفة جديدة')),
           const SizedBox(height: 8),
-          TextField(controller: _code, textCapitalization: TextCapitalization.none, decoration: const InputDecoration(labelText: 'رمز الغرفة', border: OutlineInputBorder())),
+          TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'رمز الغرفة المكوّن من 6 أرقام', border: OutlineInputBorder(), counterText: '')),
           const SizedBox(height: 8),
           OutlinedButton.icon(onPressed: _busy ? null : () => _joinRoom(), icon: const Icon(Icons.login), label: const Text('انضم إلى صديق')),
         ]))),
+        const SizedBox(height: 14),
+        const Text('الدعوات الواردة', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _db.collection('gameInvites').where('to', isEqualTo: _uid).limit(30).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(10), child: Text('تعذر تحميل الدعوات حالياً.'));
+            if (!snapshot.hasData) return const Padding(padding: EdgeInsets.all(10), child: LinearProgressIndicator());
+            final invites = snapshot.data!.docs.where((d) => d.data()['status'] == 'pending' && d.data()['game'] == 'xo').toList();
+            if (invites.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('ما عندك دعوات لعب جديدة.')));
+            return Column(children: invites.map((invite) {
+              final data = invite.data();
+              return Card(child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.sports_esports)),
+                title: Text("دعوة من ${data['fromName'] ?? 'صديق'}"),
+                subtitle: Text("غرفة رقم ${data['roomId'] ?? '------'} • إكس أو"),
+                trailing: FilledButton(
+                  onPressed: _busy ? null : () async {
+                    final roomId = data['roomId']?.toString() ?? '';
+                    await _joinRoom(roomId);
+                    if (mounted) await invite.reference.update({'status': 'accepted'});
+                  },
+                  child: const Text('انضم'),
+                ),
+              ));
+            }).toList());
+          },
+        ),
         const SizedBox(height: 8),
         const Text('ألعاب قادمة للصالة', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
@@ -169,6 +199,44 @@ class _OnlineXoRoomPageState extends State<OnlineXoRoomPage> {
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
+
+  Future<void> _inviteFriend(BuildContext context, Map<String, dynamic> room) async {
+    try {
+      final profiles = await _db.collection('publicProfiles').limit(100).get();
+      if (!context.mounted) return;
+      final friends = profiles.docs.where((d) => d.id != _uid).toList();
+      if (friends.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ماكو أعضاء متاحين للدعوة حالياً')));
+        return;
+      }
+      final selected = await showModalBottomSheet<String>(
+        context: context, showDragHandle: true,
+        builder: (sheetContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(child: ListView(shrinkWrap: true, children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('اختَر صديقك للدعوة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            ...friends.map((profile) => ListTile(
+              leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+              title: Text(profile.data()['name']?.toString() ?? 'عضو'),
+              onTap: () => Navigator.pop(sheetContext, profile.id),
+            )),
+          ])),
+        ),
+      );
+      if (selected == null) return;
+      final me = await _db.collection('publicProfiles').doc(_uid).get();
+      final roomCode = room['roomCode']?.toString() ?? widget.roomId;
+      await _db.collection('gameInvites').add({
+        'from': _uid, 'to': selected, 'fromName': me.data()?['name'] ?? 'صديق',
+        'game': 'xo', 'roomId': widget.roomId, 'roomCode': roomCode,
+        'status': 'pending', 'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('وصلت الدعوة لصديقك 🎮')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال الدعوة: $e')));
+    }
+  }
+
   Future<void> _rematch(Map<String, dynamic> data) async {
     if (data['hostId'] != _uid) return;
     await _room.update({
@@ -205,10 +273,11 @@ class _OnlineXoRoomPageState extends State<OnlineXoRoomPage> {
           return ListView(padding: const EdgeInsets.all(16), children: [
             Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [
               const Text('رمز الدعوة', style: TextStyle(color: Colors.grey)),
-              SelectableText(widget.roomId, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold, letterSpacing: 1)),
-              TextButton.icon(onPressed: () { Clipboard.setData(ClipboardData(text: widget.roomId)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الرمز'))); }, icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
+              SelectableText(data['roomCode']?.toString() ?? widget.roomId, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: 5)),
+              TextButton.icon(onPressed: () { Clipboard.setData(ClipboardData(text: data['roomCode']?.toString() ?? widget.roomId)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ الرمز'))); }, icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
               const Divider(),
               Text((members.isNotEmpty ? (names[members[0]] ?? 'اللاعب الأول') : 'اللاعب الأول').toString() + '  X   •   O  ' + (members.length > 1 ? (names[members[1]] ?? 'اللاعب الثاني').toString() : 'بانتظار صديق')),
+              if (data['hostId'] == _uid) TextButton.icon(onPressed: () => _inviteFriend(context, data), icon: const Icon(Icons.person_add_alt_1), label: const Text('أرسل دعوة لصديق')),
             ]))),
             const SizedBox(height: 14),
             Center(child: Text(message, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
