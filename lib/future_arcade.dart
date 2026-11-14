@@ -361,7 +361,7 @@ class _ArcadeRoomsPageState extends State<ArcadeRoomsPage> {
   }
   Future<void> _join() async {
     final code=_code.text.trim();
-    if(!RegExp('^[0-9]{6}){_show('أدخل رمزاً من 6 أرقام.');return;}
+    if(!RegExp('^[0-9]{6}$'){_show('أدخل رمزاً من 6 أرقام.');return;}
     setState(()=>_busy=true);
     try{
       final found=await _db.collection('arcadeRooms').where('roomCode',isEqualTo:code).limit(1).get();
