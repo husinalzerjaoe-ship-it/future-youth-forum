@@ -10,7 +10,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'community_pages.dart';
 import 'community_plus.dart';
 import 'enhanced_public_chat.dart';
-import 'direct_chat_page.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
 import 'creative_library.dart';
@@ -291,8 +290,10 @@ String? _youtubeVideoId(String raw) {
 }
 
 String? _validYoutubeId(String value) =>
-    RegExp(r'^[A-Za-z0-9_-]{11}
-  const PostsPage({super.key});
+    RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(value) ? value : null;
+
+class PostsPage extends StatelessWidget {
+
   Future<void> addPost(BuildContext context) async {
     final text = TextEditingController();
     final video = TextEditingController();
@@ -1082,7 +1083,6 @@ class _MemberSearchPageState extends State<MemberSearchPage> {
     );
   }
 }
-).hasMatch(value) ? value : null;
 
 class YouTubeVideoPlayer extends StatefulWidget {
   final String url;
