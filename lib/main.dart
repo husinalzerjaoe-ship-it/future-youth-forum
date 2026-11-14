@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -164,6 +165,7 @@ class _AuthPageState extends State<AuthPage> {
           ),
         ),
         child: Stack(children: [
+          const Positioned.fill(child: _AuthStarfield()),
           Positioned(top: -75, left: -55, child: _authGlow(210, const Color(0xFF8E7CFF).withOpacity(.20))),
           Positioned(bottom: -90, right: -60, child: _authGlow(250, const Color(0xFF38C9D8).withOpacity(.14))),
           SafeArea(child: Center(child: SingleChildScrollView(
@@ -1325,4 +1327,88 @@ class _MemberSearchPageState extends State<MemberSearchPage> {
       ),
     );
   }
+}
+
+
+/// Lightweight animated anime-night atmosphere; uses no remote image or asset.
+class _AuthStarfield extends StatefulWidget {
+  const _AuthStarfield();
+
+  @override
+  State<_AuthStarfield> createState() => _AuthStarfieldState();
+}
+
+class _AuthStarfieldState extends State<_AuthStarfield>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 18),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => CustomPaint(
+        painter: _AnimeNightPainter(_controller.value),
+        child: const SizedBox.expand(),
+      ),
+    ),
+  );
+}
+
+class _AnimeNightPainter extends CustomPainter {
+  _AnimeNightPainter(this.phase);
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(29);
+    for (var i = 0; i < 72; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = .45 + random.nextDouble() * 1.25;
+      final wave = (math.sin((phase * math.pi * 2) + i * .71) + 1) / 2;
+      final alpha = (.12 + wave * .48).clamp(0.0, .62);
+      final paint = Paint()
+        ..color = Color.lerp(
+          const Color(0xFFB9C9FF),
+          const Color(0xFFE4C8FF),
+          (i % 4) / 3,
+        )!.withOpacity(alpha);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+
+    final cometPhase = (phase * 1.35) % 1;
+    final cometX = size.width * (1.15 - cometPhase * 1.45);
+    final cometY = size.height * (.18 + .24 * cometPhase);
+    final cometPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0x00B8C8FF),
+          const Color(0x88C6C8FF),
+          const Color(0x00FFFFFF),
+        ],
+      ).createShader(Rect.fromLTWH(cometX - 70, cometY - 2, 70, 4));
+    canvas.drawLine(
+      Offset(cometX - 70, cometY - 2),
+      Offset(cometX, cometY),
+      cometPaint..strokeWidth = 2,
+    );
+    canvas.drawCircle(
+      Offset(cometX, cometY),
+      2,
+      Paint()..color = const Color(0x99E5DCFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimeNightPainter oldDelegate) =>
+      oldDelegate.phase != phase;
 }
