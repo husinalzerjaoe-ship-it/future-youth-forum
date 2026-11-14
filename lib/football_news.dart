@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:xml/xml.dart';
+import 'news_article_page.dart';
 
 const _footballTabs = <String>['آخر الأخبار', 'الانتقالات', 'العراق', 'أوروبا', 'الدوريات العربية', 'المنتخبات'];
 const _feedQueries = <List<String>>[
@@ -16,8 +16,8 @@ const _feedQueries = <List<String>>[
 ];
 
 class _FootballNewsItem {
-  const _FootballNewsItem({required this.title, required this.url, required this.source, required this.published, required this.category});
-  final String title, url, source, published, category;
+  const _FootballNewsItem({required this.title, required this.url, required this.source, required this.published, required this.category, this.imageUrl = ''});
+  final String title, url, source, published, category, imageUrl;
 }
 
 class FootballNewsPage extends StatefulWidget {
@@ -80,7 +80,15 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
         final link = value('link');
         if (title.isEmpty || !link.startsWith('http')) return null;
         final source = value('source');
-        return _FootballNewsItem(title: title, url: link, source: source.isEmpty ? 'Google News' : source, published: value('pubDate'), category: category);
+        var imageUrl = '';
+        for (final node in item.descendants.whereType<XmlElement>()) {
+          final tag = node.name.qualified.toLowerCase();
+          if (tag.endsWith('thumbnail') || tag.endsWith('content') || tag == 'enclosure') {
+            final candidate = node.getAttribute('url') ?? node.getAttribute('href') ?? '';
+            if (candidate.startsWith('https://')) { imageUrl = candidate; break; }
+          }
+        }
+        return _FootballNewsItem(title: title, url: link, source: source.isEmpty ? 'Google News' : source, published: value('pubDate'), category: category, imageUrl: imageUrl);
       }).whereType<_FootballNewsItem>().toList();
     } on TimeoutException {
       return const [];
@@ -95,14 +103,14 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
     await next;
   }
 
-  Future<void> _openArticle(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر فتح رابط الخبر.')));
-    }
+  void _openArticle(_FootballNewsItem item) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => NewsArticlePage(
+      title: item.title,
+      url: item.url,
+      source: item.source,
+      published: item.published,
+      imageUrl: item.imageUrl,
+    )));
   }
 
   @override
@@ -177,10 +185,23 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
                         margin: const EdgeInsets.only(bottom: 10), elevation: 1,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: .35))),
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(16), onTap: () => _openArticle(item.url),
+                          borderRadius: BorderRadius.circular(16), onTap: () => _openArticle(item),
                           child: Padding(
                             padding: const EdgeInsets.all(14),
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              if (item.imageUrl.isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    item.imageUrl,
+                                    width: double.infinity,
+                                    height: 165,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                  ),
+                                ),
+                                const SizedBox(height: 11),
+                              ],
                               Row(children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
