@@ -1,8 +1,12 @@
 
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
@@ -21,6 +25,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  bool _recordingVoice = false;
+  String? _voicePath;
+  final AudioRecorder _voiceRecorder = AudioRecorder();
   DateTime? _lastSuccessfulSend;
   String? _error;
   String? _pulseMessageId;
@@ -42,7 +49,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Future<void> _loadBackground() async {
     try { final d=await _chatDb.collection('chatPreferences').doc(_uid).get(); final c=d.data()?['background']; if(mounted && c is int && _backgrounds.contains(c)) setState(()=>_background=c); } catch (_) {}
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); _voiceRecorder.dispose(); super.dispose(); }
 
   Future<String> _name() async {
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
@@ -77,7 +84,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       }
       final senderName = await _name();
       await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
+        'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,if(audioUrl!=null)'audioUrl':audioUrl,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
@@ -111,6 +118,46 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _toggleVoiceRecording() async {
+    if (_recordingVoice) { await _finishVoiceRecording(); return; }
+    try {
+      if (!await _voiceRecorder.hasPermission()) {
+        if (mounted) setState(() => _error = 'اسمح للتطبيق باستخدام المايك.');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path = dir.path + '/public_voice_' + _uid + '_' + DateTime.now().microsecondsSinceEpoch.toString() + '.m4a';
+      await _voiceRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100), path: path);
+      if (mounted) setState(() { _voicePath = path; _recordingVoice = true; _error = null; });
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر بدء التسجيل: ' + e.toString());
+    }
+  }
+
+  Future<void> _finishVoiceRecording() async {
+    if (!_recordingVoice) return;
+    String? path;
+    try {
+      path = await _voiceRecorder.stop();
+      if (mounted) setState(() => _recordingVoice = false);
+      final saved = path ?? _voicePath;
+      if (saved == null || !await File(saved).exists() || await File(saved).length() < 500) {
+        if (mounted) setState(() => _error = 'التسجيل قصير أو غير صالح.');
+        return;
+      }
+      if (mounted) setState(() => _sending = true);
+      final url = await uploadForumMedia(XFile(saved), folder: 'public-chat');
+      await _send(audioUrl: url, type: 'voice', uploadInProgress: true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر رفع أو إرسال الفويس: ' + e.toString());
+    } finally {
+      final saved = path ?? _voicePath;
+      if (saved != null) { try { final file = File(saved); if (await file.exists()) await file.delete(); } catch (_) {} }
+      _voicePath = null;
+      if (mounted) setState(() { _recordingVoice = false; _sending = false; });
+    }
+  }
+
   Future<void> _showStickers() async {
     final v=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('الملصقات',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
@@ -366,7 +413,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         ]),
         const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
-        if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
+        if(type=='voice'&&d['audioUrl'] is String)_PublicVoicePlayer(url:d['audioUrl'] as String),
+         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -461,4 +509,47 @@ class ChatMemberProfilePage extends StatelessWidget {
       ]);
     }),
   ));
+}
+
+
+class _PublicVoicePlayer extends StatefulWidget {
+  final String url;
+  const _PublicVoicePlayer({required this.url});
+  @override State<_PublicVoicePlayer> createState() => _PublicVoicePlayerState();
+}
+class _PublicVoicePlayerState extends State<_PublicVoicePlayer> {
+  late final AudioPlayer _player;
+  bool _failed = false;
+  @override void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _player.setUrl(widget.url).catchError((_) {
+      if (mounted) setState(() => _failed = true);
+      return null;
+    });
+  }
+  @override void dispose() { _player.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    StreamBuilder<PlayerState>(
+      stream: _player.playerStateStream,
+      builder: (context, snapshot) {
+        final playing = snapshot.data?.playing == true;
+        return IconButton(
+          visualDensity: VisualDensity.compact,
+          onPressed: _failed ? null : () async {
+            try {
+              if (playing) { await _player.pause(); }
+              else {
+                if (_player.processingState == ProcessingState.completed) await _player.seek(Duration.zero);
+                await _player.play();
+              }
+            } catch (_) { if (mounted) setState(() => _failed = true); }
+          },
+          icon: Icon(_failed ? Icons.error_outline : playing ? Icons.pause_circle : Icons.play_circle,
+            color: _chatBrand, size: 30),
+        );
+      },
+    ),
+    const Text('رسالة صوتية', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF30265E))),
+  ]);
 }
