@@ -110,7 +110,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
     padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(c),selected:_category==c,onSelected:(_)=>setState(()=>_category=c)),
    )).toList()))),
    SliverPadding(padding:const EdgeInsets.fromLTRB(12,8,12,24),sliver:visible.isEmpty
-    ?SliverToBoxAdapter(child(Padding(padding:const EdgeInsets.all(30),child:Center(child:Text('ما لقينا قسم بهذا الاسم. جرّب كلمة ثانية.',style:TextStyle(color:cs.onSurfaceVariant))))))
+    ?SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.all(30),child:Center(child:Text('ما لقينا قسم بهذا الاسم. جرّب كلمة ثانية.',style:TextStyle(color:cs.onSurfaceVariant)))))
     :SliverGrid(delegate:SliverChildBuilderDelegate((c,i){
       final item=visible[i];
       final colors=[p,const Color(0xFF168E9B),const Color(0xFFB65BC8),const Color(0xFF2878C7)];
