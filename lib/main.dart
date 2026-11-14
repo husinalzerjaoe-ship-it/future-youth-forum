@@ -334,7 +334,7 @@ class _HomePageState extends State<HomePage> {
 String? _youtubeVideoId(String raw) {
   final uri = Uri.tryParse(raw.trim());
   if (uri == null || !['http', 'https'].contains(uri.scheme)) return null;
-  final host = uri.host.toLowerCase().replaceFirst(RegExp(r'^www\\.'), '');
+  final host = uri.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
   if (host == 'youtu.be') return uri.pathSegments.isNotEmpty ? _validYoutubeId(uri.pathSegments.first) : null;
   if (!['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'].contains(host)) return null;
   if (uri.path == '/watch') return _validYoutubeId(uri.queryParameters['v'] ?? '');
