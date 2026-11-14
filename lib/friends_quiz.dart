@@ -48,7 +48,8 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
     try {
       final code = (100000 + Random.secure().nextInt(900000)).toString();
       final ref = _db.collection('gameRooms').doc(code);
-      if ((await ref.get()).exists) throw Exception('حاول إنشاء غرفة جديدة');
+      // Create directly. A pre-read of a missing room can be rejected by
+      // Firestore read rules before the create operation is evaluated.
       await ref.set({
         'game': 'football_quiz', 'hostId': _uid, 'roomCode': code,
         'members': [_uid], 'memberNames': {_uid: _name},
