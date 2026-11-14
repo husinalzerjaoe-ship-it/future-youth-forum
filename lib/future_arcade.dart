@@ -94,8 +94,11 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   final List<int> _snake=[27,28,29];
   final List<int> _bombs=[];
   final List<String> _roles=['مواطن','مافيا','طبيب','محقق'];
-  final List<String> _millionAnswers=['بغداد','المريخ','المحيط الهادئ','البرتغالية'];
-  final List<String> _millionQuestions=['ما عاصمة العراق؟','ما الكوكب الأحمر؟','ما أكبر محيط؟','ما لغة البرازيل الرسمية؟'];
+  final List<String> _millionAnswers=['بغداد','المريخ','المحيط الهادئ','البرتغالية','7','القاهرة','الذهب','الأكسجين','آسيا','جبران خليل جبران','زحل','ليوناردو دافنشي','النيل','اليابان','القلب','3','التمثيل الضوئي','الحوت الأزرق','باريس','4'];
+  final List<String> _millionQuestions=['ما عاصمة العراق؟','ما الكوكب الأحمر؟','ما أكبر محيط؟','ما لغة البرازيل الرسمية؟','كم عدد أيام الأسبوع؟','ما عاصمة مصر؟','ما المعدن الذي رمزه Au؟','ما الغاز الذي يحتاجه الإنسان للتنفس؟','ما أكبر قارة؟','من مؤلف كتاب النبي؟','أي كوكب مشهور بحلقاته؟','من رسم الموناليزا؟','ما أطول نهر في أفريقيا؟','في أي دولة تقع طوكيو؟','ما العضو الذي يضخ الدم؟','كم ضلعاً للمثلث؟','ما العملية التي تصنع بها النباتات غذاءها؟','ما أكبر حيوان على الأرض؟','ما عاصمة فرنسا؟','كم ضلعاً للمربع؟'];
+  final List<int> _questionOrder=[];
+  @override void initState(){super.initState();_shuffleQuestions();}
+  void _shuffleQuestions(){_questionOrder..clear()..addAll(List<int>.generate(_millionQuestions.length,(i)=>i))..shuffle(_random);}
   final List<List<int>> _sudoku=[
     [1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]
   ];
@@ -196,14 +199,20 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
     ]);
   }
   Widget _millionaire(){
-    final i=min(_step,_millionQuestions.length-1);
-    return _panel('💰 السؤال '+(i+1).toString()+' من 4',[
+    final i=_questionOrder[min(_step,_questionOrder.length-1)];
+    final options=List<String>.from(_millionOptions[i])..shuffle(_random);
+    return _panel('💰 السؤال '+(_step+1).toString()+' من '+_questionOrder.length.toString(),[
       Text(_millionQuestions[i],style:_big),
-      ...(_millionOptions[i]).map((a)=>_button(a,(){setState((){if(a==_millionAnswers[i]){_score+=10;_message='إجابة صحيحة!';}else{_message='إجابة غير صحيحة. حاول بالسؤال التالي.';}_step++;if(_step>=_millionQuestions.length){_ended=true;_message='انتهت المسابقة! نقاطك '+_score.toString();}});})),
+      ...options.map((a)=>_button(a,(){setState((){if(a==_millionAnswers[i]){_score+=10;_message='إجابة صحيحة!';}else{_message='إجابة غير صحيحة. الإجابة الصحيحة: '+_millionAnswers[i];}_step++;if(_step>=_questionOrder.length){_ended=true;_message='انتهت المسابقة! نقاطك '+_score.toString();}});})),
     ]);
   }
   final List<List<String>> _millionOptions=[
-    ['البصرة','بغداد','أربيل','الموصل'],['الزهرة','المريخ','زحل','عطارد'],['الأطلسي','الهندي','الهادئ','المتجمد'],['الإسبانية','البرتغالية','الفرنسية','الإنجليزية']
+    ['البصرة','بغداد','أربيل','الموصل'],['الزهرة','المريخ','زحل','عطارد'],['الأطلسي','الهندي','الهادئ','المتجمد'],['الإسبانية','البرتغالية','الفرنسية','الإنجليزية'],
+    ['5','6','7','8'],['الإسكندرية','القاهرة','الجيزة','أسوان'],['الفضة','الحديد','الذهب','النحاس'],['النيتروجين','الأكسجين','الهيدروجين','الهيليوم'],
+    ['أفريقيا','أوروبا','آسيا','أستراليا'],['نجيب محفوظ','جبران خليل جبران','طه حسين','أحمد شوقي'],['المريخ','عطارد','زحل','الأرض'],
+    ['فان غوخ','بيكاسو','ليوناردو دافنشي','رامبرانت'],['دجلة','الفرات','النيل','الأمازون'],['الصين','اليابان','كوريا','تايلند'],
+    ['الرئة','الكبد','القلب','المعدة'],['2','3','4','5'],['التنفس','التمثيل الضوئي','التبخر','التكاثف'],
+    ['الفيل','الزرافة','الحوت الأزرق','القرش'],['روما','مدريد','باريس','لندن'],['3','4','5','6']
   ];
   Widget _sudokuBoard(){
     return _panel('🔢 سودوكو 4×4',[
@@ -246,7 +255,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر استلام المكافأة. تأكد من نشر Cloud Function: '+e.toString())));
     }
   }
-  void _reset(){setState((){_score=0;_step=0;_turn=0;_lane=1;_position=0;_wave=1;_fish=0;_selected=null;_revealed=false;_ended=false;_rewardClaimed=false;_message='ابدأ التحدي!';_snake..clear()..addAll([27,28,29]);_bombs.clear();_sudoku..clear()..addAll([[1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]]);_wordInput='';});}
+  void _reset(){setState((){_score=0;_step=0;_turn=0;_lane=1;_position=0;_wave=1;_fish=0;_selected=null;_revealed=false;_ended=false;_rewardClaimed=false;_message='ابدأ التحدي!';_snake..clear()..addAll([27,28,29]);_bombs.clear();_sudoku..clear()..addAll([[1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]]);_wordInput='';_shuffleQuestions();});}
 }
 
 class ArcadeAchievementsPage extends StatelessWidget {
