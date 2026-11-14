@@ -227,6 +227,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
 
   Future<void> _setupPlayer(Map<String, dynamic> data) async {
     _syncTimer?.cancel();
+    _viewerPlaybackUnlocked = false;
     await _ytSub?.cancel();
     await _youtube?.close();
     await _video?.dispose();
