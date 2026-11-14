@@ -215,7 +215,7 @@ service cloud.firestore {
       allow create: if request.auth != null && accountNotBanned() && chatNotMuted()
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
-        && request.resource.data.type in ['text', 'image', 'sticker']
+        && request.resource.data.type in ['text', 'image', 'sticker', 'voice']
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 1000
         && (
@@ -224,6 +224,10 @@ service cloud.firestore {
           || (request.resource.data.type == 'image'
             && request.resource.data.imageUrl is string
             && request.resource.data.imageUrl.matches('https://.*'))
+          || (request.resource.data.type == 'voice'
+            && request.resource.data.audioUrl is string
+            && request.resource.data.audioUrl.matches('https://.*')
+            && request.resource.data.text.size() == 0)
         )
         && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map);
       allow update: if request.auth != null && (
@@ -512,7 +516,12 @@ service cloud.firestore {
             (request.resource.data.type == 'image'
               && request.resource.data.imageUrl is string
               && request.resource.data.imageUrl.matches('https://.*'))
+            || (request.resource.data.type == 'voice'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*')
+              && request.resource.data.text.size() == 0)
             || (request.resource.data.type != 'image'
+              && request.resource.data.type != 'voice'
               && request.resource.data.text.size() > 0)
           )
           && usersNotBlocked(members()[0], members()[1]);
