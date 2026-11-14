@@ -49,8 +49,8 @@ Future<String> uploadForumMedia(
     utf8.decode(base64Url.decode(base64Url.normalize(payload))),
   ) as Map<String, dynamic>;
   final firebase = claims['firebase'];
-  if (claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8' ||
-      claims['aud'] != 'futureyouth-69f8' ||
+  if (claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8a' ||
+      claims['aud'] != 'futureyouth-69f8a' ||
       claims['sub'] != user.uid ||
       firebase is! Map ||
       firebase['sign_in_provider'] == null) {
