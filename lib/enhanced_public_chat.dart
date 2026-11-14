@@ -558,7 +558,7 @@ class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
   @override void initState() {
     super.initState();
     _player=AudioPlayer();
-    _player.setUrl(widget.url).catchError((_) {});
+    _player.setUrl(widget.url).catchError((_) => null);
   }
   @override void dispose() { _player.dispose(); super.dispose(); }
   String _time(Duration d) {
