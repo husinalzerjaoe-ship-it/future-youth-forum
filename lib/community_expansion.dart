@@ -257,7 +257,7 @@ class _CommunityQuestionPageState extends State<CommunityQuestionPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(ctx, text.text.trim().isNotEmpty), child: const Text('نشر مجهول'))],
     )));
     if (ok == true) {
-      try { await db.collection('communityQuestions').add({'text': text.text.trim(), 'authorId': uid, 'createdAt': FieldValue.serverTimestamp(), 'anonymous': true}); }
+      try { await db.collection('communityQuestions').add({'text': text.text.trim(), 'createdAt': FieldValue.serverTimestamp(), 'anonymous': true}); }
       catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر النشر. تحقق من قواعد Firestore.'))); }
     }
     text.dispose();
