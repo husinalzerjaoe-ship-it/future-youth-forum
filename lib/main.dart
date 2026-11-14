@@ -23,6 +23,29 @@ const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
 final db = FirebaseFirestore.instance;
 
+Future<void> _notifyContentMentions({
+  required String text,
+  required String targetType,
+  required String targetId,
+  required String actorUid,
+  required String actorName,
+}) async {
+  final tags = RegExp(r'@([^\\s@]+)').allMatches(text)
+      .map((m) => m.group(1)!.replaceAll('_', ' ')).toSet().take(10).toList();
+  if (tags.isEmpty) return;
+  final matches = await db.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
+  for (final profile in matches.docs) {
+    if (profile.id == actorUid) continue;
+    await db.collection('notifications').add({
+      'recipientId': profile.id, 'actorId': actorUid, 'actorName': actorName,
+      'type': 'mention', 'text': 'أشار إليك في منشور',
+      'read': false, 'targetType': targetType, 'targetId': targetId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -379,12 +402,17 @@ class PostsPage extends StatelessWidget {
       )));
     if (ok == true && (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
       final profile = await db.collection('publicProfiles').doc(user.uid).get();
-      await db.collection('posts').add({
+      final authorName = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
+      final post = await db.collection('posts').add({
         'text': text.text.trim(), 'videoUrl': video.text.trim(), 'authorId': user.uid,
-        'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
+        'authorName': authorName,
         'authorPhoto': profile.data()?['photoUrl'] ?? '',
         'createdAt': FieldValue.serverTimestamp(),
       });
+      await _notifyContentMentions(
+        text: text.text.trim(), targetType: 'post', targetId: post.id,
+        actorUid: user.uid, actorName: authorName,
+      );
     }
     text.dispose();
     video.dispose();
