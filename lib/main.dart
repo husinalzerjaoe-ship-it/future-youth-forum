@@ -83,7 +83,86 @@ class FutureYouthApp extends StatelessWidget {
       textTheme: GoogleFonts.notoSansArabicTextTheme(ThemeData.dark().textTheme),
       scaffoldBackgroundColor: const Color(0xFF111321),
     ),
-    home: const AuthGate(),
+    home: const AnimatedIntroGate(),
+  );
+}
+
+
+class AnimatedIntroGate extends StatefulWidget {
+  const AnimatedIntroGate({super.key});
+  @override
+  State<AnimatedIntroGate> createState() => _AnimatedIntroGateState();
+}
+
+class _AnimatedIntroGateState extends State<AnimatedIntroGate> {
+  bool _showIntro = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+      if (mounted) setState(() => _showIntro = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 650),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(scale: Tween<double>(begin: .96, end: 1).animate(animation), child: child),
+    ),
+    child: _showIntro
+      ? const _AnimatedIntroScreen(key: ValueKey('future-youth-intro'))
+      : const AuthGate(key: ValueKey('future-youth-auth')),
+  );
+}
+
+class _AnimatedIntroScreen extends StatelessWidget {
+  const _AnimatedIntroScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF10152F), Color(0xFF29215D), Color(0xFF111321)],
+        ),
+      ),
+      child: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: .72, end: 1),
+          duration: const Duration(milliseconds: 1100),
+          curve: Curves.elasticOut,
+          builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 104, height: 104,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0xFFB9AEFF).withValues(alpha: .65)),
+                boxShadow: [BoxShadow(color: brand.withValues(alpha: .35), blurRadius: 35, spreadRadius: 2)],
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFE4DEFF), size: 54),
+            ),
+            const SizedBox(height: 22),
+            const Text('ملتقى شباب المستقبل',
+              style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text('مساحة تجمع الأصدقاء والإبداع',
+              style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 26),
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(
+              strokeWidth: 2, color: Color(0xFFB9AEFF))),
+          ]),
+        ),
+      ),
+    ),
   );
 }
 
