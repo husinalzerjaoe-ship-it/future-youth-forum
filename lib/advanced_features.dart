@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -138,6 +142,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
   final controller = TextEditingController();
   bool busy = false;
   bool changingBackground = false;
+  bool recordingVoice = false;
+  String? voicePath;
+  final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
@@ -187,10 +194,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تغيير الخلفية. تحقق من صلاحيات تخزين Supabase.')));
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
-  @override void dispose() { controller.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl}) async {
+  @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
+  Future<void> send({String? imageUrl, String? audioUrl}) async {
     final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null) || busy) return;
+    if ((value.isEmpty && imageUrl == null && audioUrl == null) || busy) return;
     setState(() => busy = true);
     try {
       final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
@@ -212,14 +219,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': imageUrl == null ? 'text' : 'image', if (imageUrl != null) 'imageUrl': imageUrl, 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': imageUrl == null ? value : '📷 صورة', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      final type = imageUrl != null ? 'image' : audioUrl != null ? 'voice' : 'text';
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': type, if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': imageUrl != null ? '📷 صورة' : audioUrl != null ? '🎤 رسالة صوتية' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': imageUrl == null ? 'أرسل لك رسالة خاصة' : 'أرسل لك صورة',
+          'type': 'message', 'text': imageUrl != null ? 'أرسل لك صورة' : audioUrl != null ? 'أرسل لك رسالة صوتية' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
@@ -238,6 +246,45 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع الصورة: $e')));
       if (mounted) setState(() => busy = false);
+    }
+  }
+  Future<void> toggleVoiceRecording() async {
+    if (recordingVoice) { await finishVoiceRecording(); return; }
+    try {
+      if (!await voiceRecorder.hasPermission()) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للتطبيق باستخدام المايك.')));
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path = dir.path + '/private_voice_' + _uid + '_' + DateTime.now().microsecondsSinceEpoch.toString() + '.m4a';
+      await voiceRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 128000, sampleRate: 44100), path: path);
+      if (mounted) setState(() { voicePath = path; recordingVoice = true; });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر بدء التسجيل: $e')));
+    }
+  }
+  Future<void> finishVoiceRecording() async {
+    if (!recordingVoice) return;
+    String? path;
+    try {
+      path = await voiceRecorder.stop();
+      if (mounted) setState(() => recordingVoice = false);
+      final saved = path ?? voicePath;
+      if (saved == null || !await File(saved).exists() || await File(saved).length() < 500) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('التسجيل قصير أو غير صالح.')));
+        return;
+      }
+      if (mounted) setState(() => busy = true);
+      final url = await uploadForumMedia(XFile(saved), folder: 'private-chat');
+      if (mounted) setState(() => busy = false);
+      await send(audioUrl: url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال الفويس: $e')));
+    } finally {
+      final saved = path ?? voicePath;
+      if (saved != null) { try { final file = File(saved); if (await file.exists()) await file.delete(); } catch (_) {} }
+      voicePath = null;
+      if (mounted) setState(() { recordingVoice = false; busy = false; });
     }
   }
   Future<void> reactToMessage(String messageId, String emoji) async {
@@ -349,6 +396,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
+                  if (d['type'] == 'voice' && d['audioUrl'] is String)
+                    _PrivateVoicePlayer(url: d['audioUrl'] as String),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
                   if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
@@ -363,8 +412,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
             }).toList());
           },
         )),
+        if (recordingVoice) const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: Text('🔴 جاري تسجيل الفويس — اضغط المايك للإيقاف والإرسال', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
           IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : toggleVoiceRecording, icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand), tooltip: recordingVoice ? 'إيقاف وإرسال' : 'تسجيل فويس'),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
@@ -720,4 +771,39 @@ class SavePostControl extends StatelessWidget {
       },
     );
   }
+}
+
+class _PrivateVoicePlayer extends StatefulWidget {
+  final String url;
+  const _PrivateVoicePlayer({required this.url});
+  @override State<_PrivateVoicePlayer> createState() => _PrivateVoicePlayerState();
+}
+class _PrivateVoicePlayerState extends State<_PrivateVoicePlayer> {
+  late final AudioPlayer player;
+  bool failed = false;
+  @override void initState() {
+    super.initState();
+    player = AudioPlayer();
+    player.setUrl(widget.url).catchError((_) { if (mounted) setState(() => failed = true); return null; });
+  }
+  @override void dispose() { player.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    StreamBuilder<PlayerState>(
+      stream: player.playerStateStream,
+      builder: (context, snap) {
+        final playing = snap.data?.playing == true;
+        return IconButton(
+          visualDensity: VisualDensity.compact,
+          onPressed: failed ? null : () async {
+            try {
+              if (playing) { await player.pause(); }
+              else { if (player.processingState == ProcessingState.completed) await player.seek(Duration.zero); await player.play(); }
+            } catch (_) { if (mounted) setState(() => failed = true); }
+          },
+          icon: Icon(failed ? Icons.error_outline : playing ? Icons.pause_circle : Icons.play_circle, color: _brand, size: 30),
+        );
+      },
+    ),
+    const Text('رسالة صوتية', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF30265E))),
+  ]);
 }
