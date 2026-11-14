@@ -11,6 +11,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 import 'engagement_features.dart';
 import 'game_center.dart';
@@ -21,6 +22,10 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'watch_party.dart';
+import 'arcade_hub.dart';
+import 'inspiration_hub.dart';
+import 'match_center.dart';
+import 'livekit_calls.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -41,11 +46,16 @@ class CommunityHubPage extends StatelessWidget {
    ('المشاهدة الجماعية','شاهدوا يوتيوب والبث المباشر معاً',Icons.groups_rounded,const WatchPartyLobbyPage()),
    ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
    ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
+   ('مدينة الألعاب','ألعاب مصغرة وتحديات جماعية وألعاب لوحية',Icons.videogame_asset_rounded,const ArcadeHubPage()),
+   ('مركز المباريات','مواعيد ونتائج ومتابعة أخبار الكرة',Icons.sports_soccer,const MatchCenterPage()),
+   ('أبراج وحساب العمر','احسب عمرك واكتشف برجك ومعلوماته الترفيهية',Icons.cake_outlined,const LifeToolsPage()),
+   ('إلهام يومي','أفكار واقتباسات ومحتوى إيجابي متجدد',Icons.lightbulb_outline,const InspirationHubPage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
    ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
    ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
    ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
+   ('مكالمات الصوت والفيديو','مكالمات جماعية وخاصة عبر LiveKit',Icons.video_call_rounded,const LiveKitCallsPage()),
   ];
   return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
@@ -444,7 +454,124 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
  final url=TextEditingController();
  String category='أغاني';
  bool busy=false;
+
  static const categories=['أغاني','فيديوهات','أفلام ومقاطع رسمية','تعليم','متنوع'];
+ static const featuredTracks=[
+  {'title':"موسيقى عراقية تراثية",'artist':"تراث عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام اللامي",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام الحجاز",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"جورج وسوف – كلام الناس",'artist':"جورج وسوف",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – زيديني عشقاً",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – مدرسة الحب",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"ماجدة الرومي – كلمات",'artist':"ماجدة الرومي",'category':"طرب عربي"},
+  {'title':"فيروز – نسم علينا الهوى",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"فيروز – كان عنا طاحون",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"أم كلثوم – ألف ليلة وليلة",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"عبد الحليم حافظ – قارئة الفنجان",'artist':"عبد الحليم حافظ",'category':"طرب عربي"},
+  {'title':"محمد عبده – الأماكن",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"راشد الماجد – المسافر",'artist':"راشد الماجد",'category':"خليجي"},
+  {'title':"عبد المجيد عبد الله – تتنفسك دنياي",'artist':"عبد المجيد عبد الله",'category':"خليجي"},
+  {'title':"أصالة – عيش سكر وطن",'artist':"أصالة",'category':"عربي حديث"},
+  {'title':"شيرين – مشاعر",'artist':"شيرين",'category':"عربي حديث"},
+  {'title':"عمرو دياب – تملي معاك",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"عمرو دياب – نور العين",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"محمد حماقي – أجمل يوم",'artist':"محمد حماقي",'category':"عربي حديث"},
+  {'title':"إليسا – عايشالك",'artist':"إليسا",'category':"عربي حديث"},
+  {'title':"نانسي عجرم – يا سلام",'artist':"نانسي عجرم",'category':"عربي حديث"},
+  {'title':"حمزة نمرة – داري يا قلبي",'artist':"حمزة نمرة",'category':"عربي حديث"},
+  {'title':"أدهم نابلسي – هو الحب",'artist':"أدهم نابلسي",'category':"عربي حديث"},
+  {'title':"سيف نبيل – فدوه اروحلك",'artist':"سيف نبيل",'category':"عراقي حديث"},
+  {'title':"ماجد المهندس – تناديك",'artist':"ماجد المهندس",'category':"عراقي حديث"},
+  {'title':"رحمة رياض – وعد مني",'artist':"رحمة رياض",'category':"عراقي حديث"},
+  {'title':"إلهام المدفعي – خيّال",'artist':"إلهام المدفعي",'category':"عراقي وتراث"},
+  {'title':"ناظم الغزالي – طالعة من بيت أبوها",'artist':"ناظم الغزالي",'category':"عراقي وتراث"},
+  {'title':"سعدون جابر – يا طيور الطايرة",'artist':"سعدون جابر",'category':"عراقي وتراث"},
+  {'title':"فؤاد سالم – غريبة الروح",'artist':"فؤاد سالم",'category':"عراقي وتراث"},
+  {'title':"The Beatles – Here Comes the Sun",'artist':"The Beatles",'category':"عالمي"},
+  {'title':"Queen – Bohemian Rhapsody",'artist':"Queen",'category':"عالمي"},
+  {'title':"Coldplay – Viva La Vida",'artist':"Coldplay",'category':"عالمي"},
+  {'title':"Ed Sheeran – Perfect",'artist':"Ed Sheeran",'category':"عالمي"},
+  {'title':"Adele – Someone Like You",'artist':"Adele",'category':"عالمي"},
+  {'title':"Imagine Dragons – Demons",'artist':"Imagine Dragons",'category':"عالمي"},
+  {'title':"Ludovico Einaudi – Nuvole Bianche",'artist':"Ludovico Einaudi",'category':"هادئ وآلات"},
+  {'title':"Yiruma – River Flows in You",'artist':"Yiruma",'category':"هادئ وآلات"},
+  {'title':"Debussy – Clair de Lune",'artist':"Claude Debussy",'category':"كلاسيكي"},
+  {'title':"Beethoven – Moonlight Sonata",'artist':"Ludwig van Beethoven",'category':"كلاسيكي"},
+  {'title':"Mozart – Eine kleine Nachtmusik",'artist':"Wolfgang Amadeus Mozart",'category':"كلاسيكي"},
+  {'title':"Vivaldi – The Four Seasons Spring",'artist':"Antonio Vivaldi",'category':"كلاسيكي"},
+  {'title':"Bach – Air on the G String",'artist':"Johann Sebastian Bach",'category':"كلاسيكي"},
+  {'title':"Chopin – Nocturne Op.9 No.2",'artist':"Frédéric Chopin",'category':"كلاسيكي"},
+  {'title':"Tchaikovsky – Swan Lake",'artist':"Pyotr Ilyich Tchaikovsky",'category':"كلاسيكي"},
+  {'title':"Erik Satie – Gymnopédie No.1",'artist':"Erik Satie",'category':"هادئ وآلات"},
+  {'title':"Kevin MacLeod – Carefree",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Kevin MacLeod – Monkeys Spinning Monkeys",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – Signal to Noise",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – The Illusionist",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Chris Zabriskie – Cylinder Seven",'artist':"Chris Zabriskie",'category':"موسيقى مجانية"},
+  {'title':"كاظم الساهر – أنا وليلى",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – هل عندك شك",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"فيروز – كيفك إنت",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"فيروز – رجعت الشتوية",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"أم كلثوم – أنت عمري",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"أم كلثوم – سيرة الحب",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"عبد الحليم حافظ – جانا الهوى",'artist':"عبد الحليم حافظ",'category':"طرب عربي"},
+  {'title':"وردة الجزائرية – بتونس بيك",'artist':"وردة الجزائرية",'category':"طرب عربي"},
+  {'title':"صباح فخري – قدك المياس",'artist':"صباح فخري",'category':"طرب عربي"},
+  {'title':"ملحم بركات – على بابي واقف قمرين",'artist':"ملحم بركات",'category':"طرب عربي"},
+  {'title':"محمد عبده – الأماكن",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"محمد عبده – مذهلة",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"راشد الماجد – ويلي",'artist':"راشد الماجد",'category':"خليجي"},
+  {'title':"عبد الله الرويشد – رحلتي",'artist':"عبد الله الرويشد",'category':"خليجي"},
+  {'title':"أحلام – تدري ليش",'artist':"أحلام",'category':"خليجي"},
+  {'title':"نوال الكويتية – أنت طيب",'artist':"نوال الكويتية",'category':"خليجي"},
+  {'title':"حسين الجسمي – أحبك",'artist':"حسين الجسمي",'category':"عربي حديث"},
+  {'title':"بلقيس – انتهى",'artist':"بلقيس",'category':"عربي حديث"},
+  {'title':"تامر حسني – قرب حبيبي",'artist':"تامر حسني",'category':"عربي حديث"},
+  {'title':"مصطفى قمر – السود عيونه",'artist':"مصطفى قمر",'category':"عربي حديث"},
+  {'title':"رامي صبري – يمكن خير",'artist':"رامي صبري",'category':"عربي حديث"},
+  {'title':"أبو – 3 دقات",'artist':"أبو",'category':"عربي حديث"},
+  {'title':"مسار إجباري – نهايات الحكاوي",'artist':"مسار إجباري",'category':"عربي حديث"},
+  {'title':"ويجز – البخت",'artist':"ويجز",'category':"عربي حديث"},
+  {'title':"عزيز مرقة – مين قال",'artist':"عزيز مرقة",'category':"عربي حديث"},
+  {'title':"كاظم الساهر – بغداد",'artist':"كاظم الساهر",'category':"عراقي حديث"},
+  {'title':"نصرت البدر – تعال",'artist':"نصرت البدر",'category':"عراقي حديث"},
+  {'title':"حسام الرسام – هذا العراق",'artist':"حسام الرسام",'category':"عراقي حديث"},
+  {'title':"علي جاسم – عندي احساس",'artist':"علي جاسم",'category':"عراقي حديث"},
+  {'title':"محمد السالم – قلب قلب",'artist':"محمد السالم",'category':"عراقي حديث"},
+  {'title':"أصيل هميم – سر الحياة",'artist':"أصيل هميم",'category':"عراقي حديث"},
+  {'title':"رحمة رياض – أصعد للكمر",'artist':"رحمة رياض",'category':"عراقي حديث"},
+  {'title':"سعدون جابر – اعبر على جفوني",'artist':"سعدون جابر",'category':"عراقي وتراث"},
+  {'title':"فاضل عواد – لا خبر",'artist':"فاضل عواد",'category':"عراقي وتراث"},
+  {'title':"ناظم الغزالي – ميحانة",'artist':"ناظم الغزالي",'category':"عراقي وتراث"},
+  {'title':"Elton John – Your Song",'artist':"Elton John",'category':"عالمي"},
+  {'title':"Michael Jackson – Billie Jean",'artist':"Michael Jackson",'category':"عالمي"},
+  {'title':"ABBA – Dancing Queen",'artist':"ABBA",'category':"عالمي"},
+  {'title':"Eagles – Hotel California",'artist':"Eagles",'category':"عالمي"},
+  {'title':"John Lennon – Imagine",'artist':"John Lennon",'category':"عالمي"},
+  {'title':"Whitney Houston – I Will Always Love You",'artist':"Whitney Houston",'category':"عالمي"},
+  {'title':"Bruno Mars – Just the Way You Are",'artist':"Bruno Mars",'category':"عالمي"},
+  {'title':"Taylor Swift – Love Story",'artist':"Taylor Swift",'category':"عالمي"},
+  {'title':"OneRepublic – Counting Stars",'artist':"OneRepublic",'category':"عالمي"},
+  {'title':"Hans Zimmer – Time",'artist':"Hans Zimmer",'category':"موسيقى تصويرية"},
+  {'title':"Hans Zimmer – Interstellar Main Theme",'artist':"Hans Zimmer",'category':"موسيقى تصويرية"},
+  {'title':"John Williams – Hedwig's Theme",'artist':"John Williams",'category':"موسيقى تصويرية"},
+  {'title':"Ennio Morricone – Gabriel's Oboe",'artist':"Ennio Morricone",'category':"موسيقى تصويرية"},
+  {'title':"Ramin Djawadi – Light of the Seven",'artist':"Ramin Djawadi",'category':"موسيقى تصويرية"},
+ ];
+ List<Widget> _featuredCards()=>featuredTracks.map((track)=>Card(child:ListTile(
+  leading:const CircleAvatar(child:Icon(Icons.music_note)),
+  title:Text(track['title']!),
+  subtitle:Text('${track['artist']} • ${track['category']}'),
+  trailing:const Icon(Icons.open_in_new),
+  onTap:()=>openFeatured(track),
+ ))).toList();
+ Future<void> openFeatured(Map<String,String> track) async {
+  final query='${track['artist']} ${track['title']} official audio';
+  final uri=Uri.https('www.youtube.com','/results',{'search_query':query});
+  try { await launchUrl(uri,mode:LaunchMode.externalApplication); }
+  catch (_) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر فتح نتائج الموسيقى'))); }
+ }
+
  bool validYoutube(String value) => isSupportedYoutubeUrl(value);
  Future<void> add() async {
   if(title.text.trim().isEmpty||!validYoutube(url.text)) {
@@ -497,10 +624,12 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
     stream:db2.collection('mediaLinks').orderBy('createdAt',descending:true).limit(100).snapshots(),
     builder:(c,s){
-     if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
+     if(s.hasError)return ListView(padding:const EdgeInsets.all(12),children:[const Text('تعذر تحميل روابط الأعضاء حالياً؛ دليل الموسيقى الجاهز متاح أدناه.'),..._featuredCards()]);
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
-     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو روابط بعد. أضف أول أغنية أو فيديو'));
-     return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
+          return ListView(padding:const EdgeInsets.all(12),children:[
+     Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 100 اختيار من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
+     ..._featuredCards(),
+     ...s.data!.docs.map((doc){
       final d=doc.data();
       return Card(child:ListTile(
        leading:const CircleAvatar(child:Icon(Icons.play_arrow)),
@@ -509,7 +638,8 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
        trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو')),
        onTap:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو'),
       ));
-     }).toList());
+     }),
+    ]);
     },
    ),
   ),
@@ -543,4 +673,67 @@ class _RegionVoicePlayerState extends State<_RegionVoicePlayer>{
    });
   })),
  ]));
+}
+
+
+/// أدوات شخصية خفيفة: حساب العمر والبرج الفلكي للترفيه فقط.
+class LifeToolsPage extends StatefulWidget {
+ const LifeToolsPage({super.key});
+ @override State<LifeToolsPage> createState()=>_LifeToolsPageState();
+}
+class _LifeToolsPageState extends State<LifeToolsPage> {
+ DateTime? birthday;
+ String get ageDetail {
+  final b=birthday!, now=DateTime.now();
+  var years=now.year-b.year, months=now.month-b.month, days=now.day-b.day;
+  if(days<0){final previous=DateTime(now.year,now.month,0);days+=previous.day;months--;}
+  if(months<0){months+=12;years--;}
+  return '$years سنة • $months شهر • $days يوم';
+ }
+ String get zodiac {
+  final d=birthday!; final m=d.month, day=d.day;
+  if((m==3&&day>=21)||(m==4&&day<=19))return 'الحمل ♈';
+  if((m==4&&day>=20)||(m==5&&day<=20))return 'الثور ♉';
+  if((m==5&&day>=21)||(m==6&&day<=20))return 'الجوزاء ♊';
+  if((m==6&&day>=21)||(m==7&&day<=22))return 'السرطان ♋';
+  if((m==7&&day>=23)||(m==8&&day<=22))return 'الأسد ♌';
+  if((m==8&&day>=23)||(m==9&&day<=22))return 'العذراء ♍';
+  if((m==9&&day>=23)||(m==10&&day<=22))return 'الميزان ♎';
+  if((m==10&&day>=23)||(m==11&&day<=21))return 'العقرب ♏';
+  if((m==11&&day>=22)||(m==12&&day<=21))return 'القوس ♐';
+  if((m==12&&day>=22)||(m==1&&day<=19))return 'الجدي ♑';
+  if((m==1&&day>=20)||(m==2&&day<=18))return 'الدلو ♒';
+  return 'الحوت ♓';
+ }
+ Future<void> chooseBirthday() async {
+  final now=DateTime.now();
+  final picked=await showDatePicker(context:context,initialDate:birthday??DateTime(now.year-18,now.month,now.day),firstDate:DateTime(1900),lastDate:now,helpText:'اختر تاريخ ميلادك');
+  if(picked!=null)setState(()=>birthday=picked);
+ }
+ @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('أدوات العمر والأبراج')),
+  body:ListView(padding:const EdgeInsets.all(18),children:[
+   Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    const Icon(Icons.cake_rounded,size:48,color:p),
+    const SizedBox(height:8),
+    const Text('حاسبة العمر',textAlign:TextAlign.center,style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
+    const Text('اعرف عمرك بالسنوات والأشهر والأيام',textAlign:TextAlign.center),
+    const SizedBox(height:16),
+    OutlinedButton.icon(onPressed:chooseBirthday,icon:const Icon(Icons.calendar_month),label:Text(birthday==null?'اختيار تاريخ الميلاد':'تاريخ الميلاد: ${birthday!.year}/${birthday!.month}/${birthday!.day}')),
+    if(birthday!=null)...[
+     const SizedBox(height:12),
+     Text(ageDetail,textAlign:TextAlign.center,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:p)),
+     Text('عمرك بالأيام تقريباً: ${DateTime.now().difference(birthday!).inDays} يوم',textAlign:TextAlign.center),
+     const Divider(height:28),
+     Text('برجك: $zodiac',textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),
+    ]
+   ]))),
+   const SizedBox(height:12),
+   const Card(child:Padding(padding:EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text('عن الأبراج',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+    SizedBox(height:8),
+    Text('الأبراج هنا للتسلية والتعرّف على التقسيمات الفلكية الشائعة فقط؛ لا تتنبأ بالمستقبل ولا تحدد الشخصية أو القرارات.'),
+   ]))),
+  ]),
+ ));
 }

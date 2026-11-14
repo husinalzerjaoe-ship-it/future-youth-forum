@@ -18,11 +18,49 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
   final _url = TextEditingController();
   final _name = TextEditingController(text: 'غرفة مشاهدة');
   bool _creating = false;
+  bool _privateRoom = false;
+  final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void dispose() { _url.dispose(); _name.dispose(); super.dispose(); }
+
+  Future<void> _chooseFriends() async {
+    final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
+    if (!mounted) return;
+    final chosen = Set<String>.from(_invitedUids);
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, updateSheet) =>
+        Directionality(textDirection: TextDirection.rtl, child: SafeArea(
+          child: SizedBox(height: MediaQuery.of(sheetContext).size.height * .65,
+            child: Column(children: [
+              const Padding(padding: EdgeInsets.all(14), child: Text('اختَر أصدقاء الغرفة الخاصة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(child: ListView(children: profiles.docs.where((p) => p.id != _uid).map((p) {
+                final d = p.data();
+                final selected = chosen.contains(p.id);
+                final photo = (d['photoUrl'] ?? '').toString();
+                return CheckboxListTile(
+                  value: selected,
+                  secondary: CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                    child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                  title: Text((d['name'] ?? 'عضو').toString()),
+                  onChanged: (value) => updateSheet(() {
+                    if (value == true) chosen.add(p.id); else chosen.remove(p.id);
+                  }),
+                );
+              }).toList())),
+              Padding(padding: const EdgeInsets.all(12), child: FilledButton(
+                onPressed: () { _invitedUids..clear()..addAll(chosen); Navigator.pop(sheetContext); if (mounted) setState(() {}); },
+                child: Text('تأكيد الاختيار (${chosen.length})'),
+              )),
+            ]),
+          ),
+        )),
+      ),
+    );
+  }
 
   Future<void> _createRoom() async {
     final raw = _url.text.trim();
@@ -47,12 +85,26 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         'sourceType': videoId == null ? 'direct' : 'youtube',
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
+        'visibility': _privateRoom ? 'private' : 'public',
+        'invitedUids': _privateRoom ? _invitedUids.toList() : <String>[],
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
         'active': true,
       });
+      if (_privateRoom && _invitedUids.isNotEmpty) {
+        final me = await _watchDb.collection('publicProfiles').doc(_uid).get();
+        final actorName = (me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'صديق').toString();
+        for (final friendUid in _invitedUids) {
+          await _watchDb.collection('notifications').add({
+            'recipientId': friendUid, 'actorId': _uid, 'actorName': actorName,
+            'type': 'message', 'text': 'دعاك إلى غرفة مشاهدة خاصة: ${_name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim()}',
+            'read': false, 'targetType': 'watchRoom', 'targetId': ref.id,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: ref.id)));
     } catch (_) {
@@ -76,7 +128,18 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
             const SizedBox(height: 12),
             TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم الغرفة', border: OutlineInputBorder())),
             const SizedBox(height: 10),
-            TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط يوتيوب أو رابط فيديو مباشر', hintText: 'https://', border: OutlineInputBorder())),
+            TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط يوتيوب أو فيديو تملكه/مصرّح بمشاركته', hintText: 'https://', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero, value: _privateRoom,
+              title: const Text('غرفة خاصة للأصدقاء'),
+              subtitle: const Text('لا تظهر للعامة؛ فقط أنت والأصدقاء الذين تختارهم'),
+              onChanged: (value) => setState(() { _privateRoom = value; if (!value) _invitedUids.clear(); }),
+            ),
+            if (_privateRoom) OutlinedButton.icon(
+              onPressed: _chooseFriends, icon: const Icon(Icons.group_add),
+              label: Text('اختيار الأصدقاء (${_invitedUids.length})'),
+            ),
             if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: const TextStyle(color: Colors.red))),
             const SizedBox(height: 12),
             FilledButton.icon(onPressed: _creating ? null : _createRoom, icon: const Icon(Icons.play_circle_fill), label: Text(_creating ? 'جارٍ الإنشاء...' : 'إنشاء غرفة وتشغيل الفيديو')),
@@ -85,7 +148,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         const SizedBox(height: 12),
         const Text('الغرف المباشرة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).limit(40).snapshots(),
+          stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).where('visibility', isEqualTo: 'public').limit(40).snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الغرف. تحقق من قواعد Firestore.'));
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
