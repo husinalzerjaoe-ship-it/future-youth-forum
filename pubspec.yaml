@@ -16,6 +16,8 @@ dependencies:
   cloud_functions: ^7.0.1
   cloud_firestore: ^7.1.0
   image_picker: ^1.1.2
+  record: ^6.1.2
+  path_provider: ^2.1.5
   video_player: ^2.9.2
   youtube_player_iframe: ^5.2.2
   url_launcher: ^6.3.2
