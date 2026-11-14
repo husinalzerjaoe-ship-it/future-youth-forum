@@ -399,7 +399,9 @@ class _TreasureRoomPageState extends State<TreasureRoomPage> {
         if (treasures.contains(target)) { scores[_uid] = (scores[_uid] as num? ?? 0).toInt() + 1; treasures.remove(target); }
         final moves = (d['moves'] as num? ?? 0).toInt() + 1;
         final ended = treasures.isEmpty || moves >= 36;
-        final winner = ended ? (members.firstWhere((m) => (scores[m] as num? ?? 0) == members.map((id) => (scores[id] as num? ?? 0)).reduce(max))) : '';
+        final topScore = members.map((id) => (scores[id] as num? ?? 0).toInt()).reduce(max);
+        final leaders = members.where((id) => (scores[id] as num? ?? 0).toInt() == topScore).toList();
+        final winner = ended && leaders.length == 1 ? leaders.first : '';
         final next = members.firstWhere((m) => m != _uid);
         tx.update(_room, {'positions': positions, 'treasures': treasures, 'scores': scores, 'moves': moves, 'turn': ended ? '' : next, 'winner': winner, 'status': ended ? 'finished' : 'playing', 'updatedAt': FieldValue.serverTimestamp()});
       });
@@ -429,6 +431,16 @@ class _TreasureRoomPageState extends State<TreasureRoomPage> {
             Text(names[m]?.toString() ?? 'لاعب', style: const TextStyle(fontWeight: FontWeight.bold)),
             Text('⭐ ${scores[m] ?? 0}'),
           ])).toList()))),
+          Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('تقدّم جمع الكنوز', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('${6 - treasures.length}/6 💎'),
+            ]),
+            const SizedBox(height: 8),
+            ClipRRect(borderRadius: BorderRadius.circular(20), child: LinearProgressIndicator(value: (6 - treasures.length) / 6, minHeight: 9)),
+            const SizedBox(height: 6),
+            Text('الحركات: ${d['moves'] ?? 0}/36', style: const TextStyle(fontSize: 12)),
+          ]))),
           Card(child: Padding(padding: const EdgeInsets.all(10), child: Text(
             d['status'] == 'waiting' ? 'أرسل الدعوة أو شارك الرمز ${widget.roomId}' :
             d['status'] == 'finished' ? (winner == _uid ? 'فزت بالمغامرة! 🏆' : winner.isEmpty ? 'تعادل!' : 'فاز صديقك!') :
@@ -449,14 +461,14 @@ class _TreasureRoomPageState extends State<TreasureRoomPage> {
                 final row = i ~/ 7, col = i % 7;
                 final current = mine >= 0 ? positions[mine] : -1;
                 final canMove = myTurn && ((row-current~/7).abs() + (col-current%7).abs() == 1) && !positions.contains(i);
-                return InkWell(onTap: canMove && !_busy ? () => _move(i,d) : null, child: AnimatedContainer(duration: const Duration(milliseconds: 180),
+                return InkWell(onTap: canMove && !_busy ? () { HapticFeedback.selectionClick(); _move(i,d); } : null, child: AnimatedContainer(duration: const Duration(milliseconds: 180),
                   decoration: BoxDecoration(color: me ? _arenaPurple : other ? Colors.teal : treasure ? Colors.amber.withValues(alpha:.25) : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(9), border: Border.all(color: canMove ? Colors.green : Colors.transparent, width: 2)),
                   child: Center(child: Text(me ? '🧙' : other ? '🛡️' : treasure ? '💎' : '', style: const TextStyle(fontSize: 21))),
                 ));
               },
             )),
           ],
-          if (d['status'] == 'finished') FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.home), label: const Text('العودة للألعاب')),
+          if (d['status'] == 'finished') FilledButton.icon(onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TreasureLobbyPage())), icon: const Icon(Icons.replay_rounded), label: const Text('ابدأ مغامرة جديدة')),
           const SizedBox(height: 8),
           SelectableText('رمز الغرفة: ${widget.roomId}', textAlign: TextAlign.center),
           TextButton.icon(onPressed: () => Clipboard.setData(ClipboardData(text: widget.roomId)), icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
