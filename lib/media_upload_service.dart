@@ -36,20 +36,44 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Existing accounts may predate the onUserCreated trigger. This callable
-  // safely adds role=authenticated to the current user's custom claims.
-  await FirebaseFunctions.instance
-      .httpsCallable('ensureSupabaseAuthenticatedRole')
-      .call();
-
-  final token = await user.getIdToken(true);
-  if (token == null || token.split('.').length != 3) {
-    throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
+  // Check the current Firebase token first. Accounts that already have the
+  // Supabase role must not depend on a callable function being deployed.
+  String? token = await user.getIdToken();
+  Map<String, dynamic> readClaims(String value) {
+    final parts = value.split('.');
+    if (parts.length != 3) {
+      throw StateError('رمز تسجيل الدخول غير صالح. سجّل خروج وادخل من جديد.');
+    }
+    return jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+    ) as Map<String, dynamic>;
   }
-  final payload = token.split('.')[1];
-  final claims = jsonDecode(
-    utf8.decode(base64Url.decode(base64Url.normalize(payload))),
-  ) as Map<String, dynamic>;
+
+  var claims = readClaims(token ?? '');
+  if (claims['role'] != 'authenticated') {
+    // Existing accounts may predate the onUserCreated trigger. This callable
+    // safely adds role=authenticated to the current user's custom claims.
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('ensureSupabaseAuthenticatedRole')
+          .call();
+    } on FirebaseFunctionsException catch (error) {
+      if (error.code == 'not-found') {
+        throw StateError(
+          'خدمة تفعيل رفع الصور غير منشورة على Firebase بعد. '
+          'يلزم نشر ensureSupabaseAuthenticatedRole أو تفعيل الصلاحية '
+          'للحساب من الخادم، ثم إعادة المحاولة.',
+        );
+      }
+      rethrow;
+    }
+    token = await user.getIdToken(true);
+    if (token == null) {
+      throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
+    }
+    claims = readClaims(token);
+  }
+
   if (claims['role'] != 'authenticated') {
     throw StateError('صلاحية التخزين لم تتحدث بعد. أعد المحاولة بعد لحظات.');
   }

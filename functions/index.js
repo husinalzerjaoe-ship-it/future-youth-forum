@@ -40,6 +40,43 @@ exports.addSupabaseAuthenticatedRole = onUserCreated(async (event) => {
 });
 
 
+// Claim the daily check-in reward on the trusted server. The unique
+// per-user/per-Baghdad-date marker makes repeated taps and retries idempotent.
+exports.claimDailyCheckIn = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Baghdad",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const dateKey = `${values.year}-${values.month}-${values.day}`;
+  const uid = request.auth.uid;
+  const marker = adminDb.collection("dailyCheckIns").doc(`${uid}_${dateKey}`);
+  const profile = adminDb.collection("publicProfiles").doc(uid);
+  let awarded = false;
+  await adminDb.runTransaction(async (tx) => {
+    const seen = await tx.get(marker);
+    if (seen.exists) return;
+    tx.create(marker, {
+      uid,
+      date: dateKey,
+      points: 10,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    tx.set(profile, {
+      points: FieldValue.increment(10),
+      checkInCount: FieldValue.increment(1),
+      lastCheckIn: dateKey,
+    }, { merge: true });
+    awarded = true;
+  });
+  return { awarded, points: awarded ? 10 : 0, date: dateKey };
+});
+
 // Award engagement points on the trusted server, not from the mobile client.
 // Event markers make retries idempotent. Weekly totals use an ISO-like Monday key.
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");

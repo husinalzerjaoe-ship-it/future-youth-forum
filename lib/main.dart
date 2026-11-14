@@ -340,9 +340,12 @@ class PostsPage extends StatelessWidget {
                       style: TextStyle(color: Color(0xFFFFD66B), fontSize: 16, fontWeight: FontWeight.bold, height: 1.6)),
                     SizedBox(height: 12),
                     Text(
-                      'أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.\\n\\n'
-                      'وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.\\n\\n'
-                      'قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.\\n— Alfredo | المطوّر 👑',
+                      '''أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.
+
+وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.
+
+قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.
+— Alfredo | المطوّر 👑''',
                       style: TextStyle(color: Colors.white, fontSize: 14, height: 1.8)),
                   ],
                 ),
@@ -562,14 +565,11 @@ class MyProfilePage extends StatelessWidget {
         return ListView(padding: const EdgeInsets.all(18), children: [
           const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
-          Center(child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFFFB52E) : brand, width: 4),
-            ),
-            child: UserAvatar(url: d['photoUrl'] as String?),
-          )),
+          if ((d['coverUrl'] as String? ?? '').startsWith('https://'))
+            ClipRRect(borderRadius: BorderRadius.circular(18), child: Image.network(d['coverUrl'] as String, height: 135, width: double.infinity, fit: BoxFit.cover,
+              errorBuilder: (c,e,s)=>const SizedBox(height: 12))),
+          Center(child: _FramedAvatar(url: d['photoUrl'] as String?, frame: d['avatarFrame'] as String?,
+            founder: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')),
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
@@ -664,7 +664,8 @@ class EditProfilePage extends StatefulWidget {
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 class _EditProfilePageState extends State<EditProfilePage> {
-  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController();
+  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController(), cover = TextEditingController();
+  String avatarFrame = 'none';
   bool loading = true, saving = false, uploadingPhoto = false;
   @override
   void initState() {
@@ -674,11 +675,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
       name.text = d['name'] as String? ?? '';
       bio.text = d['bio'] as String? ?? '';
       photo.text = d['photoUrl'] as String? ?? '';
+      cover.text = d['coverUrl'] as String? ?? '';
+      avatarFrame = d['avatarFrame'] as String? ?? 'none';
       if (mounted) setState(() => loading = false);
     });
   }
   @override
-  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); cover.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
     appBar: AppBar(title: const Text('تعديل الملف الشخصي')),
@@ -687,7 +690,41 @@ class _EditProfilePageState extends State<EditProfilePage> {
       const SizedBox(height: 12),
       TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
       const SizedBox(height: 12),
-      TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
+      Center(child: CircleAvatar(radius: 42, backgroundImage: photo.text.startsWith('https://') ? NetworkImage(photo.text) : null,
+        child: photo.text.startsWith('https://') ? null : const Icon(Icons.person, size: 42))),
+      const SizedBox(height: 8),
+      TextField(controller: photo, keyboardType: TextInputType.url, onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
+      const SizedBox(height: 12),
+      TextField(controller: cover, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط صورة الغلاف (اختياري)', border: OutlineInputBorder())),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        onPressed: uploadingPhoto ? null : () async {
+          try {
+            final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 82, maxWidth: 1800);
+            if (picked == null) return;
+            setState(() => uploadingPhoto = true);
+            cover.text = await uploadForumMedia(picked, folder: 'profiles');
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع الغلاف')));
+          } catch (e) {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع الغلاف: $e')));
+          } finally { if (mounted) setState(() => uploadingPhoto = false); }
+        },
+        icon: const Icon(Icons.wallpaper), label: const Text('اختيار صورة الغلاف'),
+      ),
+      const SizedBox(height: 8),
+      const Text('إطار الصورة'),
+      DropdownButtonFormField<String>(
+        value: avatarFrame,
+        items: const [
+          DropdownMenuItem(value: 'none', child: Text('بدون إطار')),
+          DropdownMenuItem(value: 'gold', child: Text('ذهبي')),
+          DropdownMenuItem(value: 'violet', child: Text('بنفسجي')),
+          DropdownMenuItem(value: 'cyan', child: Text('سماوي')),
+          DropdownMenuItem(value: 'rainbow', child: Text('متدرج')),
+        ],
+        onChanged: (v) => setState(() => avatarFrame = v ?? 'none'),
+      ),
       const SizedBox(height: 10),
       OutlinedButton.icon(
         onPressed: uploadingPhoto ? null : () async {
@@ -712,8 +749,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => saving = true);
         try {
           final u = FirebaseAuth.instance.currentUser!;
-          await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim(), 'coverUrl': cover.text.trim(), 'avatarFrame': avatarFrame}, SetOptions(merge: true));
           await u.updateDisplayName(name.text.trim());
+          if (photo.text.trim().startsWith('https://')) {
+            await u.updatePhotoURL(photo.text.trim());
+          }
           if (context.mounted) Navigator.pop(context);
         } catch (_) {
           if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر الحفظ. تحقق من قواعد Firestore.')));
@@ -782,7 +822,10 @@ class MemberProfilePage extends StatelessWidget {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final d = s.data!.data() ?? {};
           return ListView(padding: const EdgeInsets.all(18), children: [
-            Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+            if ((d['coverUrl'] as String? ?? '').startsWith('https://'))
+              ClipRRect(borderRadius: BorderRadius.circular(18), child: Image.network(d['coverUrl'] as String, height: 135, width: double.infinity, fit: BoxFit.cover,
+                errorBuilder: (c,e,s)=>const SizedBox(height: 12))),
+            Center(child: _FramedAvatar(url: d['photoUrl'] as String?, frame: d['avatarFrame'] as String?)),
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             Center(child: Text(d['bio'] as String? ?? '')),
@@ -1062,6 +1105,37 @@ class _MemberSearchPageState extends State<MemberSearchPage> {
             ),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+
+class _FramedAvatar extends StatelessWidget {
+  final String? url;
+  final String? frame;
+  final bool founder;
+  const _FramedAvatar({this.url, this.frame, this.founder = false});
+  @override
+  Widget build(BuildContext context) {
+    final colors = switch (frame) {
+      'gold' => [const Color(0xFFFFD76A), const Color(0xFFB77900)],
+      'violet' => [const Color(0xFFB69CFF), const Color(0xFF6554D9)],
+      'cyan' => [const Color(0xFF8DEBFF), const Color(0xFF168FA8)],
+      'rainbow' => [const Color(0xFFFF6B6B), const Color(0xFF6554D9), const Color(0xFF39C6A5)],
+      _ => founder ? [const Color(0xFFFFD76A), const Color(0xFFB77900)] : [brand, brand],
+    };
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: colors),
+        boxShadow: founder ? const [BoxShadow(color: Color(0x55FFB52E), blurRadius: 14)] : null,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).scaffoldBackgroundColor),
+        child: UserAvatar(url: url),
       ),
     );
   }

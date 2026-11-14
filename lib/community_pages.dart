@@ -17,6 +17,7 @@ import 'community_events.dart';
 import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
+import 'zodiac_age.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -36,6 +37,7 @@ class CommunityHubPage extends StatelessWidget {
    ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
    ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
    ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
+   ('الأبراج وحاسبة العمر','حاسبة دقيقة للعمر ودليل الأبراج ورسالة يومية',Icons.auto_awesome,const ZodiacAgePage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
    ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
