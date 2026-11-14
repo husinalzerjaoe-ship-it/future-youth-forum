@@ -154,12 +154,19 @@ class _WeeklyContests extends StatelessWidget {
   try{
    await _db.runTransaction((tx)async{
     final contest=_db.collection('weeklyContests').doc(contestId);
+    final membership=_db.collection('memberships').doc(uid);
     final snap=await tx.get(contest);
+    final oldMembership=await tx.get(membership);
     if(!snap.exists || snap.data()?['status']!='open') throw StateError('المسابقة مغلقة أو تم اختيار فائز مسبقاً.');
+    final now=DateTime.now();
+    final oldExpiry=oldMembership.data()?['expiresAt'];
+    final baseExpiry=oldExpiry is Timestamp && oldExpiry.toDate().isAfter(now) ? oldExpiry.toDate() : now;
+    final oldTier=(oldMembership.data()?['tier']??'premium').toString();
+    final tier=['premium','silver','gold','diamond'].contains(oldTier)?oldTier:'premium';
     tx.update(contest,{'status':'completed','winnerUid':uid,'winnerChosenAt':FieldValue.serverTimestamp()});
-    tx.set(_db.collection('memberships').doc(uid),{
-     'uid':uid,'tier':'premium',
-     'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(days:7))),
+    tx.set(membership,{
+     'uid':uid,'tier':tier,
+     'expiresAt':Timestamp.fromDate(baseExpiry.add(const Duration(days:7))),
      'grantedBy':_uid,'grantReason':'weeklyContest','grantedAt':FieldValue.serverTimestamp(),
     });
    });
