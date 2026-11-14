@@ -34,7 +34,7 @@ String? youtubeEmbedUrl(String raw) {
 bool isSupportedYoutubeUrl(String raw) => youtubeEmbedUrl(raw) != null;
 
 bool _isDirectVideoUrl(Uri uri) =>
-    RegExp(r'\.(mp4|m4v|mov|webm|m3u8), caseSensitive: false).hasMatch(uri.path);
+    RegExp(r'\.(mp4|m4v|mov|webm|m3u8).hasMatch(uri.path);
 
 class YouTubeVideoPlayer extends StatefulWidget {
   final String url;
@@ -171,8 +171,7 @@ class YouTubeWatchPage extends StatelessWidget {
       ]),
     ),
   );
-}
-, caseSensitive: false).hasMatch(uri.path);
+}, caseSensitive: false).hasMatch(uri.path);
 
 class YouTubeVideoPlayer extends StatefulWidget {
   final String url;
