@@ -1,0 +1,30 @@
+name: Initialize Supabase Firebase Auth Claims
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  initialize-claims:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Firebase service account
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Firebase Admin SDK
+        run: npm install --prefix functions
+
+      - name: Add Supabase authenticated claim to existing Firebase users
+        run: node functions/scripts/set_existing_users_role.js
