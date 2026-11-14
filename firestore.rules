@@ -51,7 +51,13 @@ service cloud.firestore {
           || isFounder());
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.uploaderId == request.auth.uid
-        && request.resource.data.status == 'pending'
+        && (
+          (request.resource.data.get('category', '') == 'music'
+            && request.resource.data.status == 'approved'
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+          || (request.resource.data.get('category', '') != 'music'
+            && request.resource.data.status == 'pending')
+        )
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 100
@@ -179,22 +185,34 @@ service cloud.firestore {
     }
 
     match /watchRooms/{roomId} {
-      allow read: if request.auth != null;
+      function canAccessRoom() {
+        let room = get(/databases/$(database)/documents/watchRooms/$(roomId)).data;
+        return request.auth != null && (
+          room.visibility != 'private'
+          || room.hostUid == request.auth.uid
+          || (room.invitedUids is list && request.auth.uid in room.invitedUids)
+        );
+      }
+      allow read: if canAccessRoom();
       allow create: if request.auth != null
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.url is string
         && request.resource.data.sourceType in ['youtube', 'direct']
         && request.resource.data.status == 'paused'
-        && request.resource.data.active == true;
+        && request.resource.data.active == true
+        && request.resource.data.visibility in ['public', 'private']
+        && request.resource.data.invitedUids is list
+        && request.resource.data.invitedUids.size() <= 50
+        && (request.resource.data.visibility != 'private' || request.auth.uid in request.resource.data.invitedUids || request.resource.data.invitedUids.size() == 0);
       allow update: if request.auth != null
         && resource.data.hostUid == request.auth.uid
         && request.resource.data.hostUid == resource.data.hostUid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'positionSeconds', 'updatedAt', 'active']);
       allow delete: if request.auth != null && (resource.data.hostUid == request.auth.uid || isFounder());
       match /participants/{userId} {
-        allow read: if request.auth != null;
-        allow create, update: if request.auth != null && request.auth.uid == userId
+        allow read: if canAccessRoom();
+        allow create, update: if canAccessRoom() && request.auth.uid == userId
           && request.resource.data.uid == request.auth.uid
           && request.resource.data.name is string
           && request.resource.data.name.size() <= 60
@@ -593,7 +611,26 @@ service cloud.firestore {
         && request.resource.data.to is string
         && request.resource.data.to != request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.game in ['general', 'football', 'player', 'speed'];
+        && request.resource.data.game in ['general', 'football', 'player', 'speed', 'xo']
+        && (
+          (request.resource.data.game in ['general', 'player', 'speed'])
+          || (request.resource.data.game == 'football'
+            && !('roomId' in request.resource.data))
+          || (request.resource.data.game == 'xo'
+            && request.resource.data.roomId is string
+            && exists(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId))
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.hostId == request.auth.uid
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.game == 'xo'
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.status == 'waiting'
+            && !(request.resource.data.to in get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.members))
+          || (request.resource.data.game == 'football'
+            && request.resource.data.roomId is string
+            && exists(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId))
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.hostId == request.auth.uid
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.game == 'football_quiz'
+            && get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.status == 'waiting'
+            && !(request.resource.data.to in get(/databases/$(database)/documents/gameRooms/$(request.resource.data.roomId)).data.members))
+        );
       allow read: if request.auth != null
         && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
       allow update: if request.auth != null
@@ -807,7 +844,13 @@ service cloud.firestore {
           || isFounder());
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.uploaderId == request.auth.uid
-        && request.resource.data.status == 'pending'
+        && (
+          (request.resource.data.get('category', '') == 'music'
+            && request.resource.data.status == 'approved'
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+          || (request.resource.data.get('category', '') != 'music'
+            && request.resource.data.status == 'pending')
+        )
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 160
@@ -973,7 +1016,9 @@ service cloud.firestore {
             && request.resource.data.board is list
             && request.resource.data.board.size() == 9
             && request.resource.data.turn == request.auth.uid
-            && request.resource.data.winner == '')
+            && request.resource.data.winner == ''
+            && request.resource.data.roomCode is string
+            && request.resource.data.roomCode.matches('^[0-9]{6}$'))
           ||
           (request.resource.data.game == 'football_quiz'
             && request.resource.data.round == 0
