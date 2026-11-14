@@ -7,6 +7,8 @@ import 'package:audio_service/audio_service.dart';
 import 'local_audio_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'media_upload_service.dart';
 import 'download_service.dart';
@@ -137,27 +139,68 @@ class PrivateRoomChatPage extends StatefulWidget {
  @override State<PrivateRoomChatPage> createState()=>_PrivateRoomChatPageState();
 }
 class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
- final db=FirebaseFirestore.instance;final text=TextEditingController();bool busy=false;
+ final db=FirebaseFirestore.instance;final text=TextEditingController();final recorder=AudioRecorder();bool busy=false;bool recordingVoice=false;DateTime? voiceStartedAt;
  int _background=0xFFF5F3FF;
  static const _roomBackgrounds=[0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5,0xFFEDE7F6,0xFFE0F2F1,0xFFFFF8E1,0xFFE3F2FD,0xFF263238,0xFFFCE4EC];
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
- Future<void> send() async {
-  final value=text.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
-  try{
-   await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'text':value,'createdAt':FieldValue.serverTimestamp()});
-   await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':value.length>200?value.substring(0,200):value,'updatedAt':FieldValue.serverTimestamp()});text.clear();
-  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الإرسال: '+e.toString())));}
-  finally{if(mounted)setState(()=>busy=false);}
- }
- @override void dispose(){text.dispose();super.dispose();}
+ Future<void> send({String? imageUrl,String? audioUrl,int? durationSeconds}) async {
+   final value=text.text.trim();if((value.isEmpty&&imageUrl==null&&audioUrl==null)||busy)return;setState(()=>busy=true);
+   try{
+    final type=audioUrl!=null?'voice':imageUrl!=null?'image':'text';
+    await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({
+     'senderId':uid,'text':value,'type':type,
+     if(imageUrl!=null)'imageUrl':imageUrl,
+     if(audioUrl!=null)'audioUrl':audioUrl,
+     if(durationSeconds!=null)'durationSeconds':durationSeconds,
+     'createdAt':FieldValue.serverTimestamp()
+    });
+    final last=audioUrl!=null?'🎙️ رسالة صوتية':imageUrl!=null?'📷 صورة':value;
+    await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':last.length>200?last.substring(0,200):last,'updatedAt':FieldValue.serverTimestamp()});
+    text.clear();
+   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الإرسال: '+e.toString())));}
+   finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> sendImage() async {
+   final picked=await ImagePicker().pickImage(source:ImageSource.gallery,imageQuality:85,maxWidth:1600);
+   if(picked==null||!mounted)return;
+   setState(()=>busy=true);
+   try{final url=await uploadForumMedia(picked,folder:'private-chat');if(mounted)setState(()=>busy=false);await send(imageUrl:url);}
+   catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر رفع الصورة: '+e.toString())));}
+   finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> toggleVoice() async {
+   if(busy)return;
+   if(!recordingVoice){
+    try{
+     if(!await recorder.hasPermission()){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اسمح للتطبيق باستخدام المايكروفون أولاً.')));return;}
+     final dir=await getTemporaryDirectory();
+     final path=dir.path+'/private_room_voice_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
+     await recorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:64000,sampleRate:44100),path:path);
+     if(mounted)setState(() { recordingVoice=true; voiceStartedAt=DateTime.now(); });
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر بدء التسجيل: '+e.toString())));}
+    return;
+   }
+   try{
+    final started=voiceStartedAt;final path=await recorder.stop();
+    if(mounted)setState(() { recordingVoice=false; voiceStartedAt=null; });
+    if(path==null||started==null)return;
+    final seconds=DateTime.now().difference(started).inSeconds.clamp(1,180).toInt();
+    if(mounted)setState(()=>busy=true);
+    final url=await uploadForumMedia(XFile(path,name:'private_room_voice.m4a'),folder:'private-chat');
+    if(mounted)setState(()=>busy=false);
+    await send(audioUrl:url,durationSeconds:seconds);
+   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الفويس: '+e.toString())));}
+   finally{if(mounted)setState(() { busy=false; recordingVoice=false; voiceStartedAt=null; });}
+  }
+ @override void dispose(){text.dispose();recorder.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName),actions:[
   IconButton(tooltip:'خلفية المحادثة',icon:const Icon(Icons.palette_outlined),onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_roomBackgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:const Text('اختيار هذه الخلفية'),onTap:(){Navigator.pop(c);setState(()=>_background=v);})).toList())))
  ]),body:Column(children:[
   Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
    if(s.hasError)return const Center(child:Text('تعذر تحميل الرسائل'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
-   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Text(x['text'] as String? ?? '',style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))));}).toList());
+   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(x['type']=='image'&&x['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(10),child:Image.network(x['imageUrl'] as String,width:220,fit:BoxFit.cover)),if(x['type']=='voice'&&x['audioUrl'] is String)_PrivateRoomVoicePlayer(url:x['audioUrl'] as String,durationSeconds:(x['durationSeconds'] as num?)?.toInt()??0),if((x['text'] as String? ?? '').isNotEmpty)Text(x['text'] as String,style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))])));}).toList());
   }))),
-  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
+  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[IconButton(onPressed:busy?null:sendImage,icon:const Icon(Icons.image_outlined)),IconButton(onPressed:busy?null:toggleVoice,tooltip:recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(recordingVoice?Icons.stop_circle:Icons.mic,color:recordingVoice?Colors.red:Colors.deepPurple)),Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:InputDecoration(hintText:recordingVoice?'جاري تسجيل الفويس...':'اكتب رسالة واضحة...',border:const OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:()=>send(),icon:const Icon(Icons.send))])))
  ]));
 }
 
@@ -380,4 +423,20 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
    const Padding(padding:EdgeInsets.all(10),child:Text('التشغيل بالخلفية يستخدم مشغل Android. مشاركة الأغاني تمر بمراجعة الإدارة.',style:TextStyle(fontSize:12)))
   ])
  );
+}
+
+
+class _PrivateRoomVoicePlayer extends StatefulWidget {
+ final String url;final int durationSeconds;
+ const _PrivateRoomVoicePlayer({required this.url,required this.durationSeconds});
+ @override State<_PrivateRoomVoicePlayer> createState()=>_PrivateRoomVoicePlayerState();
+}
+class _PrivateRoomVoicePlayerState extends State<_PrivateRoomVoicePlayer>{
+ late final AudioPlayer player;
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _){});}
+ @override void dispose(){player.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>SizedBox(width:220,child:Row(children:[
+  StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){final playing=s.data?.playing??false;return IconButton(onPressed:()async{if(playing){await player.pause();}else{await player.play();}},icon:Icon(playing?Icons.pause_circle:Icons.play_circle,color:Colors.deepPurple,size:30));}),
+  Expanded(child:StreamBuilder<Duration?>(stream:player.durationStream,builder:(c,d){final total=d.data??Duration(seconds:widget.durationSeconds);return StreamBuilder<Duration>(stream:player.positionStream,builder:(c,pos){final now=pos.data??Duration.zero,max=total.inMilliseconds;return Column(mainAxisSize:MainAxisSize.min,children:[Slider(value:max<=0?0:now.inMilliseconds.clamp(0,max).toDouble(),max:max<=0?1:max.toDouble(),onChanged:max<=0?null:(v)=>player.seek(Duration(milliseconds:v.round()))),Text(now.inSeconds.toString()+'s / '+total.inSeconds.toString()+'s',style:const TextStyle(fontSize:10))]);});})),
+ ]));
 }
