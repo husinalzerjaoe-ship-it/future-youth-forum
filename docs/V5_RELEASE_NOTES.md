@@ -2,6 +2,7 @@
 
 ## Added
 - Exposes the existing Daily World experience directly in the Community Hub: age and birthday countdown, daily reflection, mood check-in, daily challenge, and an istikhara guide.
+- Saves the birthday, daily mood, completed challenge, and private journal note locally on the device; no journal text is uploaded.
 - Refreshes the Community Hub heading and description so it represents the full Future Youth Forum rather than only anime spaces.
 - Keeps the existing V4.4 chat, media, music, stories, games, points, events, polls, watch-party, profile, and call features intact.
 - Updates the Android app version to 4.5.0+16.
