@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -10,6 +11,9 @@ import 'package:audio_service/audio_service.dart';
 import 'local_audio_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'media_upload_service.dart';
 
 
@@ -94,7 +98,7 @@ class PrivateRoomChatPage extends StatefulWidget {
  @override State<PrivateRoomChatPage> createState()=>_PrivateRoomChatPageState();
 }
 class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
- final db=FirebaseFirestore.instance;final text=TextEditingController();bool unlocked=false,busy=false;
+ final db=FirebaseFirestore.instance;final text=TextEditingController();final AudioRecorder voiceRecorder=AudioRecorder();bool unlocked=false,busy=false,recording=false;String? voicePath;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
  Future<void> unlock() async {
   final code=TextEditingController();
@@ -106,21 +110,54 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
   }catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('الرمز غير صحيح أو أنك لست ضمن المدعوين')));}
   code.dispose();
  }
- Future<void> send() async {
-  final value=text.text.trim();if(value.isEmpty||busy)return;setState(()=>busy=true);
+ Future<void> send({String? audioUrl}) async {
+  final value=text.text.trim();if((value.isEmpty&&audioUrl==null)||busy)return;setState(()=>busy=true);
   try{
-   await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'text':value,'createdAt':FieldValue.serverTimestamp()});
-   await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':value.length>200?value.substring(0,200):value,'updatedAt':FieldValue.serverTimestamp()});text.clear();
+   final profile=await db.collection('publicProfiles').doc(uid).get();
+   await db.collection('privateRooms').doc(widget.roomId).collection('messages').add({'senderId':uid,'senderName':profile.data()?['name']??FirebaseAuth.instance.currentUser?.displayName??'عضو','text':value,'type':audioUrl==null?'text':'voice',if(audioUrl!=null)'audioUrl':audioUrl,'createdAt':FieldValue.serverTimestamp()});
+   final last=audioUrl==null?value:'🎤 رسالة صوتية';
+   await db.collection('privateRooms').doc(widget.roomId).update({'lastMessage':last.length>200?last.substring(0,200):last,'updatedAt':FieldValue.serverTimestamp()});text.clear();
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الإرسال: '+e.toString())));}
   finally{if(mounted)setState(()=>busy=false);}
  }
- @override void dispose(){text.dispose();super.dispose();}
+ Future<void> toggleVoice() async {
+  if(recording){await finishVoice();return;}
+  try{
+   if(!await voiceRecorder.hasPermission()){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اسمح للتطبيق باستخدام المايك.')));return;}
+   final dir=await getTemporaryDirectory();
+   final path=dir.path+'/private_room_voice_'+uid+'_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
+   await voiceRecorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:128000,sampleRate:44100),path:path);
+   if(mounted)setState(()=>{voicePath=path;recording=true});
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر بدء التسجيل: $e')));}
+ }
+ Future<void> finishVoice() async {
+  if(!recording)return;
+  String? path;
+  try{
+   path=await voiceRecorder.stop();
+   if(mounted)setState(()=>recording=false);
+   final saved=path??voicePath;
+   if(saved==null||!await File(saved).exists()||await File(saved).length()<500){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('التسجيل قصير أو غير صالح.')));return;}
+   if(mounted)setState(()=>busy=true);
+   final url=await uploadForumMedia(XFile(saved),folder:'private-chat');
+   if(mounted)setState(()=>busy=false);
+   await send(audioUrl:url);
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الفويس: $e')));}
+  finally{
+   final saved=path??voicePath;
+   if(saved!=null){try{final file=File(saved);if(await file.exists())await file.delete();}catch(_){}}
+   voicePath=null;
+   if(mounted)setState(()=>{recording=false;busy=false});
+  }
+ }
+ @override void dispose(){text.dispose();voiceRecorder.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.roomName)),body:!unlocked?Center(child:FilledButton.icon(onPressed:unlock,icon:const Icon(Icons.lock_open),label:const Text('إدخال رمز الغرفة'))):Column(children:[
   Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('privateRooms').doc(widget.roomId).collection('messages').orderBy('createdAt').limit(300).snapshots(),builder:(context,s){
    if(s.hasError)return const Center(child:Text('تعذر تحميل الرسائل'));if(!s.hasData)return const Center(child:CircularProgressIndicator());
-   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Text(x['text'] as String? ?? '',style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))));}).toList());
+   return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((d){final x=d.data();final mine=x['senderId']==uid;final sender=(x['senderId']??'').toString();return Align(alignment:mine?Alignment.centerLeft:Alignment.centerRight,child:Container(margin:const EdgeInsets.symmetric(vertical:4),padding:const EdgeInsets.all(12),constraints:const BoxConstraints(maxWidth:320),decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(14),border:Border.all(color:const Color(0xFFBBBBCC))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[if(sender.isNotEmpty)StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:db.collection('publicProfiles').doc(sender).snapshots(),builder:(ctx,p){final data=p.data?.data()??{};final name=data['name'] as String???x['senderName'] as String? ?? 'عضو';final photo=data['photoUrl'] as String? ?? '';return Row(mainAxisSize:MainAxisSize.min,children:[CircleAvatar(radius:13,backgroundImage:photo.startsWith('https://')?NetworkImage(photo):null,child:photo.startsWith('https://')?null:Text(name.isEmpty?'؟':name.characters.first,style:const TextStyle(fontSize:10))),const SizedBox(width:6),Text(name,style:const TextStyle(fontWeight:FontWeight.bold,fontSize:12,color:Color(0xFF6554D9)))]);}),if(x['type']=='voice'&&x['audioUrl'] is String)_PrivateRoomVoicePlayer(url:x['audioUrl'] as String),if((x['text'] as String? ?? '').isNotEmpty)Text(x['text'] as String,style:const TextStyle(fontSize:17,color:Color(0xFF171717),height:1.5))])));}).toList());
   })),
-  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
+  if(recording)const Padding(padding:EdgeInsets.symmetric(horizontal:12,vertical:4),child:Text('🔴 جاري تسجيل الفويس — اضغط المايك للإيقاف والإرسال',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold))),
+  SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[IconButton(onPressed:busy?null:toggleVoice,icon:Icon(recording?Icons.stop_circle:Icons.mic,color:recording?Colors.red:const Color(0xFF6554D9))),Expanded(child:TextField(controller:text,minLines:1,maxLines:4,decoration:const InputDecoration(hintText:'اكتب رسالة واضحة...',border:OutlineInputBorder()))),const SizedBox(width:8),IconButton.filled(onPressed:busy?null:send,icon:const Icon(Icons.send))])))
  ]));
 }
 
@@ -195,4 +232,23 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
    const Padding(padding:EdgeInsets.all(12),child:Text('الموسيقى محلية ولا تُرفع إلى الخادم. التشغيل بالخلفية يعتمد على استمرار التطبيق ونظام Android وإعدادات توفير الطاقة.',style:TextStyle(fontSize:12)))
   ])
  );
+}
+
+class _PrivateRoomVoicePlayer extends StatefulWidget {
+ final String url;
+ const _PrivateRoomVoicePlayer({required this.url});
+ @override State<_PrivateRoomVoicePlayer> createState()=>_PrivateRoomVoicePlayerState();
+}
+class _PrivateRoomVoicePlayerState extends State<_PrivateRoomVoicePlayer>{
+ late final AudioPlayer player;
+ bool failed=false;
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((_){if(mounted)setState(()=>failed=true);return null;});}
+ @override void dispose(){player.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>Row(mainAxisSize:MainAxisSize.min,children:[
+  StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){
+   final playing=s.data?.playing==true;
+   return IconButton(visualDensity:VisualDensity.compact,onPressed:failed?null:()async{try{if(playing){await player.pause();}else{if(player.processingState==ProcessingState.completed)await player.seek(Duration.zero);await player.play();}}catch(_){if(mounted)setState(()=>failed=true);}},icon:Icon(failed?Icons.error_outline:playing?Icons.pause_circle:Icons.play_circle,color:const Color(0xFF6554D9),size:30));
+  }),
+  const Text('رسالة صوتية',style:TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF30265E))),
+ ]);
 }
