@@ -70,7 +70,7 @@ class _News extends StatelessWidget{
 
 
 class _SportsNews extends StatelessWidget {
- const _SportsNews({super.key});
+ const _SportsNews();
  Future<void> _add(BuildContext context) async {
   final title=TextEditingController(), body=TextEditingController(), source=TextEditingController();
   final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
@@ -111,7 +111,7 @@ class _SportsNews extends StatelessWidget {
 
 
 class _WeeklyContests extends StatelessWidget {
- const _WeeklyContests({super.key});
+ const _WeeklyContests();
  Future<void> _create(BuildContext context) async {
   final title=TextEditingController();
   final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
