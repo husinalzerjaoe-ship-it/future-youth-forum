@@ -168,7 +168,7 @@ class _WeeklyContests extends StatelessWidget {
      'uid':uid,'tier':tier,
      'expiresAt':Timestamp.fromDate(baseExpiry.add(const Duration(days:7))),
      'grantedBy':_uid,'grantReason':'weeklyContest','grantedAt':FieldValue.serverTimestamp(),
-    });
+    }, SetOptions(merge:true));
    });
    if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم اختيار الفائز ومنحه عضوية مجانية لمدة 7 أيام 🎉')));
   }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر منح العضوية: $e')));}
