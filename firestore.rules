@@ -813,7 +813,13 @@ service cloud.firestore {
           || isFounder());
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.uploaderId == request.auth.uid
-        && request.resource.data.status == 'pending'
+        && (
+          (request.resource.data.get('category', '') == 'music'
+            && request.resource.data.status == 'approved'
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+          || (request.resource.data.get('category', '') != 'music'
+            && request.resource.data.status == 'pending')
+        )
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
         && request.resource.data.title.size() <= 160
