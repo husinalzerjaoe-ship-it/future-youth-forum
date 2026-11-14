@@ -161,7 +161,19 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         AspectRatio(aspectRatio: 16 / 9, child: Container(color: Colors.black, alignment: Alignment.center, child: _videoLoading
           ? const CircularProgressIndicator(color: Colors.white)
           : _videoError != null
-            ? Padding(padding: const EdgeInsets.all(16), child: Text(_videoError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)))
+            ? Padding(padding: const EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(_videoError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: _videoLoading ? null : () {
+                    final oldController = _videoController;
+                    setState(() { _videoLoading = true; _videoError = null; _videoController = null; });
+                    oldController?.dispose();
+                    _initializeVideo();
+                  },
+                  icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة'),
+                ),
+              ]))
             : _videoController != null && _videoController!.value.isInitialized
               ? Stack(alignment: Alignment.bottomCenter, children: [
                   Center(child: AspectRatio(aspectRatio: _videoController!.value.aspectRatio, child: VideoPlayer(_videoController!))),
