@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,7 @@ class V6CommunitySuitePage extends StatelessWidget {
         _SuiteTile(icon: Icons.groups_rounded, title: 'الأندية ومجموعات الاهتمام', subtitle: 'أنشئ نادياً أو انضم إلى مجتمع يشاركك اهتماماتك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForumClubsPage()))),
         _SuiteTile(icon: Icons.flag_rounded, title: 'مهامي وتحدياتي اليومية', subtitle: 'مهام شخصية وسجل إنجاز محلي على جهازك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DailyMissionsPage()))),
         _SuiteTile(icon: Icons.favorite_rounded, title: 'جدار الامتنان', subtitle: 'شارك كلمة شكر أو رسالة إيجابية مع الجميع', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GratitudeWallPage()))),
+        _SuiteTile(icon: Icons.timer_rounded, title: 'مساحة التركيز والبومودورو', subtitle: 'جلسات تركيز واستراحات ومتابعة إنجازك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FocusRoomPage()))),
         _SuiteTile(icon: Icons.auto_graph_rounded, title: 'مساحتي الشخصية', subtitle: 'سجّل مزاجك وأهدافك وعاداتك وملاحظاتك اليومية', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalGrowthPage()))),
         _SuiteTile(icon: Icons.shield_rounded, title: 'مركز السلامة والخصوصية', subtitle: 'إرشادات سريعة لحماية حسابك وتفاعلك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const V6SafetyPage()))),
       ]),
@@ -318,6 +320,99 @@ class _SafetyTip extends StatelessWidget {
   Widget build(BuildContext context) => Card(child: ListTile(leading: Icon(icon, color: _v6Brand), title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(body)));
 }
 
+
+
+class FocusRoomPage extends StatefulWidget {
+  const FocusRoomPage({super.key});
+  @override State<FocusRoomPage> createState() => _FocusRoomPageState();
+}
+
+class _FocusRoomPageState extends State<FocusRoomPage> {
+  Timer? _timer;
+  int _minutes = 25;
+  int _seconds = 0;
+  int _sessions = 0;
+  bool _running = false;
+  bool _breakMode = false;
+  String _task = '';
+  final _taskController = TextEditingController();
+  int get _total => _minutes * 60 + _seconds;
+
+  @override void initState() { super.initState(); _loadSessions(); }
+  @override void dispose() { _timer?.cancel(); _taskController.dispose(); super.dispose(); }
+
+  Future<void> _loadSessions() async {
+    final p = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _sessions = p.getInt('focus_sessions') ?? 0);
+  }
+
+  void _start() {
+    if (_running) return;
+    if (_total == 0) _reset();
+    setState(() => _running = true);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (_minutes == 0 && _seconds == 0) {
+        timer.cancel();
+        setState(() {
+          _running = false;
+          if (!_breakMode) { _sessions++; _breakMode = true; _minutes = 5; }
+          else { _breakMode = false; _minutes = 25; }
+          _seconds = 0;
+        });
+        SharedPreferences.getInstance().then((p) => p.setInt('focus_sessions', _sessions));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_breakMode ? 'انتهت الاستراحة، مستعد لجلسة جديدة؟' : 'أحسنت! اكتملت جلسة تركيز 🎉')));
+        return;
+      }
+      setState(() {
+        if (_seconds == 0) { _minutes--; _seconds = 59; } else { _seconds--; }
+      });
+    });
+  }
+
+  void _pause() { _timer?.cancel(); setState(() => _running = false); }
+  void _reset() {
+    _timer?.cancel();
+    setState(() { _running = false; _breakMode = false; _minutes = 25; _seconds = 0; });
+  }
+
+  @override Widget build(BuildContext context) {
+    final progress = 1 - (_total / ((_breakMode ? 5 : 25) * 60)).clamp(0.0, 1.0);
+    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+      appBar: AppBar(title: const Text('مساحة التركيز')),
+      body: ListView(padding: const EdgeInsets.all(18), children: [
+        Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: const LinearGradient(colors: [Color(0xFF171936), _v6Brand, Color(0xFF168E9B)])),
+          child: Column(children: [
+            Text(_breakMode ? 'وقت الاستراحة ☕' : 'وقت الإنجاز 🎯', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 20),
+            SizedBox(width: 210, height: 210, child: Stack(alignment: Alignment.center, children: [
+              SizedBox.expand(child: CircularProgressIndicator(value: progress, strokeWidth: 11, backgroundColor: Colors.white24, valueColor: const AlwaysStoppedAnimation<Color>(Colors.white))),
+              Text('${_minutes.toString().padLeft(2, '0')}:${_seconds.toString().padLeft(2, '0')}', style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+            ])),
+            const SizedBox(height: 18),
+            Text('جلسات مكتملة: $_sessions', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+          ]),
+        ),
+        const SizedBox(height: 16),
+        TextField(controller: _taskController, maxLength: 100, decoration: const InputDecoration(labelText: 'شنو المهمة اللي تريد تركز عليها؟', prefixIcon: Icon(Icons.edit_note), border: OutlineInputBorder())),
+        Row(children: [
+          Expanded(child: FilledButton.icon(onPressed: _running ? _pause : _start, icon: Icon(_running ? Icons.pause : Icons.play_arrow), label: Text(_running ? 'إيقاف مؤقت' : 'ابدأ التركيز'))),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(onPressed: _reset, icon: const Icon(Icons.restart_alt), label: const Text('إعادة')),
+        ]),
+        const SizedBox(height: 12),
+        Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('طريقة الاستخدام', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          const SizedBox(height: 6),
+          const Text('ركز 25 دقيقة على مهمة واحدة، ثم خذ استراحة 5 دقائق. كرر الجلسات وسجّل تقدمك بهدوء.'),
+          if (_taskController.text.trim().isNotEmpty) Text('مهمتك الحالية: ${_taskController.text.trim()}', style: const TextStyle(fontWeight: FontWeight.bold)),
+        ]))),
+      ]),
+    ));
+  }
+}
 
 class PersonalGrowthPage extends StatefulWidget {
   const PersonalGrowthPage({super.key});
