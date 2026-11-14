@@ -30,7 +30,7 @@ Future<void> _notifyContentMentions({
   required String actorUid,
   required String actorName,
 }) async {
-  final tags = RegExp(r'@([^\\s@]+)').allMatches(text)
+  final tags = RegExp(r'@([^\s@]+)').allMatches(text)
       .map((m) => m.group(1)!.replaceAll('_', ' ')).toSet().take(10).toList();
   if (tags.isEmpty) return;
   final matches = await db.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
