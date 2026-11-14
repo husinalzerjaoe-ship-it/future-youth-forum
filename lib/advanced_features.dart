@@ -161,6 +161,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
   bool changingBackground = false;
   bool recordingVoice = false;
   DateTime? voiceStartedAt;
+  Map<String, dynamic>? replyTo;
   final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
   @override void initState() { super.initState(); _loadBackground(); }
@@ -236,10 +237,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
       batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
+      if (mounted) setState(() => replyTo = null);
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
@@ -321,10 +323,18 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Future<void> showMessageActions(DocumentSnapshot<Map<String,dynamic>> doc) async {
     final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
+        ListTile(leading: const Icon(Icons.reply, color: _brand), title: const Text('الرد على هذه الرسالة'), onTap: () => Navigator.pop(c, 'reply')),
         const ListTile(title: Text('تفاعل مع الرسالة')),
         ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
       ])));
-    if (choice != null) await reactToMessage(doc.id, choice);
+    if (choice == 'reply') {
+      final d = doc.data();
+      final type = d['type'];
+      final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
+      if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
+    } else if (choice != null) {
+      await reactToMessage(doc.id, choice);
+    }
   }
   @override
   Widget build(BuildContext context) => Directionality(
@@ -421,6 +431,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
+                  if (d['replyToMessageId'] is String)
+                    Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
                   if (d['type'] == 'voice' && d['audioUrl'] is String)
@@ -437,13 +449,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
             }).toList());
           },
         )),
-        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
+        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (replyTo != null) Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الرد على ${replyTo!['senderName']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)), Text(replyTo!['preview'] as String, maxLines: 1, overflow: TextOverflow.ellipsis)])), IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => replyTo = null), icon: const Icon(Icons.close, size: 18))])),
+          Row(children: [
           IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
-        ]))),
+        ])]))),
           ]),
         ]),
       ),
