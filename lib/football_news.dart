@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
@@ -45,7 +46,16 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
         if (key.isNotEmpty && seen.add(key)) news.add(item);
       }
     }
+    news.sort((a, b) => _publishedMillis(b.published).compareTo(_publishedMillis(a.published)));
     return news.take(45).toList();
+  }
+
+  int _publishedMillis(String value) {
+    try {
+      return HttpDate.parse(value).millisecondsSinceEpoch;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<List<_FootballNewsItem>> _readFeed(String query, String category) async {
