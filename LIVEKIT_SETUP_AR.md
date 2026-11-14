@@ -11,39 +11,24 @@
 - حفظ رابط خادم إصدار الرموز محلياً داخل التطبيق.
 - عدم وضع LiveKit API Secret داخل التطبيق أو GitHub.
 
-## نشر خادم الرموز من Termux
+## نشر خادم الرموز من الموبايل عبر Cloudflare Dashboard
 
-افتح Termux، وأنت داخل مجلد المستودع:
+1. افتح https://dash.cloudflare.com/ وسجّل الدخول أو أنشئ حساباً مجانياً.
+2. افتح **Workers & Pages** ثم **Create** ثم **Create Worker**.
+3. سمِّ العامل `future-youth-forum-livekit-token` ثم انشر النسخة الأولية.
+4. افتح العامل واختر **Edit code**.
+5. استبدل الكود التجريبي كاملاً بمحتوى الملف `src/index.js` من هذا المستودع:
+   https://github.com/husinalzerjaoe-ship-it/future-youth-forum/blob/feature/v4-complete-profile-stats/workers/livekit-token/src/index.js
+6. اضغط Save and Deploy.
+7. افتح **Settings → Variables and Secrets** وأضف متغيرين عاديين:
+   - `FIREBASE_PROJECT_ID` = `futureyouth-69f8a`
+   - `LIVEKIT_URL` = `wss://youth-forum-future-lu43byvc.livekit.cloud`
+8. أضف متغيرين من النوع **Secret**:
+   - `LIVEKIT_API_KEY`: معرّف المفتاح من LiveKit.
+   - `LIVEKIT_API_SECRET`: السر المطابق له. أدخله داخل Cloudflare فقط ولا ترسله لي.
+9. احفظ وانشر مرة ثانية، ثم انسخ رابط العامل الذي ينتهي بـ `.workers.dev`.
 
-```bash
-cd ~/future-youth-forum
-git pull origin feature/v4-complete-profile-stats
-cd workers/livekit-token
-npm install -g wrangler
-wrangler login
-```
-
-سيُفتح تسجيل Cloudflare. أنشئ حساباً مجانياً إذا لم يكن لديك حساب، ثم وافق على ربط Wrangler.
-
-أدخل المفتاحين في مطالبة Termux فقط:
-
-```bash
-wrangler secret put LIVEKIT_API_KEY
-wrangler secret put LIVEKIT_API_SECRET
-```
-
-- `LIVEKIT_API_KEY`: معرّف API Key من LiveKit.
-- `LIVEKIT_API_SECRET`: السر الذي يظهر عند إنشاء المفتاح في LiveKit. لا تلصقه في المحادثة أو في ملف داخل المستودع.
-
-انشر العامل:
-
-```bash
-wrangler deploy
-```
-
-سيطبع Cloudflare رابطاً شبيهاً بـ:
-
-`https://future-youth-forum-livekit-token.<account>.workers.dev`
+الخطة المجانية في Cloudflare Workers لها حدود استخدام وCPU، والحصة المنشورة تصل إلى 100,000 طلب يومياً؛ وقد تتغير الحدود. LiveKit Cloud أيضاً له حدود وخطة مستقلة.
 
 ## ربط الرابط داخل التطبيق
 
