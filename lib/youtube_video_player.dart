@@ -5,7 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 String? youtubeEmbedUrl(String raw) {
   final uri = Uri.tryParse(raw.trim());
-  if (uri == null || !['https', 'http'].contains(uri.scheme)) return null;
+  if (uri == null || uri.scheme != 'https') return null;
   final host = uri.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
   const hosts = ['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'youtube-nocookie.com'];
   if (!hosts.contains(host)) return null;
@@ -76,9 +76,14 @@ class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
           },
         ));
       _web = controller;
-      await controller.loadHtmlString('''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><iframe src="$embed" title="YouTube player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></body></html>''',
+      try {
+        await controller.loadHtmlString('''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><iframe src="$embed" title="YouTube player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></body></html>''',
         baseUrl: 'https://www.youtube-nocookie.com');
-      return;
+        return;
+      } catch (_) {
+        if (mounted) setState(() { _loading = false; _failed = true; });
+        return;
+      }
     }
     final uri = Uri.tryParse(widget.url.trim());
     if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty && _isDirectVideoUrl(uri)) {
