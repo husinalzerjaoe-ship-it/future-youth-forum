@@ -2,7 +2,7 @@ name: Flutter quality check and Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, fix/media-private-chat-reactions]
+    branches: [main, fix/media-private-chat-reactions, feature/group-watch-party]
 
 concurrency:
   group: flutter-apk-${{ github.ref }}
