@@ -334,7 +334,6 @@ class _FocusRoomPageState extends State<FocusRoomPage> {
   int _sessions = 0;
   bool _running = false;
   bool _breakMode = false;
-  String _task = '';
   final _taskController = TextEditingController();
   int get _total => _minutes * 60 + _seconds;
 
