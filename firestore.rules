@@ -1139,7 +1139,8 @@ service cloud.firestore {
                 || (request.resource.data.positions[0] == resource.data.positions[0] - 1 && resource.data.positions[0] % 7 != 0)
               )
               && request.resource.data.scores[request.auth.uid] ==
-                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[0]]) ? 1 : 0))
+                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[0]]) ? 1 : 0)
+              && request.resource.data.scores[resource.data.members[1]] == resource.data.scores[resource.data.members[1]])
             ||
             (resource.data.members[1] == request.auth.uid
               && request.resource.data.positions[0] == resource.data.positions[0]
@@ -1150,7 +1151,8 @@ service cloud.firestore {
                 || (request.resource.data.positions[1] == resource.data.positions[1] - 1 && resource.data.positions[1] % 7 != 0)
               )
               && request.resource.data.scores[request.auth.uid] ==
-                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[1]]) ? 1 : 0))
+                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[1]]) ? 1 : 0)
+              && request.resource.data.scores[resource.data.members[0]] == resource.data.scores[resource.data.members[0]])
           )
           && (
             (resource.data.treasures.hasAny([request.resource.data.positions[resource.data.members[0] == request.auth.uid ? 0 : 1]])
@@ -1168,7 +1170,7 @@ service cloud.firestore {
             (request.resource.data.status == 'finished'
               && request.resource.data.turn == ''
               && (request.resource.data.treasures.size() == 0 || request.resource.data.moves >= 36)
-              && request.resource.data.winner in resource.data.members)
+              && (request.resource.data.winner == '' || request.resource.data.winner in resource.data.members))
           ))
         ||
         // Football quiz players submit answers and host advances rounds.
