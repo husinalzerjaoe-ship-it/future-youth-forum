@@ -219,7 +219,7 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
         ),
       ),
       const SizedBox(height: 10),
-      _section('اختبر معلوماتك بالأنمي','جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
+      _section('اختبر معلوماتك','أنمي ومعلومات عامة • جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
       _section('حجر ورقة مقص','تحدّى الكمبيوتر واربح 3 نقاط',Icons.sports_esports,Colors.orange,_rpsCard()),
       _section('لغز اليوم','فكّر قبل ما تشوف الحل',Icons.lightbulb_outline,Colors.teal,_riddleCard()),
       _section('تحدي السرعة','اضغط الزر 10 مرات بأسرع وقت',Icons.bolt,Colors.pink,_speedCard()),
@@ -300,7 +300,8 @@ class _WordScrambleGameState extends State<_WordScrambleGame> {
   setState((){});
  }
  void _check(){
-  if(answer.text.trim().replaceAll(' ','')==word&&!solved){
+  if(solved)return;
+  if(answer.text.trim().replaceAll(' ','')==word){
    solved=true;
    points+=3;
    setState(()=>message='صحيح! ربحت 3 نقاط 🎉');
