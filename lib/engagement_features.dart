@@ -15,7 +15,7 @@ class EngagementHubPage extends StatelessWidget {
   appBar:AppBar(title:const Text('المرح والإنجازات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
    Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF171936),_c,Color(0xFF20A8B8)]),borderRadius:BorderRadius.circular(18)),child:const Text('كل يوم بداية جديدة ✨\nاجمع النقاط وتحدَّ أصدقاءك واكتشف كلمات تلهمك',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:12),const _CheckIn(),const _Points(),const LeaderboardWidget(),const _Quote(),const _Quiz(),const _SportsNews(),const _News(),
+   const SizedBox(height:12),const _CheckIn(),const _Points(),const LeaderboardWidget(),const _WeeklyContests(),const _Quote(),const _Quiz(),const _SportsNews(),const _News(),
   ]),
  ));
 }
@@ -104,6 +104,93 @@ class _SportsNews extends StatelessWidget {
     subtitle:Text((d['body']??'').toString()),
     trailing:url.startsWith('https://')?IconButton(icon:const Icon(Icons.open_in_new),tooltip:'فتح المصدر',onPressed:()=>launchUrl(Uri.parse(url),mode:LaunchMode.externalApplication)):null,
    );}).toList());
+  })
+ ])));
+}
+
+
+class _WeeklyContests extends StatelessWidget {
+ const _WeeklyContests({super.key});
+ Future<void> _create(BuildContext context) async {
+  final title=TextEditingController();
+  final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+   title:const Text('إنشاء مسابقة أسبوعية'),
+   content:TextField(controller:title,maxLength:120,decoration:const InputDecoration(labelText:'عنوان المسابقة')),
+   actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('إنشاء'))]
+  )));
+  if(ok==true && title.text.trim().isNotEmpty){
+   try{
+    await _db.collection('weeklyContests').add({
+     'title':title.text.trim(),'status':'open','createdBy':_uid,
+     'createdAt':FieldValue.serverTimestamp(),
+     'endsAt':Timestamp.fromDate(DateTime.now().add(const Duration(days:7))),
+    });
+   }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إنشاء المسابقة: $e')));}
+  }
+  title.dispose();
+ }
+ Future<void> _join(BuildContext context, String contestId) async {
+  try{
+   final profile=await _db.collection('publicProfiles').doc(_uid).get();
+   await _db.collection('weeklyContests').doc(contestId).collection('entries').doc(_uid).set({
+    'uid':_uid,'name':profile.data()?['name']??FirebaseAuth.instance.currentUser?.displayName??'عضو',
+    'joinedAt':FieldValue.serverTimestamp(),
+   });
+   if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تسجيل اشتراكك بالمسابقة!')));
+  }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الاشتراك: $e')));}
+ }
+ Future<void> _chooseWinner(BuildContext context, String contestId, List<QueryDocumentSnapshot<Map<String,dynamic>>> entries) async {
+  if(entries.isEmpty)return;
+  final winner=await showDialog<QueryDocumentSnapshot<Map<String,dynamic>>>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+   title:const Text('اختيار الفائز ومنحه عضوية مجانية'),
+   content:SizedBox(width:360,height:320,child:ListView(children:entries.map((e)=>ListTile(
+    leading:const Icon(Icons.person),title:Text((e.data()['name']??'عضو').toString()),
+    onTap:()=>Navigator.pop(c,e),
+   )).toList())),
+   actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء'))]
+  )));
+  if(winner==null)return;
+  final uid=(winner.data()['uid']??winner.id).toString();
+  try{
+   await _db.runTransaction((tx)async{
+    final contest=_db.collection('weeklyContests').doc(contestId);
+    final snap=await tx.get(contest);
+    if(!snap.exists || snap.data()?['status']!='open') throw StateError('المسابقة مغلقة أو تم اختيار فائز مسبقاً.');
+    tx.update(contest,{'status':'completed','winnerUid':uid,'winnerChosenAt':FieldValue.serverTimestamp()});
+    tx.set(_db.collection('memberships').doc(uid),{
+     'uid':uid,'tier':'premium',
+     'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(days:7))),
+     'grantedBy':_uid,'grantReason':'weeklyContest','grantedAt':FieldValue.serverTimestamp(),
+    });
+   });
+   if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم اختيار الفائز ومنحه عضوية مجانية لمدة 7 أيام 🎉')));
+  }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر منح العضوية: $e')));}
+ }
+ @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+  Row(children:[const Expanded(child:Text('🏅 المسابقات الأسبوعية والعضوية المجانية',style:TextStyle(fontSize:17,fontWeight:FontWeight.bold))),if(_founder)IconButton(onPressed:()=>_create(context),icon:const Icon(Icons.add_circle,color:_c),tooltip:'إنشاء مسابقة')]),
+  const Text('اشترك بالمسابقة، والفائز يحصل على عضوية مميزة لمدة 7 أيام.',style:TextStyle(fontSize:12,color:Colors.grey)),
+  StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('weeklyContests').orderBy('endsAt',descending:true).limit(10).snapshots(),builder:(c,s){
+   if(s.hasError)return const Text('تعذر تحميل المسابقات. تحقق من قواعد Firestore.');
+   if(!s.hasData)return const LinearProgressIndicator();
+   if(s.data!.docs.isEmpty)return const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('لا توجد مسابقات حالياً.'));
+   return Column(children:s.data!.docs.map((doc){
+    final d=doc.data();final open=d['status']=='open';
+    return Column(children:[
+     ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.emoji_events,color:Colors.orange),
+      title:Text((d['title']??'مسابقة أسبوعية').toString()),
+      subtitle:Text(open?'تنتهي: ${(d['endsAt'] as Timestamp?)?.toDate().toLocal().toString().split('.').first??'قريباً'}':'انتهت المسابقة'),
+      trailing:open?FilledButton.tonal(onPressed:()=>_join(context,doc.id),child:const Text('اشترك')):const Icon(Icons.check_circle,color:Colors.green)),
+     if(_founder && open)
+      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('entries').snapshots(),builder:(ctx,entries){
+       final list=entries.data?.docs??[];
+       return Align(alignment:Alignment.centerLeft,child:TextButton.icon(
+        onPressed:list.isEmpty?null:()=>_chooseWinner(context,doc.id,list),
+        icon:const Icon(Icons.workspace_premium),label:Text('اختيار الفائز (${list.length})')));
+      }),
+     if(d['winnerUid']!=null)Text('الفائز: ${d['winnerUid']} • عضوية مجانية 7 أيام',style:const TextStyle(color:Colors.green,fontWeight:FontWeight.bold)),
+     const Divider(),
+    ]);
+   }).toList());
   })
  ])));
 }
