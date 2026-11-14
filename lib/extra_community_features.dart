@@ -36,7 +36,8 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
    await showDialog<void>(context:context,builder:(ctx)=>AlertDialog(
     title:Text('إدارة الأعضاء • '+(room['name']??'الغرفة')),
     content:SizedBox(width:420,height:420,child:ListView(children:members.map((id){
-     final data=profiles.docs.where((p)=>p.id==id).map((p)=>p.data()).firstOrNull??{};
+     final matches=profiles.docs.where((p)=>p.id==id).toList();
+     final data=matches.isEmpty?<String,dynamic>{}:matches.first.data();
      final isOwner=id==room['ownerId'], isAdmin=admins.contains(id);
      return ListTile(title:Text(data['name']??'عضو'),subtitle:Text(isOwner?'مالك الغرفة':isAdmin?'مشرف غرفة':'عضو'),
       trailing:isOwner?const Icon(Icons.workspace_premium):PopupMenuButton<String>(
