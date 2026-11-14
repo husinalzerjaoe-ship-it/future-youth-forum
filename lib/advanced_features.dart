@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -26,7 +29,25 @@ class DirectMessagesPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
         builder: (context, s) {
-          if (s.hasError) return const Center(child: Text('تعذر تحميل الرسائل. تأكد من نشر قواعد Firestore.'));
+          if (s.hasError) {
+            final error = s.error;
+            final code = error is FirebaseException ? error.code : 'unknown';
+            return Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.mark_email_unread_outlined, size: 42),
+                const SizedBox(height: 10),
+                const Text('تعذر تحميل الرسائل الخاصة'),
+                const SizedBox(height: 6),
+                Text('رمز الخطأ: $code', style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                const SizedBox(height: 8),
+                const Text('تحقق من اتصال الإنترنت وصلاحيات Firestore، ثم أعد المحاولة.', textAlign: TextAlign.center),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DirectMessagesPage())),
+                  icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
+              ]),
+            ));
+          }
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           if (s.data!.docs.isEmpty) return const Center(child: Text('ما عندك محادثات بعد. ابدأ محادثة جديدة.'));
           final conversations = [...s.data!.docs]..sort((a, b) {
@@ -138,6 +159,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
   final controller = TextEditingController();
   bool busy = false;
   bool changingBackground = false;
+  bool recordingVoice = false;
+  DateTime? voiceStartedAt;
+  final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
@@ -187,15 +211,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تغيير الخلفية. تحقق من صلاحيات تخزين Supabase.')));
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
-  @override void dispose() { controller.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl}) async {
+  @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
+  Future<void> send({String? imageUrl, String? audioUrl, int? durationSeconds}) async {
     final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null) || busy) return;
+    if ((value.isEmpty && imageUrl == null && audioUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
       final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
-      final theirBlock = await _db.collection('userBlocks').doc('${widget.otherUid}_${_uid}').get();
-      if (myBlock.exists || theirBlock.exists) {
+      if (myBlock.exists) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا يمكن إرسال الرسائل: يوجد حظر بين الحسابين.')));
         return;
       }
@@ -212,17 +236,24 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': imageUrl == null ? 'text' : 'image', if (imageUrl != null) 'imageUrl': imageUrl, 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': imageUrl == null ? value : '📷 صورة', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': imageUrl == null ? 'أرسل لك رسالة خاصة' : 'أرسل لك صورة',
+          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        final message = e.code == 'permission-denied'
+            ? 'تعذر الإرسال: قد يكون أحدكما حظر الآخر أو أن صلاحية المحادثة غير متاحة.'
+            : 'تعذر إرسال الرسالة (' + e.code + '). تحقق من الاتصال وحاول مجدداً.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
@@ -240,6 +271,47 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) setState(() => busy = false);
     }
   }
+  Future<void> toggleVoiceRecording() async {
+    if (busy) return;
+    if (!recordingVoice) {
+      try {
+        if (!await voiceRecorder.hasPermission()) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للتطبيق باستخدام المايكروفون أولاً.')));
+          return;
+        }
+        final dir = await getTemporaryDirectory();
+        final path = '${dir.path}/private_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+        await voiceRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: path);
+        if (mounted) setState(() { recordingVoice = true; voiceStartedAt = DateTime.now(); });
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر بدء التسجيل: $e')));
+      }
+      return;
+    }
+    try {
+      final started = voiceStartedAt;
+      final path = await voiceRecorder.stop();
+      if (mounted) setState(() { recordingVoice = false; voiceStartedAt = null; });
+      if (path == null || started == null) return;
+      final elapsed = DateTime.now().difference(started).inSeconds;
+      final seconds = elapsed.clamp(1, 180).toInt();
+      if (elapsed > 180 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديد الرسالة الصوتية بثلاث دقائق.')));
+      }
+      if (mounted) setState(() => busy = true);
+      final url = await uploadForumMedia(XFile(path), folder: 'private-chat');
+      if (mounted) setState(() => busy = false);
+      await send(audioUrl: url, durationSeconds: seconds);
+    } catch (e) {
+      if (mounted) {
+        setState(() { recordingVoice = false; voiceStartedAt = null; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التسجيل الصوتي: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> reactToMessage(String messageId, String emoji) async {
     final ref = _db.collection('conversations').doc(widget.conversationId).collection('messages').doc(messageId).collection('reactions').doc(_uid);
     final old = await ref.get();
@@ -351,6 +423,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     ),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
+                  if (d['type'] == 'voice' && d['audioUrl'] is String)
+                    _DirectVoicePlayer(url: d['audioUrl'] as String, durationSeconds: (d['durationSeconds'] as num?)?.toInt() ?? 0),
                   if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
                   StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream: doc.reference.collection('reactions').snapshots(), builder: (c, rs) {
                     final counts = <String,int>{};
@@ -365,6 +439,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
         )),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
           IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
@@ -454,7 +529,7 @@ class MemberSafetyPage extends StatelessWidget {
             return ListTile(
               leading: const CircleAvatar(child: Icon(Icons.block)),
               title: Text(d['blockedName'] as String? ?? 'عضو'),
-              subtitle: const Text('الحظر الحالي يمنع الرسائل الخاصة بينكما فقط'),
+              subtitle: const Text('يمنع الرسائل الخاصة ويخفي رسائله من الدردشة العامة عندك'),
               trailing: TextButton(
                 onPressed: () => doc.reference.delete(),
                 child: const Text('إلغاء الحظر'),
@@ -720,4 +795,45 @@ class SavePostControl extends StatelessWidget {
       },
     );
   }
+}
+
+
+class _DirectVoicePlayer extends StatefulWidget {
+  final String url;
+  final int durationSeconds;
+  const _DirectVoicePlayer({required this.url, required this.durationSeconds});
+  @override State<_DirectVoicePlayer> createState() => _DirectVoicePlayerState();
+}
+class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
+  late final AudioPlayer player;
+  @override void initState() {
+    super.initState();
+    player = AudioPlayer();
+    player.setUrl(widget.url).catchError((Object _) => Duration.zero);
+  }
+  @override void dispose() { player.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Container(
+    width: 230, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(color: _brand.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)),
+    child: Row(children: [
+      StreamBuilder<PlayerState>(stream: player.playerStateStream, builder: (context, snapshot) {
+        final playing = snapshot.data?.playing ?? false;
+        return IconButton(onPressed: () async { if (playing) { await player.pause(); } else { await player.play(); } },
+          icon: Icon(playing ? Icons.pause_circle_filled : Icons.play_circle_fill, color: _brand, size: 32));
+      }),
+      Expanded(child: StreamBuilder<Duration?>(stream: player.durationStream, builder: (context, durationSnap) {
+        final total = durationSnap.data ?? Duration(seconds: widget.durationSeconds);
+        return StreamBuilder<Duration>(stream: player.positionStream, builder: (context, positionSnap) {
+          final position = positionSnap.data ?? Duration.zero;
+          final maxMs = total.inMilliseconds;
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            Slider(value: maxMs <= 0 ? 0 : position.inMilliseconds.clamp(0, maxMs).toDouble(),
+              max: maxMs <= 0 ? 1 : maxMs.toDouble(),
+              onChanged: maxMs <= 0 ? null : (v) => player.seek(Duration(milliseconds: v.round()))),
+            Text('${position.inSeconds}s / ${total.inSeconds}s', style: const TextStyle(fontSize: 10)),
+          ]);
+        });
+      })),
+    ]),
+  );
 }
