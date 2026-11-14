@@ -468,7 +468,7 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
        leading:const CircleAvatar(child:Icon(Icons.play_arrow)),
        title:Text(d['title'] as String? ??'فيديو'),
        subtitle:Text('${d['category']??'متنوع'} • ${d['authorName']??'عضو'}'),
-       trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'')),
+       trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو')),
        onTap:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو'),
       ));
      }).toList());
