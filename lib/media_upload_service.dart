@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -38,16 +37,8 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Existing accounts may predate the onUserCreated trigger. This callable
-  // safely adds role=authenticated to the current user's custom claims.
-  try {
-    await FirebaseFunctions.instance
-        .httpsCallable('ensureSupabaseAuthenticatedRole')
-        .call();
-  } on FirebaseFunctionsException catch (e) {
-    throw StateError('تعذر تجهيز صلاحية رفع الوسائط (' + e.code + '). شغّل نشر Cloud Functions ثم أعد تسجيل الدخول.');
-  }
-
+  // Claims are provisioned with the local Firebase Admin SDK migration script.
+  // Uploads therefore do not depend on a billable Cloud Function deployment.
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
     throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
@@ -66,7 +57,7 @@ Future<String> uploadForumMedia(
     throw StateError('هوية Firebase لا تطابق مشروع التطبيق. راجع إعداد Firebase Third-party Auth في Supabase.');
   }
   if (claims['role'] != 'authenticated') {
-    throw StateError('Firebase لم يضف صلاحية authenticated بعد. انشر Cloud Functions ثم سجّل خروج وادخل من جديد.');
+    throw StateError('حسابك يحتاج صلاحية رفع الوسائط. شغّل سكربت منح الصلاحية من Cloud Shell (بدون نشر Functions أو تفعيل Blaze)، ثم سجّل خروج وادخل من جديد.');
   }
 
   final name = file.name.toLowerCase();
