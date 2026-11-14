@@ -303,7 +303,9 @@ class _RegionChatPageState extends State<RegionChatPage> {
    await db2.collection('regionalChats').doc(widget.id).collection('messages').add({
     'text':text.trim(),'type':type,if(imageUrl!=null)'imageUrl':imageUrl,
     'senderId':me.uid,'senderRole':founder?'founder':'member',
-    'senderName':profile.data()?['name']??me.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});
+    'senderName':profile.data()?['name']??me.displayName??'عضو',
+    'senderPhoto':profile.data()?['photoUrl']??'',
+    'createdAt':FieldValue.serverTimestamp()});
    if(text.isNotEmpty)t.clear();
   }catch(_){if(mounted)setState(()=>error='تعذر الإرسال. تأكد من نشر قواعد Firestore الجديدة.');}
   finally{if(mounted)setState(()=>busy=false);}
@@ -343,6 +345,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
   final type=d['type'] as String? ?? 'text';
   final txt=d['text'] as String? ?? '';
   final url=d['imageUrl'] as String?;
+  final senderPhoto=d['senderPhoto'] as String?;
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
    constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
@@ -351,6 +354,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
     boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
+     CircleAvatar(radius:14,backgroundColor:const Color(0xFFEAE6FF),backgroundImage:senderPhoto!=null&&senderPhoto.startsWith('https://')?NetworkImage(senderPhoto):null,child:senderPhoto==null||!senderPhoto.startsWith('https://')?const Icon(Icons.person,size:16,color:Color(0xFF6554D9)):null),
+     const SizedBox(width:6),
      Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
      if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
      if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
