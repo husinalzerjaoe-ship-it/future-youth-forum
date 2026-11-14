@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'multiplayer_arcade.dart';
 import 'football_quiz.dart';
 import 'arcade_minigames.dart';
+import 'arcade_penalty.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -137,6 +138,16 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
           subtitle: const Text('ذاكرة الرموز • فك الكلمة • خمن الرقم'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArcadeMiniGamesPage())),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.sports_soccer_rounded)),
+          title: const Text('ضربات الجزاء', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('سدد خمس ركلات وحاول تتغلب على الحارس'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PenaltyShootoutPage())),
         ),
       ),
       const SizedBox(height: 10),
