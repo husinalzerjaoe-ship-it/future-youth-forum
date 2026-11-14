@@ -169,11 +169,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
                   Positioned(right: 8, bottom: 12, child: IconButton.filledTonal(onPressed: () { setState(() { _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play(); }); }, icon: Icon(_videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow))),
                 ])
               : const Text('البث غير متاح حالياً', style: TextStyle(color: Colors.white)))),
-        Padding(padding: const EdgeInsets.all(10), child: Row(children: const [
-          Icon(Icons.verified_user_outlined, size: 16, color: Colors.green),
-          SizedBox(width: 6),
-          Expanded(child: Text('استخدم فقط بثاً يملك المنتدى إذناً بعرضه داخل التطبيق', style: TextStyle(fontSize: 11, color: Colors.grey))),
-        ])),
+
       ])),
       Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: party.collection('messages').orderBy('createdAt').limit(200).snapshots(),
