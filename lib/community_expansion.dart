@@ -49,7 +49,7 @@ class _WatchPartiesPageState extends State<WatchPartiesPage> {
           TextFormField(controller: stream, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط البث المباشر المرخّص', hintText: 'رابط HLS أو MP4 من مزوّد الحقوق'), validator: (v) { final u = Uri.tryParse((v ?? '').trim()); return u == null || u.scheme != 'https' || u.host.isEmpty ? 'أدخل رابط HTTPS صحيحاً' : null; }),
           const Text('أدخل رابط تشغيل مباشر يوفّره صاحب الحقوق ويسمح بتضمينه داخل التطبيق (HLS أو MP4). رابط صفحة الموقع وحده قد لا يعمل.', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ]))),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(ctx, form.currentState?.validate() ?? false), child: const Text('إنشاء'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')), FilledButton(onPressed: () { if (form.currentState?.validate() ?? false) Navigator.pop(ctx, true); }, child: const Text('إنشاء'))],
       ),
     ));
     if (ok == true) {
