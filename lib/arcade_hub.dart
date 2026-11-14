@@ -7,6 +7,7 @@ import 'football_quiz.dart';
 import 'arcade_minigames.dart';
 import 'arcade_penalty.dart';
 import 'social_party_games.dart';
+import 'board_games.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -162,6 +163,15 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
         ),
       ),
       const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.grid_4x4_rounded)),
+          title: const Text('ألعاب الطاولة'),
+          subtitle: const Text('الدومينو • الدامة • لاعبان على نفس الجهاز'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BoardGamesPage())),
+        ),
+      ),
       const SizedBox(height: 10),
       _section('اختبر معلوماتك بالأنمي','جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
       _section('حجر ورقة مقص','تحدّى الكمبيوتر واربح 3 نقاط',Icons.sports_esports,Colors.orange,_rpsCard()),
