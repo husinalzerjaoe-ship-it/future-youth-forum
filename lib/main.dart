@@ -1078,6 +1078,8 @@ class MemberProfilePage extends StatelessWidget {
             StarRateControl(uid: uid),
             Center(child: RatingSummary(uid: uid)),
             const Divider(height: 28),
+            MemberActivityStats(uid: uid, joinedAt: d['createdAt']),
+            const SizedBox(height: 12),
             const Text('منشوراته', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             MemberPosts(uid: uid),
           ]);
