@@ -588,7 +588,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
               final data=d.data();
               if(blockedIds.contains((data['senderId']??'').toString())) return false;
               if(_searchQuery.isEmpty) return true;
-              final text='${data['text']??''} ${data['senderName']??''}'.toLowerCase();
+              final text = "${data['text'] ?? ''} ${data['senderName'] ?? ''}".toLowerCase();
               return text.contains(_searchQuery);
             }).toList();
             if(visible.isEmpty)return Center(child:Text(_searchQuery.isEmpty?'ابدأ أول محادثة في الساحة ✨':'ما لقينا رسائل تطابق بحثك 🔎'));
