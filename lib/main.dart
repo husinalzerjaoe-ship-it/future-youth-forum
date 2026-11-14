@@ -19,6 +19,7 @@ import 'arcade_hub.dart';
 import 'football_news.dart';
 import 'community_expansion.dart';
 import 'match_center.dart';
+import 'achievement_hub.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -239,6 +240,9 @@ class _HomePageState extends State<HomePage> {
                 case 'arcade':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ArcadeHubPage()));
                   break;
+                case 'achievements':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementHubPage()));
+                  break;
                 case 'matchCenter':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchCenterPage()));
                   break;
@@ -266,6 +270,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'extras', child: ListTile(leading: Icon(Icons.hub_outlined), title: Text('الغرف الخاصة والملفات والموسيقى'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dailyWorld', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('عالمك اليومي: العمر والأبراج والاستخارة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'arcade', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مدينة الترفيه والألعاب والنقاط'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_outlined), title: Text('إنجازاتي والحضور اليومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'matchCenter', child: ListTile(leading: Icon(Icons.scoreboard_outlined), title: Text('مركز المباريات والنتائج'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityExpansion', child: ListTile(leading: Icon(Icons.stadium), title: Text('استاد الأصدقاء والفعاليات والمجتمعات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'safety', child: ListTile(leading: Icon(Icons.shield_outlined), title: Text('الأمان والحظر'), contentPadding: EdgeInsets.zero)),
