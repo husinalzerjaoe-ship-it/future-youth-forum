@@ -433,7 +433,7 @@ class _PrivateRoomVoicePlayer extends StatefulWidget {
 }
 class _PrivateRoomVoicePlayerState extends State<_PrivateRoomVoicePlayer>{
  late final AudioPlayer player;
- @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _){});}
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((Object _) => Duration.zero);}
  @override void dispose(){player.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>SizedBox(width:220,child:Row(children:[
   StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){final playing=s.data?.playing??false;return IconButton(onPressed:()async{if(playing){await player.pause();}else{await player.play();}},icon:Icon(playing?Icons.pause_circle:Icons.play_circle,color:Colors.deepPurple,size:30));}),
