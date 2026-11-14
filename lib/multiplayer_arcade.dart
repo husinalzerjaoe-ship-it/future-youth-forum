@@ -26,7 +26,8 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
     try {
       final code = (100000 + Random.secure().nextInt(900000)).toString();
       final ref = _db.collection('gameRooms').doc(code);
-      if ((await ref.get()).exists) throw Exception('تعذر توليد رمز جديد، حاول مرة ثانية');
+      // Do not pre-read a not-yet-created room: Firestore rules intentionally
+      // restrict room reads, and a missing document can be denied by that rule.
       await ref.set({
         'game': 'xo', 'hostId': _uid, 'roomCode': code, 'members': [_uid],
         'memberNames': {_uid: _name}, 'status': 'waiting',
