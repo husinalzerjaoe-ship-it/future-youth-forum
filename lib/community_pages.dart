@@ -177,7 +177,7 @@ class _StoriesPageState extends State<StoriesPage>{
    if(docs.isEmpty)return const Center(child:Text('ماكو ستوريات حالياً'));
    return ListView(children:docs.map((doc){final d=doc.data();final video=d['mediaType']=='video';final url=d['mediaUrl'] as String;
     return Card(clipBehavior:Clip.antiAlias,child:Column(children:[
-     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو')),
+     ListTile(leading:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:db2.collection('publicProfiles').doc((d['authorId']??'').toString()).snapshots(),builder:(ctx,profile){final photo=profile.data?.data()?['photoUrl'] as String?;return CircleAvatar(backgroundImage:photo!=null&&photo.startsWith('https://')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('https://')?const Icon(Icons.person):null);}),title:Text(d['authorName'] as String? ??'عضو')),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
