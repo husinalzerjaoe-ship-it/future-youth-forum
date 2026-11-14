@@ -753,8 +753,19 @@ service cloud.firestore {
           && request.auth.uid in roomMembers()
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && request.resource.data.text.size() <= 2000
+          && (
+            (request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
+            || (request.resource.data.type == 'image'
+              && request.resource.data.imageUrl is string
+              && request.resource.data.imageUrl.matches('https://.*'))
+            || (request.resource.data.type == 'voice'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*')
+              && request.resource.data.durationSeconds is int
+              && request.resource.data.durationSeconds >= 1
+              && request.resource.data.durationSeconds <= 180)
+          );
         allow update: if false;
         allow delete: if request.auth != null
           && request.auth.uid in roomMembers()
