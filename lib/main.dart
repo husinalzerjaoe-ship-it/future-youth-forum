@@ -16,6 +16,7 @@ import 'extra_community_features.dart';
 import 'local_audio_handler.dart';
 import 'daily_world.dart';
 import 'arcade_hub.dart';
+import 'football_news.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -268,11 +269,12 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: IndexedStack(index: selected, children: const [PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
+      body: IndexedStack(index: selected, children: const [FootballNewsPage(), PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
         destinations: const [
+          NavigationDestination(icon: Icon(Icons.sports_soccer_outlined), selectedIcon: Icon(Icons.sports_soccer), label: 'الأخبار'),
           NavigationDestination(icon: Icon(Icons.dynamic_feed_outlined), selectedIcon: Icon(Icons.dynamic_feed), label: 'المنشورات'),
           NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'المحادثة العامة'),
           NavigationDestination(icon: Icon(Icons.grid_view_rounded), selectedIcon: Icon(Icons.grid_view), label: 'الأقسام'),
