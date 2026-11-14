@@ -532,7 +532,16 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
-    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    Expanded(child:AnimatedContainer(
+      duration: const Duration(milliseconds: 850),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight, end: Alignment.bottomLeft,
+          colors: [Color(_background), Color(_background).withOpacity(.78), Color(_background).withOpacity(.92)],
+        ),
+      ),
+      child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
       stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
       builder:(context,blocks){
         if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
