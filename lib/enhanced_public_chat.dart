@@ -33,6 +33,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   DateTime? _lastSuccessfulSend;
   String? _error;
   String? _pulseMessageId;
+  String _searchQuery = '';
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
     final normalized = value.toLowerCase().replaceAll(RegExp(r'[\sـ]+'), '');
@@ -529,6 +530,24 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
     ])),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
+      child: TextField(
+        onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'ابحث في رسائل الساحة وأسماء الأعضاء...',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+            tooltip: 'مسح البحث', onPressed: () => setState(() => _searchQuery = ''),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: .92),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        ),
+      ),
+    ),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
       stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
       builder:(context,s){
@@ -565,8 +584,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           builder:(c,s){
             if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
             if(!s.hasData)return const Center(child:CircularProgressIndicator());
-            final visible=s.data!.docs.where((d)=>!blockedIds.contains((d.data()['senderId']??'').toString())).toList();
-            if(visible.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
+            final visible=s.data!.docs.where((d) {
+              final data=d.data();
+              if(blockedIds.contains((data['senderId']??'').toString())) return false;
+              if(_searchQuery.isEmpty) return true;
+              final text='\${data['text']??''} \${data['senderName']??''}'.toLowerCase();
+              return text.contains(_searchQuery);
+            }).toList();
+            if(visible.isEmpty)return Center(child:Text(_searchQuery.isEmpty?'ابدأ أول محادثة في الساحة ✨':'ما لقينا رسائل تطابق بحثك 🔎'));
             return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
           },
         );
