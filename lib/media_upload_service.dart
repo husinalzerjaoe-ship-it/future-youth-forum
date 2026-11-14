@@ -19,6 +19,7 @@ Future<String> uploadForumMedia(
   switch (folder) {
     case 'anime-wallpapers':
     case 'public-chat':
+    case 'voice-messages':
     case 'stories':
     case 'private-chat':
     case 'chat-backgrounds':
@@ -38,9 +39,13 @@ Future<String> uploadForumMedia(
 
   // Existing accounts may predate the onUserCreated trigger. This callable
   // safely adds role=authenticated to the current user's custom claims.
-  await FirebaseFunctions.instance
-      .httpsCallable('ensureSupabaseAuthenticatedRole')
-      .call();
+  try {
+    await FirebaseFunctions.instance
+        .httpsCallable('ensureSupabaseAuthenticatedRole')
+        .call();
+  } on FirebaseFunctionsException catch (e) {
+    throw StateError('تعذر تجهيز صلاحية رفع الوسائط (' + e.code + '). شغّل نشر Cloud Functions ثم أعد تسجيل الدخول.');
+  }
 
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
