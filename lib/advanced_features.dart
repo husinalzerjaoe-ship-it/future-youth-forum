@@ -30,7 +30,25 @@ class DirectMessagesPage extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
         builder: (context, s) {
-          if (s.hasError) return const Center(child: Text('تعذر تحميل الرسائل. تأكد من نشر قواعد Firestore.'));
+          if (s.hasError) {
+            final error = s.error;
+            final code = error is FirebaseException ? error.code : 'unknown';
+            return Center(child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.mark_email_unread_outlined, size: 42),
+                const SizedBox(height: 10),
+                const Text('تعذر تحميل الرسائل الخاصة'),
+                const SizedBox(height: 6),
+                Text('رمز الخطأ: $code', style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                const SizedBox(height: 8),
+                const Text('تحقق من اتصال الإنترنت وصلاحيات Firestore، ثم أعد المحاولة.', textAlign: TextAlign.center),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(onPressed: () { (context as Element).markNeedsBuild(); },
+                  icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
+              ]),
+            ));
+          }
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           if (s.data!.docs.isEmpty) return const Center(child: Text('ما عندك محادثات بعد. ابدأ محادثة جديدة.'));
           final conversations = [...s.data!.docs]..sort((a, b) {
