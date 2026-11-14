@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -810,7 +809,7 @@ class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
   @override void initState() {
     super.initState();
     player = AudioPlayer();
-    player.setUrl(widget.url).catchError((Object _) {});
+    player.setUrl(widget.url).catchError((Object _) => Duration.zero);
   }
   @override void dispose() { player.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) => Container(
