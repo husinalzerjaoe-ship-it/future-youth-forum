@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'multiplayer_arcade.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -107,6 +108,16 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
         const SizedBox(height:16),Row(children:[const Icon(Icons.stars,color:Colors.amber,size:30),const SizedBox(width:8),Text('$_score نقطة',style:const TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.bold)),const Spacer(),FilledButton.tonal(onPressed:_dailyClaimed||_busy?null:_claimDaily,child:Text(_dailyClaimed?'استلمت هدية اليوم':'هدية اليوم +10 🎁'))])
       ])),
       const SizedBox(height:18),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.people_alt_rounded)),
+          title: const Text('صالة الألعاب أونلاين', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('غرف خاصة وتحديات مباشرة مع الأصدقاء'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultiplayerArcadePage())),
+        ),
+      ),
+      const SizedBox(height: 10),
       _section('اختبر معلوماتك بالأنمي','جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
       _section('حجر ورقة مقص','تحدّى الكمبيوتر واربح 3 نقاط',Icons.sports_esports,Colors.orange,_rpsCard()),
       _section('لغز اليوم','فكّر قبل ما تشوف الحل',Icons.lightbulb_outline,Colors.teal,_riddleCard()),
