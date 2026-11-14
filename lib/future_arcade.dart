@@ -294,7 +294,7 @@ class _ArcadeTournamentsPageState extends State<ArcadeTournamentsPage> {
       const Text('أنشئ بطولة جديدة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:17)),
       TextField(controller:_title,decoration:const InputDecoration(labelText:'اسم البطولة')),
       const SizedBox(height:8),DropdownButtonFormField<String>(value:_game,items:_games.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);},decoration:const InputDecoration(labelText:'اللعبة')),
-      const SizedBox(height:8),FilledButton(onPressed:_busy?_null:_create,child:const Text('إنشاء البطولة')),
+      const SizedBox(height:8),FilledButton(onPressed:_busy?null:_create,child:const Text('إنشاء البطولة')),
     ]))),
     const SizedBox(height:12),const Text('البطولات المفتوحة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeTournaments').where('status',isEqualTo:'open').snapshots(),builder:(c,s){if(s.hasError)return const Text('تعذر تحميل البطولات.');if(!s.hasData)return const Center(child:CircularProgressIndicator());return Column(children:s.data!.docs.map((d){final x=d.data();final joined=List<String>.from(x['participants']??[]).contains(_uid);return Card(child:ListTile(title:Text(x['title']??'بطولة'),subtitle:Text((_games[x['gameId']]??'لعبة')+' • '+List<String>.from(x['participants']??[]).length.toString()+' مشاركين'),trailing:joined?const Icon(Icons.check_circle,color:Colors.green):TextButton(onPressed:()=>_join(d),child:const Text('انضم'))));}).toList());}),
