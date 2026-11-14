@@ -482,7 +482,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final tierLabel = switch (tier) { 'gold' => 'ذهبية', 'silver' => 'فضية', 'diamond' => 'ماسية', 'legendary' => 'أسطورية', _ => 'مميزة' };
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
-    return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
+    return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onDoubleTap:()=>_react(doc.id,'❤️'),onHorizontalDragEnd:(details){if(details.primaryVelocity!=null&&details.primaryVelocity!.abs()>250){setState(()=>_reply=doc);}},onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
       decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(tierColor!=null?tierColor.withValues(alpha:.13):(mine?const Color(0xFFE8E2FF):Colors.white)),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.7),width:founder?2.6:(tierColor!=null?2:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -511,7 +511,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
-          ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
+          ...['❤️','😂','🔥','👏','😍','🥹','💜','🎉'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
             final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
             return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:11));
@@ -525,7 +525,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
     Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:const BoxDecoration(gradient:LinearGradient(colors:[Color(0xFF171936),Color(0xFF5144B8),Color(0xFF8C7CF0)])),child:Row(children:[
       const Icon(Icons.forum,color:Colors.white,size:30),const SizedBox(width:9),
-      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('صور • GIF • ملصقات • مسابقات',style:TextStyle(color:Colors.white70,fontSize:11))])),
+      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('اسحب الرسالة للرد • اضغط مرتين للإعجاب',style:TextStyle(color:Colors.white70,fontSize:11))])),
       StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Text((s.data?.docs.length??0).toString()+' متصل',style:const TextStyle(color:Colors.white,fontSize:11))),
       IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
@@ -603,7 +603,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }),
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
-    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
+    Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
       IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
