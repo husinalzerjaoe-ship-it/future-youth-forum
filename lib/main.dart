@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,6 +14,7 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'local_audio_handler.dart';
+import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -273,24 +273,6 @@ class _HomePageState extends State<HomePage> {
     ));
   }
 }
-
-String? _youtubeVideoId(String raw) {
-  final uri = Uri.tryParse(raw.trim());
-  if (uri == null || !['http', 'https'].contains(uri.scheme)) return null;
-  final host = uri.host.toLowerCase().replaceFirst(RegExp(r'^www\.'), '');
-  if (host == 'youtu.be') {
-    return uri.pathSegments.isNotEmpty ? _validYoutubeId(uri.pathSegments.first) : null;
-  }
-  if (!['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'].contains(host)) return null;
-  if (uri.path == '/watch') return _validYoutubeId(uri.queryParameters['v'] ?? '');
-  if (uri.pathSegments.length >= 2 && ['embed', 'shorts', 'live', 'v'].contains(uri.pathSegments.first)) {
-    return _validYoutubeId(uri.pathSegments[1]);
-  }
-  return null;
-}
-
-String? _validYoutubeId(String value) =>
-    RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(value) ? value : null;
 
 class PostsPage extends StatelessWidget {
 
@@ -1082,79 +1064,4 @@ class _MemberSearchPageState extends State<MemberSearchPage> {
       ),
     );
   }
-}
-
-class YouTubeVideoPlayer extends StatefulWidget {
-  final String url;
-  const YouTubeVideoPlayer({super.key, required this.url});
-  @override State<YouTubeVideoPlayer> createState() => _YouTubeVideoPlayerState();
-}
-
-class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
-  WebViewController? _controller;
-  bool _loading = true;
-  bool _failed = false;
-  String? get _id => _youtubeVideoId(widget.url);
-
-  @override
-  void initState() { super.initState(); _createPlayer(); }
-
-  @override
-  void didUpdateWidget(covariant YouTubeVideoPlayer oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) _createPlayer();
-  }
-
-  void _createPlayer() {
-    final id = _id;
-    if (id == null) { _controller = null; _loading = false; _failed = true; return; }
-    _loading = true;
-    _failed = false;
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF000000))
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) { if (mounted) setState(() => _loading = false); },
-        onWebResourceError: (error) {
-          if (error.isForMainFrame == true && mounted) {
-            setState(() { _loading = false; _failed = true; });
-          }
-        },
-      ));
-    _controller = controller;
-    controller.loadHtmlString('''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><iframe src="https://www.youtube.com/embed/$id?playsinline=1&rel=0" title="YouTube video player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></body></html>''', baseUrl: 'https://www.youtube.com');
-  }
-
-  Future<void> _openExternal() async {
-    final uri = Uri.tryParse(widget.url);
-    if (uri != null && ['https', 'http'].contains(uri.scheme)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(12),
-    child: AspectRatio(
-      aspectRatio: 16 / 9,
-      child: Stack(fit: StackFit.expand, children: [
-        if (_controller != null && !_failed)
-          WebViewWidget(controller: _controller!)
-        else
-          ColoredBox(color: Colors.black87, child: Center(child: TextButton.icon(
-            onPressed: _openExternal,
-            icon: const Icon(Icons.open_in_new, color: Colors.white),
-            label: const Text('افتح الفيديو في يوتيوب', style: TextStyle(color: Colors.white)),
-          ))),
-        if (_loading && !_failed)
-          const ColoredBox(color: Colors.black45, child: Center(child: CircularProgressIndicator(color: Colors.white))),
-        if (_failed && _id != null)
-          ColoredBox(color: Colors.black87, child: Center(child: TextButton.icon(
-            onPressed: _openExternal,
-            icon: const Icon(Icons.play_circle_fill, color: Colors.white),
-            label: const Text('تعذر التشغيل؟ افتحه في يوتيوب', style: TextStyle(color: Colors.white)),
-          ))),
-      ]),
-    ),
-  );
 }
