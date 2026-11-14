@@ -872,14 +872,12 @@ service cloud.firestore {
     match /communityQuestions/{questionId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && accountNotBanned()
-        && request.resource.data.authorId == request.auth.uid
         && request.resource.data.anonymous == true
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
         && request.resource.data.text.size() <= 700;
       allow update: if false;
-      allow delete: if isChatStaff()
-        || (request.auth != null && resource.data.authorId == request.auth.uid);
+      allow delete: if isChatStaff();
     }
 
     match /interestPosts/{postId} {
