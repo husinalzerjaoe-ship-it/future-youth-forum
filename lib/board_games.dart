@@ -96,6 +96,7 @@ class CheckersGamePage extends StatefulWidget {
 class _CheckersGamePageState extends State<CheckersGamePage>{
   late List<int> board;
   int turn=1,redScore=0,blackScore=0;
+  bool gameOver=false;
   int? selected;
   String message='دور الأحمر';
   @override void initState(){super.initState();reset();}
@@ -103,12 +104,13 @@ class _CheckersGamePageState extends State<CheckersGamePage>{
     board=List.filled(64,0);
     for(var r=0;r<3;r++){for(var c=0;c<8;c++){if((r+c).isOdd)board[r*8+c]=2;}}
     for(var r=5;r<8;r++){for(var c=0;c<8;c++){if((r+c).isOdd)board[r*8+c]=1;}}
-    turn=1;selected=null;message='دور الأحمر';setState((){});
+    turn=1;selected=null;gameOver=false;message='دور الأحمر';setState((){});
   }
   bool mine(int p)=>p!=0&&((p==1||p==3)==(turn==1));
   bool king(int p)=>p==3||p==4;
-  bool enemy(int a,int b)=>a!=0&&b!=0&&((a<=2&&b>=3)||(a>=3&&b<=2));
+  bool enemy(int a,int b)=>a!=0&&b!=0&&((a==1||a==3)!=(b==1||b==3));
   void tap(int i){
+    if(gameOver)return;
     final p=board[i];
     if(selected==null){if(mine(p))setState(()=>selected=i);return;}
     if(mine(p)){setState(()=>selected=i);return;}
@@ -126,7 +128,7 @@ class _CheckersGamePageState extends State<CheckersGamePage>{
       if(mover==1&&tr==0)board[i]=3;if(mover==2&&tr==7)board[i]=4;
       selected=null;turn=turn==1?2:1;message='دور '+(turn==1?'الأحمر':'الأسود');
       final red=board.where((x)=>x==1||x==3).length,black=board.where((x)=>x==2||x==4).length;
-      if(red==0){blackScore++;message='فاز الأسود!';}else if(black==0){redScore++;message='فاز الأحمر!';}
+      if(red==0){blackScore++;message='فاز الأسود!';gameOver=true;}else if(black==0){redScore++;message='فاز الأحمر!';gameOver=true;}
     });
   }
   @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
