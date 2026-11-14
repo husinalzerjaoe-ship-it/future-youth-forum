@@ -864,24 +864,6 @@ service cloud.firestore {
               && !(request.auth.uid in request.resource.data.members))
           ))
       );
-        ||
-        // Football quiz: members submit one answer per round; host controls start and next round.
-        (resource.data.game == 'football_quiz'
-          && request.auth.uid in resource.data.members
-          && request.resource.data.members == resource.data.members
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['answers', 'scores', 'round', 'status', 'updatedAt'])
-          && request.resource.data.answers is map
-          && request.resource.data.scores is map
-          && request.resource.data.round is int
-          && request.resource.data.status in ['waiting', 'playing', 'finished'])
-        ||
-        (resource.data.game == 'football_quiz'
-          && request.auth.uid == resource.data.hostId
-          && resource.data.members.size() >= 2
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['status', 'updatedAt'])
-          && request.resource.data.status == 'playing')
       allow delete: if request.auth != null && request.auth.uid == resource.data.hostId;
       match /messages/{messageId} {
         function partyMembers() {
