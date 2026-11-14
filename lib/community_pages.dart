@@ -11,6 +11,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 import 'engagement_features.dart';
 import 'game_center.dart';
@@ -451,7 +452,68 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
  final url=TextEditingController();
  String category='أغاني';
  bool busy=false;
+
  static const categories=['أغاني','فيديوهات','أفلام ومقاطع رسمية','تعليم','متنوع'];
+ static const featuredTracks=[
+  {'title':"موسيقى عراقية تراثية",'artist':"تراث عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام اللامي",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام الحجاز",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"جورج وسوف – كلام الناس",'artist':"جورج وسوف",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – زيديني عشقاً",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – مدرسة الحب",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"ماجدة الرومي – كلمات",'artist':"ماجدة الرومي",'category':"طرب عربي"},
+  {'title':"فيروز – نسم علينا الهوى",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"فيروز – كان عنا طاحون",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"أم كلثوم – ألف ليلة وليلة",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"عبد الحليم حافظ – قارئة الفنجان",'artist':"عبد الحليم حافظ",'category':"طرب عربي"},
+  {'title':"محمد عبده – الأماكن",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"راشد الماجد – المسافر",'artist':"راشد الماجد",'category':"خليجي"},
+  {'title':"عبد المجيد عبد الله – تتنفسك دنياي",'artist':"عبد المجيد عبد الله",'category':"خليجي"},
+  {'title':"أصالة – عيش سكر وطن",'artist':"أصالة",'category':"عربي حديث"},
+  {'title':"شيرين – مشاعر",'artist':"شيرين",'category':"عربي حديث"},
+  {'title':"عمرو دياب – تملي معاك",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"عمرو دياب – نور العين",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"محمد حماقي – أجمل يوم",'artist':"محمد حماقي",'category':"عربي حديث"},
+  {'title':"إليسا – عايشالك",'artist':"إليسا",'category':"عربي حديث"},
+  {'title':"نانسي عجرم – يا سلام",'artist':"نانسي عجرم",'category':"عربي حديث"},
+  {'title':"حمزة نمرة – داري يا قلبي",'artist':"حمزة نمرة",'category':"عربي حديث"},
+  {'title':"أدهم نابلسي – هو الحب",'artist':"أدهم نابلسي",'category':"عربي حديث"},
+  {'title':"سيف نبيل – فدوه اروحلك",'artist':"سيف نبيل",'category':"عراقي حديث"},
+  {'title':"ماجد المهندس – تناديك",'artist':"ماجد المهندس",'category':"عراقي حديث"},
+  {'title':"رحمة رياض – وعد مني",'artist':"رحمة رياض",'category':"عراقي حديث"},
+  {'title':"إلهام المدفعي – خيّال",'artist':"إلهام المدفعي",'category':"عراقي وتراث"},
+  {'title':"ناظم الغزالي – طالعة من بيت أبوها",'artist':"ناظم الغزالي",'category':"عراقي وتراث"},
+  {'title':"سعدون جابر – يا طيور الطايرة",'artist':"سعدون جابر",'category':"عراقي وتراث"},
+  {'title':"فؤاد سالم – غريبة الروح",'artist':"فؤاد سالم",'category':"عراقي وتراث"},
+  {'title':"The Beatles – Here Comes the Sun",'artist':"The Beatles",'category':"عالمي"},
+  {'title':"Queen – Bohemian Rhapsody",'artist':"Queen",'category':"عالمي"},
+  {'title':"Coldplay – Viva La Vida",'artist':"Coldplay",'category':"عالمي"},
+  {'title':"Ed Sheeran – Perfect",'artist':"Ed Sheeran",'category':"عالمي"},
+  {'title':"Adele – Someone Like You",'artist':"Adele",'category':"عالمي"},
+  {'title':"Imagine Dragons – Demons",'artist':"Imagine Dragons",'category':"عالمي"},
+  {'title':"Ludovico Einaudi – Nuvole Bianche",'artist':"Ludovico Einaudi",'category':"هادئ وآلات"},
+  {'title':"Yiruma – River Flows in You",'artist':"Yiruma",'category':"هادئ وآلات"},
+  {'title':"Debussy – Clair de Lune",'artist':"Claude Debussy",'category':"كلاسيكي"},
+  {'title':"Beethoven – Moonlight Sonata",'artist':"Ludwig van Beethoven",'category':"كلاسيكي"},
+  {'title':"Mozart – Eine kleine Nachtmusik",'artist':"Wolfgang Amadeus Mozart",'category':"كلاسيكي"},
+  {'title':"Vivaldi – The Four Seasons Spring",'artist':"Antonio Vivaldi",'category':"كلاسيكي"},
+  {'title':"Bach – Air on the G String",'artist':"Johann Sebastian Bach",'category':"كلاسيكي"},
+  {'title':"Chopin – Nocturne Op.9 No.2",'artist':"Frédéric Chopin",'category':"كلاسيكي"},
+  {'title':"Tchaikovsky – Swan Lake",'artist':"Pyotr Ilyich Tchaikovsky",'category':"كلاسيكي"},
+  {'title':"Erik Satie – Gymnopédie No.1",'artist':"Erik Satie",'category':"هادئ وآلات"},
+  {'title':"Kevin MacLeod – Carefree",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Kevin MacLeod – Monkeys Spinning Monkeys",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – Signal to Noise",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – The Illusionist",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Chris Zabriskie – Cylinder Seven",'artist':"Chris Zabriskie",'category':"موسيقى مجانية"},
+ ];
+ Future<void> openFeatured(Map<String,String> track) async {
+  final query='${track['artist']} ${track['title']} official audio';
+  final uri=Uri.https('www.youtube.com','/results',{'search_query':query});
+  try { await launchUrl(uri,mode:LaunchMode.externalApplication); }
+  catch (_) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر فتح نتائج الموسيقى'))); }
+ }
+
  bool validYoutube(String value) => isSupportedYoutubeUrl(value);
  Future<void> add() async {
   if(title.text.trim().isEmpty||!validYoutube(url.text)) {
@@ -506,8 +568,16 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
     builder:(c,s){
      if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
-     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو روابط بعد. أضف أول أغنية أو فيديو'));
-     return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
+          return ListView(padding:const EdgeInsets.all(12),children:[
+     Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 50 اختياراً من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
+     ...featuredTracks.map((track)=>Card(child:ListTile(
+      leading:const CircleAvatar(child:Icon(Icons.music_note)),
+      title:Text(track['title']!),
+      subtitle:Text('${track['artist']} • ${track['category']}'),
+      trailing:const Icon(Icons.open_in_new),
+      onTap:()=>openFeatured(track),
+     ))),
+     ...s.data!.docs.map((doc){
       final d=doc.data();
       return Card(child:ListTile(
        leading:const CircleAvatar(child:Icon(Icons.play_arrow)),
@@ -516,7 +586,8 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
        trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو')),
        onTap:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو'),
       ));
-     }).toList());
+     }),
+    ]);
     },
    ),
   ),
