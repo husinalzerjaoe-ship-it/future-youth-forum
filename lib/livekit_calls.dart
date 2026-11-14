@@ -23,6 +23,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   bool _connecting = false;
   bool _videoEnabled = false;
   bool _microphoneEnabled = true;
+  bool _speakerEnabled = true;
+  int _videoFilter = 0;
   String? _error;
   String? _endpoint;
 
@@ -205,12 +207,55 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     if (mounted) setState(() => _error = null);
   }
 
+  ColorFilter _selectedVideoFilter() {
+    switch (_videoFilter) {
+      case 1:
+        return const ColorFilter.matrix(<double>[
+          .2126,.7152,.0722,0,0, .2126,.7152,.0722,0,0,
+          .2126,.7152,.0722,0,0, 0,0,0,1,0,
+        ]);
+      case 2:
+        return const ColorFilter.matrix(<double>[
+          1.12,.04,0,0,8, .02,1.02,0,0,2, 0,.02,.88,0,-5, 0,0,0,1,0,
+        ]);
+      case 3:
+        return const ColorFilter.matrix(<double>[
+          .92,0,.08,0,8, 0,.94,.06,0,2, .08,0,1.12,0,10, 0,0,0,1,0,
+        ]);
+      case 4:
+        return const ColorFilter.matrix(<double>[
+          1.08,0,.04,0,5, .02,.92,.08,0,0, .08,.04,1.12,0,8, 0,0,0,1,0,
+        ]);
+      default:
+        return const ColorFilter.mode(Colors.transparent, BlendMode.dst);
+    }
+  }
+
+  Future<void> _copyRoomCode() async {
+    final code = _room?.name ?? _roomController.text.trim();
+    if (code.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ رمز الغرفة، أرسله لأصدقائك')),
+    );
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerEnabled;
+    try {
+      await lk.AudioManager.instance.setSpeakerOutputPreferred(next);
+      if (mounted) setState(() => _speakerEnabled = next);
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر تغيير مخرج الصوت: $error');
+    }
+  }
+
   Widget _participantTile(lk.Participant participant, {required bool local}) {
     Widget? video;
     for (final publication in participant.videoTrackPublications) {
       final track = publication.track;
       if (publication.subscribed && track is lk.VideoTrack && !publication.isScreenShare) {
-        video = lk.VideoTrackRenderer(track);
+        video = ColorFiltered(colorFilter: _selectedVideoFilter(), child: lk.VideoTrackRenderer(track));
         break;
       }
     }
@@ -287,10 +332,27 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
                         color: const Color(0xFF171936),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Text('الغرفة: ${room.name}  •  المشاركون: ${participants.length}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: Row(children: [
+                        const Icon(Icons.groups_rounded, color: Colors.white70),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text('الغرفة: ${room.name}  •  المشاركون: ${participants.length}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                        IconButton(onPressed: _copyRoomCode, tooltip: 'نسخ رمز الغرفة',
+                          icon: const Icon(Icons.copy_rounded, color: Colors.white)),
+                      ]),
                     ),
                     const SizedBox(height: 12),
+                    if (_videoFilter != 0 || participants.any((p) => p.videoTrackPublications.isNotEmpty))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Wrap(alignment: WrapAlignment.center, spacing: 7, children: [
+                          ChoiceChip(label: const Text('طبيعي'), selected: _videoFilter == 0, onSelected: (_) => setState(() => _videoFilter = 0)),
+                          ChoiceChip(label: const Text('أبيض وأسود'), selected: _videoFilter == 1, onSelected: (_) => setState(() => _videoFilter = 1)),
+                          ChoiceChip(label: const Text('دافئ'), selected: _videoFilter == 2, onSelected: (_) => setState(() => _videoFilter = 2)),
+                          ChoiceChip(label: const Text('بارد'), selected: _videoFilter == 3, onSelected: (_) => setState(() => _videoFilter = 3)),
+                          ChoiceChip(label: const Text('بنفسجي'), selected: _videoFilter == 4, onSelected: (_) => setState(() => _videoFilter = 4)),
+                        ]),
+                      ),
                     Expanded(
                       child: GridView.builder(
                         itemCount: participants.length,
@@ -312,6 +374,11 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
                           tooltip: _microphoneEnabled ? 'كتم المايكروفون' : 'تشغيل المايكروفون',
                           onPressed: _toggleMicrophone,
                           icon: Icon(_microphoneEnabled ? Icons.mic : Icons.mic_off),
+                        ),
+                        IconButton.filledTonal(
+                          tooltip: _speakerEnabled ? 'تحويل الصوت للسماعة' : 'تشغيل مكبر الصوت',
+                          onPressed: _toggleSpeaker,
+                          icon: Icon(_speakerEnabled ? Icons.volume_up_rounded : Icons.hearing_rounded),
                         ),
                         IconButton.filledTonal(
                           tooltip: _videoEnabled ? 'إيقاف الكاميرا' : 'تشغيل الكاميرا',
