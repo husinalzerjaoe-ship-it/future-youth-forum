@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -36,42 +35,29 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // First inspect the existing Firebase token. Most users already have the
-  // Supabase authenticated claim from account creation, so do not make every
-  // upload depend on a separately deployed callable function.
-  Future<Map<String, dynamic>> readClaims({required bool forceRefresh}) async {
-    final token = await user.getIdToken(forceRefresh);
-    if (token == null || token.split('.').length != 3) {
-      throw StateError('تعذر قراءة رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
-    }
-    final payload = token.split('.')[1];
-    return jsonDecode(
-      utf8.decode(base64Url.decode(base64Url.normalize(payload))),
-    ) as Map<String, dynamic>;
+  // Supabase trusts Firebase as a Third-Party Auth provider. Firebase ID
+  // tokens do not need a custom "role" claim: Supabase assigns the anon role
+  // when role is absent, and the bucket RLS policies below validate the signed
+  // Firebase issuer, audience, subject, and sign-in provider before allowing
+  // uploads into this user's own folder.
+  final token = await user.getIdToken(true);
+  if (token == null || token.split('.').length != 3) {
+    throw StateError('تعذر قراءة رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
   }
-
-  var claims = await readClaims(forceRefresh: false);
-  if (claims['role'] != 'authenticated') {
-    // Backward compatibility for older accounts. If the callable is absent,
-    // surface a clear setup error instead of the raw NOT_FOUND stack trace.
-    try {
-      await FirebaseFunctions.instance
-          .httpsCallable('ensureSupabaseAuthenticatedRole')
-          .call();
-      claims = await readClaims(forceRefresh: true);
-    } on FirebaseFunctionsException catch (e) {
-      if (e.code == 'not-found') {
-        throw StateError(
-          'رفع الصور غير مهيأ لهذا الحساب: صلاحية التخزين غير موجودة '
-          'وخدمة التهيئة على Firebase غير منشورة. يلزم إعداد الصلاحية '
-          'من جهة الخادم قبل الرفع؛ لن نفتح التخزين للعامة.',
-        );
-      }
-      rethrow;
-    }
-  }
-  if (claims['role'] != 'authenticated') {
-    throw StateError('صلاحية التخزين لم تتحدث بعد. أعد المحاولة بعد لحظات.');
+  final payload = token.split('.')[1];
+  final claims = jsonDecode(
+    utf8.decode(base64Url.decode(base64Url.normalize(payload))),
+  ) as Map<String, dynamic>;
+  final firebase = claims['firebase'];
+  if (claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8' ||
+      claims['aud'] != 'futureyouth-69f8' ||
+      claims['sub'] != user.uid ||
+      firebase is! Map ||
+      firebase['sign_in_provider'] == null) {
+    throw StateError(
+      'تعذر التحقق من هوية Firebase. تأكد من ربط Firebase كمزوّد مصادقة '
+      'خارجي في إعدادات Supabase ثم سجّل الخروج والدخول.',
+    );
   }
 
   final name = file.name.toLowerCase();
