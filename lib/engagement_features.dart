@@ -14,7 +14,7 @@ class EngagementHubPage extends StatelessWidget {
   appBar:AppBar(title:const Text('المرح والإنجازات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
    Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF171936),_c,Color(0xFF20A8B8)]),borderRadius:BorderRadius.circular(18)),child:const Text('كل يوم بداية جديدة ✨\nاجمع النقاط وتحدَّ أصدقاءك واكتشف كلمات تلهمك',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:12),const _CheckIn(),const _Points(),const LeaderboardWidget(),const _Quote(),const _Quiz(),const _News(),
+   const SizedBox(height:12),const _CheckIn(),const _Points(),const LeaderboardWidget(),const _Quote(),const _Quiz(),const _SportsNews(),const _News(),
   ]),
  ));
 }
@@ -55,4 +55,45 @@ class _News extends StatelessWidget{
  const _News();
  Future<void> add(BuildContext context)async{final title=TextEditingController(),body=TextEditingController();final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('إضافة خبر للمطور Alfredo'),content:Column(mainAxisSize:MainAxisSize.min,children:[TextField(controller:title,decoration:const InputDecoration(labelText:'العنوان')),TextField(controller:body,minLines:3,maxLines:5,decoration:const InputDecoration(labelText:'التفاصيل'))]),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('نشر'))])));if(ok==true&&title.text.trim().isNotEmpty&&body.text.trim().isNotEmpty){await _db.collection('forumAnnouncements').add({'title':title.text.trim(),'body':body.text.trim(),'author':'Alfredo','createdAt':FieldValue.serverTimestamp()});}title.dispose();body.dispose();}
  @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[const Expanded(child:Text('أخبار الملتقى والمطور',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold))),if(_founder)IconButton(onPressed:()=>add(context),icon:const Icon(Icons.add_circle,color:_c))]),StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('forumAnnouncements').orderBy('createdAt',descending:true).limit(20).snapshots(),builder:(c,s){if(s.hasError)return const Text('الأخبار غير متاحة حالياً؛ تحقق من قواعد Firestore.');if(!s.hasData)return const LinearProgressIndicator();if(s.data!.docs.isEmpty)return const Text('تابع هنا أخبار وتحديثات الملتقى.');return Column(children:s.data!.docs.map((x){final d=x.data();return ListTile(leading:const Icon(Icons.campaign,color:_c),title:Text(d['title']??'إعلان'),subtitle:Text('${d['body']??''}\n— ${d['author']??'إدارة الملتقى'}'));}).toList());})])));
+}
+
+
+class _SportsNews extends StatelessWidget {
+ const _SportsNews({super.key});
+ Future<void> _add(BuildContext context) async {
+  final title=TextEditingController(), body=TextEditingController(), source=TextEditingController();
+  final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+   title:const Text('نشر خبر رياضي'),
+   content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+    TextField(controller:title,maxLength:120,decoration:const InputDecoration(labelText:'عنوان الخبر')),
+    TextField(controller:body,minLines:3,maxLines:6,maxLength:1500,decoration:const InputDecoration(labelText:'تفاصيل الخبر')),
+    TextField(controller:source,keyboardType:TextInputType.url,decoration:const InputDecoration(labelText:'رابط المصدر (اختياري)')),
+   ])),
+   actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,true),child:const Text('نشر'))]
+  )));
+  if(ok==true && title.text.trim().isNotEmpty && body.text.trim().isNotEmpty){
+   final link=Uri.tryParse(source.text.trim());
+   if(source.text.trim().isNotEmpty && (link==null || link.scheme!='https' || link.host.isEmpty)){
+    if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('رابط المصدر يجب أن يبدأ بـ https://')));
+   } else {
+    await _db.collection('sportsNews').add({'title':title.text.trim(),'body':body.text.trim(),'sourceUrl':source.text.trim(),'authorId':_uid,'author':'Alfredo','createdAt':FieldValue.serverTimestamp()});
+   }
+  }
+  title.dispose();body.dispose();source.dispose();
+ }
+ @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+  Row(children:[const Expanded(child:Text('أخبار الرياضة وكرة القدم ⚽',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold))),if(_founder)IconButton(onPressed:()=>_add(context),icon:const Icon(Icons.add_circle,color:_c),tooltip:'نشر خبر')]),
+  const Text('أخبار ينشرها فريق الملتقى مع رابط المصدر عند توفره.',style:TextStyle(fontSize:12,color:Colors.grey)),
+  StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('sportsNews').orderBy('createdAt',descending:true).limit(30).snapshots(),builder:(c,s){
+   if(s.hasError)return const Text('تعذر تحميل الأخبار. تحقق من نشر قواعد Firestore.');
+   if(!s.hasData)return const LinearProgressIndicator();
+   if(s.data!.docs.isEmpty)return const Padding(padding:EdgeInsets.symmetric(vertical:12),child:Text('لا توجد أخبار منشورة حالياً.'));
+   return Column(children:s.data!.docs.map((doc){final d=doc.data();final url=(d['sourceUrl']??'').toString();return ListTile(
+    contentPadding:EdgeInsets.zero,leading:const Icon(Icons.sports_soccer,color:_c),
+    title:Text((d['title']??'خبر رياضي').toString(),style:const TextStyle(fontWeight:FontWeight.bold)),
+    subtitle:Text((d['body']??'').toString()),
+    trailing:url.startsWith('https://')?IconButton(icon:const Icon(Icons.open_in_new),tooltip:'فتح المصدر',onPressed:()=>launchUrl(Uri.parse(url),mode:LaunchMode.externalApplication)):null,
+   );}).toList());
+  })
+ ])));
 }
