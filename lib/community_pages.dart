@@ -27,6 +27,7 @@ import 'inspiration_hub.dart';
 import 'match_center.dart';
 import 'livekit_calls.dart';
 import 'daily_world.dart';
+import 'v6_community_suite.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -51,6 +52,7 @@ class CommunityHubPage extends StatelessWidget {
    ('مركز المباريات','مواعيد ونتائج ومتابعة أخبار الكرة',Icons.sports_soccer,const MatchCenterPage()),
    ('أبراج وحساب العمر','احسب عمرك واكتشف برجك ومعلوماته الترفيهية',Icons.cake_outlined,const LifeToolsPage()),
    ('عالمك اليومي','تحديات يومية ومزاجك ودليل الاستخارة وحساب العمر',Icons.today_rounded,const DailyWorldPage()),
+   ('المجتمع الشامل V6','أندية الاهتمامات والمهام اليومية وجدار الامتنان والسلامة',Icons.diversity_3_rounded,const V6CommunitySuitePage()),
    ('إلهام يومي','أفكار واقتباسات ومحتوى إيجابي متجدد',Icons.lightbulb_outline,const InspirationHubPage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
