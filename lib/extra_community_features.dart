@@ -115,7 +115,7 @@ class _PrivateRoomsPageState extends State<PrivateRoomsPage> {
      leading:CircleAvatar(child:Icon(voice?Icons.mic:Icons.lock_outline)),
      title:Text(x['name'] as String? ?? 'غرفة خاصة'),
      subtitle:Text((voice?'غرفة صوتية • ':'محادثة كتابية • ')+'الأعضاء: '+((x['members'] as List? ?? []).length).toString()+' • '+(x['lastMessage'] ?? ''),maxLines:1,overflow:TextOverflow.ellipsis),
-     trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+     trailing:Row(mainAxisSize:MainAxisSize.min,children:[
        if(x['ownerId']==uid||List<String>.from(x['roomAdmins']??[]).contains(uid))
         IconButton(tooltip:'إدارة الأعضاء',icon:const Icon(Icons.groups_2_outlined),onPressed:()=>manageRoom(d.id,x)),
        if(voice)IconButton(tooltip:'انضم للمكالمة الصوتية',icon:const Icon(Icons.call,color:Colors.green),onPressed:meet.isEmpty?null:()=>launchUrl(Uri.parse(meet),mode:LaunchMode.externalApplication))
