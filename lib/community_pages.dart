@@ -17,6 +17,7 @@ import 'community_events.dart';
 import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
+import 'watch_party.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -34,6 +35,7 @@ class CommunityHubPage extends StatelessWidget {
    ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
    ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
    ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
+   ('المشاهدة الجماعية','شاهدوا يوتيوب والبث المباشر معاً',Icons.groups_rounded,const WatchPartyLobbyPage()),
    ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
    ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
