@@ -241,8 +241,12 @@ class _TreasureLobbyPageState extends State<TreasureLobbyPage> {
 
   Future<bool> _join(String? value) async {
     final code = (value ?? _code.text).trim();
-    if (!RegExp(r'^\d{6}
+    if (!RegExp(r'^\d{6}$').hasMatch(code) || _busy) {
+      _toast('اكتب رمزاً من 6 أرقام');
+      return false;
+    }
     setState(() => _busy = true);
+    var joined = false;
     try {
       final room = _db.collection('gameRooms').doc(code);
       await _db.runTransaction((tx) async {
@@ -250,16 +254,36 @@ class _TreasureLobbyPageState extends State<TreasureLobbyPage> {
         if (!snap.exists) throw Exception('الغرفة غير موجودة');
         final data = snap.data()!;
         final members = List<String>.from(data['members'] ?? []);
-        if (members.contains(_uid)) return;
-        if (data['game'] != 'treasure_duel' || data['status'] != 'waiting' || members.length != 1) throw Exception('الغرفة بدأت أو اكتملت');
-        final scores = Map<String,dynamic>.from(data['scores'] ?? {}); scores[_uid] = 0;
-        tx.update(room, {'members': FieldValue.arrayUnion([_uid]), 'memberNames.$_uid': _name, 'scores': scores, 'status': 'playing', 'updatedAt': FieldValue.serverTimestamp()});
+        if (members.contains(_uid)) {
+          joined = true;
+          return;
+        }
+        if (data['game'] != 'treasure_duel' || data['status'] != 'waiting' || members.length != 1) {
+          throw Exception('الغرفة بدأت أو اكتملت');
+        }
+        final scores = Map<String, dynamic>.from(data['scores'] ?? {});
+        scores[_uid] = 0;
+        tx.update(room, {
+          'members': FieldValue.arrayUnion([_uid]),
+          'memberNames.$_uid': _name,
+          'scores': scores,
+          'status': 'playing',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        joined = true;
       });
-      if (!mounted) return;
+      if (!mounted) return joined;
       _code.clear();
-      Navigator.push(context, MaterialPageRoute(builder: (_) => TreasureRoomPage(roomId: code)));
-    } catch (e) { _toast(e.toString().replaceFirst('Exception: ', '')); }
-    finally { if (mounted) setState(() => _busy = false); }
+      if (joined) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => TreasureRoomPage(roomId: code)));
+      }
+      return joined;
+    } catch (e) {
+      _toast(e.toString().replaceFirst('Exception: ', ''));
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _invite(String roomId) async {
@@ -307,192 +331,6 @@ class _TreasureLobbyPageState extends State<TreasureLobbyPage> {
             leading: const Icon(Icons.mail), title: Text('دعوة من ${d.data()['fromName'] ?? 'صديق'}'),
             subtitle: Text('غرفة ${d.data()['roomCode'] ?? d.data()['roomId']}'),
             trailing: FilledButton(onPressed: _busy ? null : () async { final joined = await _join(d.data()['roomId']?.toString()); if (joined && mounted) await d.reference.update({'status':'accepted'}); }, child: const Text('انضم')),
-          ))).toList());
-        },
-      ),
-    ]),
-  ));
-}
-
-class TreasureRoomPage extends StatefulWidget {
-  final String roomId;
-  const TreasureRoomPage({super.key, required this.roomId});
-  @override State<TreasureRoomPage> createState() => _TreasureRoomPageState();
-}
-class _TreasureRoomPageState extends State<TreasureRoomPage> {
-  final _db = FirebaseFirestore.instance;
-  bool _busy = false;
-  String get _uid => FirebaseAuth.instance.currentUser!.uid;
-  DocumentReference<Map<String,dynamic>> get _room => _db.collection('gameRooms').doc(widget.roomId);
-  Future<void> _move(int target, Map<String,dynamic> data) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await _db.runTransaction((tx) async {
-        final snap = await tx.get(_room);
-        if (!snap.exists) throw Exception('الغرفة انتهت');
-        final d = snap.data()!;
-        final members = List<String>.from(d['members'] ?? []);
-        final positions = List<int>.from(d['positions'] ?? [0,48]);
-        final treasures = List<int>.from(d['treasures'] ?? []);
-        if (d['status'] != 'playing' || !members.contains(_uid) || d['turn'] != _uid) throw Exception('انتظر دورك');
-        final index = members.indexOf(_uid);
-        final current = positions[index];
-        if (target < 0 || target >= 49 || ((target ~/ 7 - current ~/ 7).abs() + (target % 7 - current % 7).abs()) != 1) throw Exception('تقدر تتحرك خانة واحدة فقط');
-        if (positions.contains(target)) throw Exception('صديقك واقف بهذا المكان');
-        positions[index] = target;
-        final scores = Map<String,dynamic>.from(d['scores'] ?? {});
-        if (treasures.contains(target)) { scores[_uid] = (scores[_uid] as num? ?? 0).toInt() + 1; treasures.remove(target); }
-        final moves = (d['moves'] as num? ?? 0).toInt() + 1;
-        final ended = treasures.isEmpty || moves >= 36;
-        final winner = ended ? (members.firstWhere((m) => (scores[m] as num? ?? 0) == members.map((id) => (scores[id] as num? ?? 0)).reduce(max))) : '';
-        final next = members.firstWhere((m) => m != _uid);
-        tx.update(_room, {'positions': positions, 'treasures': treasures, 'scores': scores, 'moves': moves, 'turn': ended ? '' : next, 'winner': winner, 'status': ended ? 'finished' : 'playing', 'updatedAt': FieldValue.serverTimestamp()});
-      });
-    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceFirst('Exception: ', '')))); }
-    finally { if (mounted) setState(() => _busy = false); }
-  }
-  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
-    appBar: AppBar(title: const Text('كنز الأصدقاء • خريطة 2D')),
-    body: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
-      stream: _room.snapshots(),
-      builder: (context, snap) {
-        if (snap.hasError) return const Center(child: Text('تعذر الاتصال. تأكد من نشر قواعد Firestore الجديدة.'));
-        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-        if (!snap.data!.exists) return const Center(child: Text('الغرفة غير موجودة.'));
-        final d = snap.data!.data()!;
-        final members = List<String>.from(d['members'] ?? []);
-        final names = Map<String,dynamic>.from(d['memberNames'] ?? {});
-        final positions = List<int>.from(d['positions'] ?? [0,48]);
-        final treasures = List<int>.from(d['treasures'] ?? []);
-        final scores = Map<String,dynamic>.from(d['scores'] ?? {});
-        final playing = d['status'] == 'playing';
-        final mine = members.indexOf(_uid);
-        final myTurn = playing && d['turn'] == _uid;
-        final winner = d['winner']?.toString() ?? '';
-        return ListView(padding: const EdgeInsets.all(12), children: [
-          Card(child: Padding(padding: const EdgeInsets.all(12), child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: members.map((m) => Column(children: [
-            Text(names[m]?.toString() ?? 'لاعب', style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text('⭐ ${scores[m] ?? 0}'),
-          ])).toList()))),
-          Card(child: Padding(padding: const EdgeInsets.all(10), child: Text(
-            d['status'] == 'waiting' ? 'أرسل الدعوة أو شارك الرمز ${widget.roomId}' :
-            d['status'] == 'finished' ? (winner == _uid ? 'فزت بالمغامرة! 🏆' : winner.isEmpty ? 'تعادل!' : 'فاز صديقك!') :
-            myTurn ? 'دورك! اجمع أقرب كنز ✨' : 'دور ${names[d['turn']] ?? 'صديقك'}',
-            textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)))),
-          if (d['status'] == 'waiting') FilledButton.icon(onPressed: () => _invite(widget.roomId), icon: const Icon(Icons.person_add_alt_1), label: const Text('ادعُ صديقاً')),
-          if (playing) ...[
-            const Text('حرّك شخصيتك خانة واحدة باتجاه الأعلى أو الأسفل أو اليمين أو اليسار', textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            AspectRatio(aspectRatio: 1, child: GridView.builder(
-              physics: const NeverScrollableScrollPhysics(), itemCount: 49,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, crossAxisSpacing: 4, mainAxisSpacing: 4),
-              itemBuilder: (context, i) {
-                final p = positions.indexOf(i);
-                final treasure = treasures.contains(i);
-                final me = p == mine;
-                final other = p >= 0 && !me;
-                final row = i ~/ 7, col = i % 7;
-                final current = mine >= 0 ? positions[mine] : -1;
-                final canMove = myTurn && ((row-current~/7).abs() + (col-current%7).abs() == 1) && !positions.contains(i);
-                return InkWell(onTap: canMove && !_busy ? () => _move(i,d) : null, child: AnimatedContainer(duration: const Duration(milliseconds: 180),
-                  decoration: BoxDecoration(color: me ? _arenaPurple : other ? Colors.teal : treasure ? Colors.amber.withValues(alpha:.25) : Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(9), border: Border.all(color: canMove ? Colors.green : Colors.transparent, width: 2)),
-                  child: Center(child: Text(me ? '🧙' : other ? '🛡️' : treasure ? '💎' : '', style: const TextStyle(fontSize: 21))),
-                ));
-              },
-            )),
-          ],
-          if (d['status'] == 'finished') FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.home), label: const Text('العودة للألعاب')),
-          const SizedBox(height: 8),
-          SelectableText('رمز الغرفة: ${widget.roomId}', textAlign: TextAlign.center),
-          TextButton.icon(onPressed: () => Clipboard.setData(ClipboardData(text: widget.roomId)), icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
-        ]);
-      },
-    ),
-  ));
-  Future<void> _invite(String roomId) async {
-    try {
-      final profiles = await _db.collection('publicProfiles').limit(100).get();
-      if (!mounted) return;
-      final selected = await showModalBottomSheet<String>(context: context, showDragHandle: true, builder: (c) => Directionality(
-        textDirection: TextDirection.rtl, child: SafeArea(child: ListView(shrinkWrap: true, children: [
-          const Padding(padding: EdgeInsets.all(16), child: Text('اختَر صديقاً لدعوته')),
-          ...profiles.docs.where((p) => p.id != _uid).map((p) => ListTile(title: Text(p.data()['name']?.toString() ?? 'عضو'), onTap: () => Navigator.pop(c, p.id))),
-        ])),
-      ));
-      if (selected == null) return;
-      final me = await _db.collection('publicProfiles').doc(_uid).get();
-      await _db.collection('gameInvites').add({'from':_uid,'to':selected,'fromName':me.data()?['name'] ?? 'صديق','game':'treasure','roomId':roomId,'roomCode':roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('وصلت الدعوة لصديقك 🎮')));
-    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال الدعوة: $e'))); }
-  }
-}
-).hasMatch(code) || _busy) { _toast('اكتب رمزاً من 6 أرقام'); return false; }
-    setState(() => _busy = true);
-    try {
-      final room = _db.collection('gameRooms').doc(code);
-      await _db.runTransaction((tx) async {
-        final snap = await tx.get(room);
-        if (!snap.exists) throw Exception('الغرفة غير موجودة');
-        final data = snap.data()!;
-        final members = List<String>.from(data['members'] ?? []);
-        if (members.contains(_uid)) return;
-        if (data['game'] != 'treasure_duel' || data['status'] != 'waiting' || members.length != 1) throw Exception('الغرفة بدأت أو اكتملت');
-        final scores = Map<String,dynamic>.from(data['scores'] ?? {}); scores[_uid] = 0;
-        tx.update(room, {'members': FieldValue.arrayUnion([_uid]), 'memberNames.$_uid': _name, 'scores': scores, 'status': 'playing', 'updatedAt': FieldValue.serverTimestamp()});
-      });
-      if (!mounted) return;
-      _code.clear();
-      Navigator.push(context, MaterialPageRoute(builder: (_) => TreasureRoomPage(roomId: code)));
-    } catch (e) { _toast(e.toString().replaceFirst('Exception: ', '')); }
-    finally { if (mounted) setState(() => _busy = false); }
-  }
-
-  Future<void> _invite(String roomId) async {
-    try {
-      final profiles = await _db.collection('publicProfiles').limit(100).get();
-      if (!mounted) return;
-      final selected = await showModalBottomSheet<String>(context: context, showDragHandle: true, builder: (c) => Directionality(
-        textDirection: TextDirection.rtl, child: SafeArea(child: ListView(shrinkWrap: true, children: [
-          const Padding(padding: EdgeInsets.all(16), child: Text('اختَر صديقاً لدعوته', style: TextStyle(fontWeight: FontWeight.bold))),
-          ...profiles.docs.where((p) => p.id != _uid).map((p) => ListTile(title: Text(p.data()['name']?.toString() ?? 'عضو'), onTap: () => Navigator.pop(c, p.id))),
-        ])),
-      ));
-      if (selected == null) return;
-      final me = await _db.collection('publicProfiles').doc(_uid).get();
-      await _db.collection('gameInvites').add({
-        'from': _uid, 'to': selected, 'fromName': me.data()?['name'] ?? _name,
-        'game': 'treasure', 'roomId': roomId, 'roomCode': roomId,
-        'status': 'pending', 'createdAt': FieldValue.serverTimestamp(),
-      });
-      _toast('تم إرسال الدعوة 🎮');
-    } catch (e) { _toast('تعذر إرسال الدعوة: $e'); }
-  }
-
-  void _toast(String s) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s))); }
-
-  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
-    appBar: AppBar(title: const Text('مغامرة كنز الأصدقاء 2D')),
-    body: ListView(padding: const EdgeInsets.all(16), children: [
-      Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: const LinearGradient(colors: [_arenaInk,_arenaPurple,Color(0xFF159E91)])),
-        child: const Text('🗺️ تحرك على الخريطة، اجمع الكنوز، ونافس صديقك خطوة بخطوة!', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold))),
-      const SizedBox(height: 14),
-      FilledButton.icon(onPressed: _busy ? null : _create, icon: const Icon(Icons.add), label: const Text('إنشاء غرفة كنز')),
-      const SizedBox(height: 10),
-      TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6, textAlign: TextAlign.center, decoration: const InputDecoration(labelText: 'رمز الغرفة', counterText: '', border: OutlineInputBorder())),
-      OutlinedButton.icon(onPressed: _busy ? null : () => _join(null), icon: const Icon(Icons.login), label: const Text('انضم إلى غرفة صديق')),
-      const SizedBox(height: 16),
-      const Text('دعواتك الواردة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-        stream: _db.collection('gameInvites').where('to', isEqualTo: _uid).limit(30).snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData) return const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator());
-          final docs = snap.data!.docs.where((d) => d.data()['game'] == 'treasure' && d.data()['status'] == 'pending').toList();
-          if (docs.isEmpty) return const Card(child: Padding(padding: EdgeInsets.all(12), child: Text('ما عندك دعوات جديدة.')));
-          return Column(children: docs.map((d) => Card(child: ListTile(
-            leading: const Icon(Icons.mail), title: Text('دعوة من ${d.data()['fromName'] ?? 'صديق'}'),
-            subtitle: Text('غرفة ${d.data()['roomCode'] ?? d.data()['roomId']}'),
-            trailing: FilledButton(onPressed: _busy ? null : () async { await _join(d.data()['roomId']?.toString()); if (mounted) await d.reference.update({'status':'accepted'}); }, child: const Text('انضم')),
           ))).toList());
         },
       ),
