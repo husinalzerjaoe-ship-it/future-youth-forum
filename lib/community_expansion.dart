@@ -152,35 +152,113 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       id = uri.pathSegments.isEmpty ? null : uri.pathSegments.first;
     } else if (host.contains('youtube.com') || host.contains('youtube-nocookie.com')) {
       id = uri.queryParameters['v'];
-      if (id == null && uri.pathSegments.length >= 2 && ['embed', 'shorts', 'live'].contains(uri.pathSegments.first)) id = uri.pathSegments[1];
+      if (id == null && uri.pathSegments.length >= 2 &&
+          ['embed', 'shorts', 'live'].contains(uri.pathSegments.first)) {
+        id = uri.pathSegments[1];
+      }
     }
-    return id != null && RegExp(r'^[A-Za-z0-9_-]{6,}
+    return id != null && id.length >= 6 && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id) ? id : null;
+  }
+
+  bool _isDirectVideo(Uri uri) {
+    final path = uri.path.toLowerCase();
+    return path.endsWith('.mp4') || path.endsWith('.m4v') ||
+        path.endsWith('.mov') || path.endsWith('.webm') || path.endsWith('.m3u8');
+  }
+
+  Future<void> _openWebSource(Uri uri, {String? youtubeId}) async {
+    final target = uri;
+    final controller = WebViewController();
+    await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
+    await controller.setBackgroundColor(Colors.black);
+    await controller.setNavigationDelegate(NavigationDelegate(
+      onPageFinished: (_) async {
+        try {
+          await _applyRemotePlayback(await party.get());
+        } catch (_) {}
+      },
+    ));
+    if (!mounted) return;
+    setState(() {
+      _webController = controller;
+      _usingWebView = true;
+      _isYouTube = youtubeId != null;
+      _videoLoading = false;
+      _videoError = null;
+    });
+    if (youtubeId != null) {
+      await controller.loadHtmlString(
+        '''<!doctype html>
+<html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<style>html,body,#player{margin:0;width:100%;height:100%;background:#000;overflow:hidden}iframe{width:100%;height:100%;border:0}</style>
+</head><body><div id="player"></div>
+<script>
+var player;
+function onYouTubeIframeAPIReady(){
+ player=new YT.Player('player',{videoId:'$youtubeId',playerVars:{playsinline:1,rel:0,enablejsapi:1}});
+}
+</script><script src="https://www.youtube.com/iframe_api"></script></body></html>''',
+        baseUrl: 'https://www.youtube.com',
+      );
+    } else {
+      await controller.loadRequest(target);
+    }
+  }
+
+  Future<void> _initializeVideo() async {
     final raw = (widget.party['streamUrl'] as String? ?? '').trim();
     final uri = Uri.tryParse(raw);
     if (uri == null || !['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
-      if (mounted) setState(() { _videoLoading = false; _videoError = 'الرابط غير صالح. استخدم رابط http أو https.'; });
+      if (mounted) {
+        setState(() {
+          _videoLoading = false;
+          _videoError = 'الرابط غير صالح. استخدم رابط https صالحاً.';
+        });
+      }
       return;
     }
+
     final youtubeId = _youtubeId(uri);
     if (youtubeId != null || !_isDirectVideo(uri)) {
-      try { await _openWebSource(uri, youtubeId: youtubeId); }
-      catch (e) { if (mounted) setState(() { _videoLoading = false; _videoError = 'تعذر فتح صفحة الفيديو داخل التطبيق: $e'; }); }
+      try {
+        await _openWebSource(uri, youtubeId: youtubeId);
+      } catch (e) {
+        if (mounted) setState(() {
+          _videoLoading = false;
+          _videoError = 'تعذر فتح صفحة الفيديو داخل التطبيق: ' + e.toString();
+        });
+      }
       return;
     }
+
     final controller = VideoPlayerController.networkUrl(uri);
     _videoController = controller;
     try {
       await controller.initialize().timeout(const Duration(seconds: 35));
       await controller.setLooping(false);
-      if (mounted) setState(() { _videoLoading = false; _videoError = null; });
-      try { await _applyRemotePlayback(await party.get()); } catch (_) {}
+      if (mounted) setState(() {
+        _videoLoading = false;
+        _videoError = null;
+      });
+      try {
+        await _applyRemotePlayback(await party.get());
+      } catch (_) {}
     } catch (e) {
+      final description = controller.value.errorDescription;
       await controller.dispose();
       if (identical(_videoController, controller)) _videoController = null;
-      try { await _openWebSource(uri); }
-      catch (_) { if (mounted) setState(() { _videoLoading = false; _videoError = 'تعذر تشغيل الرابط: ${controller.value.errorDescription ?? e}. جرّب رابطاً مباشراً أو صفحة تسمح بالتضمين.'; }); }
+      try {
+        await _openWebSource(uri);
+      } catch (_) {
+        if (mounted) setState(() {
+          _videoLoading = false;
+          _videoError = 'تعذر تشغيل الرابط: ' + (description ?? e.toString()) +
+              '. جرّب رابط فيديو مباشر أو صفحة تسمح بالتضمين.';
+        });
+      }
     }
   }
+
   Future<void> _applyRemotePlayback(DocumentSnapshot<Map<String, dynamic>> snapshot) async {
     final data = snapshot.data();
     if (data == null || data['playbackUpdatedBy'] == uid || _applyingRemotePlayback) return;
