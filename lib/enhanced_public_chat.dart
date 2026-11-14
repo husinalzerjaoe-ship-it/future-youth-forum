@@ -84,9 +84,13 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         return;
       }
       final senderName = await _name();
+      final membership = (await _chatDb.collection('memberships').doc(_uid).get()).data() ?? {};
+      final expiry = membership['expiresAt'];
+      final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
       await _chatDb.collection('messages').add({
         'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
+        if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
@@ -423,11 +427,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
     final d=doc.data()??{};final mine=d['senderId']==_uid;final sender=(d['senderId']??'').toString();
     final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
+    final tier=(d['membershipTier']??'').toString().toLowerCase();
+    final tierColor = switch (tier) { 'gold' => const Color(0xFFD49A16), 'silver' => const Color(0xFF8795A1), 'diamond' => const Color(0xFF24A6C7), 'legendary' => const Color(0xFF9A62D8), _ => null };
+    final tierLabel = switch (tier) { 'gold' => 'ذهبية', 'silver' => 'فضية', 'diamond' => 'ماسية', 'legendary' => 'أسطورية', _ => 'مميزة' };
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
-      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(mine?const Color(0xFFE8E2FF):Colors.white),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):_chatBrand.withValues(alpha:.42),width:founder?2.6:1),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
+      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(tierColor!=null?tierColor.withValues(alpha:.13):(mine?const Color(0xFFE8E2FF):Colors.white)),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.7),width:founder?2.6:(tierColor!=null?2:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -440,8 +447,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           ),
           const SizedBox(width:8),
           Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):const Color(0xFF4532A8))),
+            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):(tierColor??const Color(0xFF4532A8)))),
             if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
+            if(!founder && tier.isNotEmpty)Text('عضوية $tierLabel',style:TextStyle(fontSize:10,color:tierColor,fontWeight:FontWeight.w900)),
             if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
           ]))),
           if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:19),

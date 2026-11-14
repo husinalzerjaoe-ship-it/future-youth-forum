@@ -834,6 +834,13 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','match','streamUrl','status'])
           && request.resource.data.streamUrl is string
           && request.resource.data.streamUrl.matches('https://.*'))
+        || (request.auth.uid in resource.data.members
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['playbackPlaying','playbackPositionMs','playbackUpdatedAt','playbackUpdatedBy'])
+          && request.resource.data.playbackPlaying is bool
+          && request.resource.data.playbackPositionMs is int
+          && request.resource.data.playbackPositionMs >= 0
+          && request.resource.data.playbackPositionMs <= 86400000
+          && request.resource.data.playbackUpdatedBy == request.auth.uid)
         || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
           && request.resource.data.members is list
           && request.resource.data.members.size() <= 30

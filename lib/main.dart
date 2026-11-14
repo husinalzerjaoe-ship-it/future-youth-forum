@@ -20,6 +20,7 @@ import 'football_news.dart';
 import 'community_expansion.dart';
 import 'match_center.dart';
 import 'achievement_hub.dart';
+import 'anime_experience.dart';
 import 'firebase_options.dart';
 
 const brand = Color(0xFF6554D9);
@@ -52,12 +53,26 @@ class FutureYouthApp extends StatelessWidget {
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
       textTheme: GoogleFonts.notoSansArabicTextTheme(),
-      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: ZoomPageTransitionsBuilder(),
+        TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+        TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+      }),
+      appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0, scrolledUnderElevation: 0),
     ),
     darkTheme: ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark),
       textTheme: GoogleFonts.notoSansArabicTextTheme(ThemeData.dark().textTheme),
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {
+        TargetPlatform.android: ZoomPageTransitionsBuilder(),
+        TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+        TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+        TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+      }),
       scaffoldBackgroundColor: const Color(0xFF111321),
     ),
     home: const AuthGate(),
@@ -206,8 +221,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(
-        backgroundColor: darkBrand, foregroundColor: Colors.white,
-        title: const Text('ملتقى شباب المستقبل'),
+        backgroundColor: darkBrand, foregroundColor: Colors.white, toolbarHeight: 68,
+        flexibleSpace: const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.centerRight, end: Alignment.centerLeft, colors: [Color(0xFF171936), Color(0xFF40378F), Color(0xFF168E9B)]))),
+        title: Row(children: [
+          Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .14), borderRadius: BorderRadius.circular(13), border: Border.all(color: Colors.white24)), child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF8FE8FF), size: 23)),
+          const SizedBox(width: 9),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('ملتقى شباب المستقبل', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+            Text('مجتمعك • ترفيهك • أصدقاؤك', style: TextStyle(fontSize: 10, color: Colors.white70)),
+          ])),
+        ]),
         actions: [
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
@@ -246,6 +269,9 @@ class _HomePageState extends State<HomePage> {
                 case 'matchCenter':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchCenterPage()));
                   break;
+                case 'anime':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AnimeExperiencePage()));
+                  break;
                 case 'communityExpansion':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityExpansionPage()));
                   break;
@@ -272,6 +298,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'arcade', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مدينة الترفيه والألعاب والنقاط'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_outlined), title: Text('إنجازاتي والحضور اليومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'matchCenter', child: ListTile(leading: Icon(Icons.scoreboard_outlined), title: Text('مركز المباريات والنتائج'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'anime', child: ListTile(leading: Icon(Icons.movie_filter_outlined), title: Text('عالم الأنمي والخلفيات وقائمتي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityExpansion', child: ListTile(leading: Icon(Icons.stadium), title: Text('استاد الأصدقاء والفعاليات والمجتمعات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'safety', child: ListTile(leading: Icon(Icons.shield_outlined), title: Text('الأمان والحظر'), contentPadding: EdgeInsets.zero)),
               if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
@@ -284,15 +311,18 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: IndexedStack(index: selected, children: const [FootballNewsPage(), PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
+      body: IndexedStack(index: selected, children: const [FootballNewsPage(), PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), AnimeExperiencePage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
+        height: 70,
+        indicatorColor: brand.withValues(alpha: .16),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.sports_soccer_outlined), selectedIcon: Icon(Icons.sports_soccer), label: 'الأخبار'),
           NavigationDestination(icon: Icon(Icons.dynamic_feed_outlined), selectedIcon: Icon(Icons.dynamic_feed), label: 'المنشورات'),
-          NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'المحادثة العامة'),
+          NavigationDestination(icon: Icon(Icons.forum_outlined), selectedIcon: Icon(Icons.forum), label: 'المحادثة'),
           NavigationDestination(icon: Icon(Icons.grid_view_rounded), selectedIcon: Icon(Icons.grid_view), label: 'الأقسام'),
+          NavigationDestination(icon: Icon(Icons.movie_filter_outlined), selectedIcon: Icon(Icons.movie_filter), label: 'الأنمي'),
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'ملفي'),
         ],
       ),
@@ -651,6 +681,13 @@ class _MembershipCard extends StatelessWidget {
       child: Column(children: [
         Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.workspace_premium, color: color), const SizedBox(width: 6), Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold))]),
         if (date != null) Text(active ? 'تنتهي: ${date.year}/${date.month}/${date.day}' : 'انتهت العضوية', style: const TextStyle(fontSize: 12)),
+        if (active) Padding(padding: const EdgeInsets.only(top: 7), child: Text(switch (tier.toLowerCase()) {
+          'gold' || 'ذهبية' => 'شارة ذهبية • إطار ملف مميز • ألوان رسائل خاصة',
+          'silver' || 'فضية' => 'شارة فضية • إطار ملف • تمييز العضوية',
+          'diamond' || 'ماسية' => 'شارة ماسية • إطار نادر • تمييز الرسائل',
+          'legendary' || 'أسطورية' => 'شارة أسطورية • إطار خاص • هوية مميزة',
+          _ => 'شارة العضوية • إطار الملف • تمييز الاسم',
+        }, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11))),
       ]),
     );
   }
