@@ -225,7 +225,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   Widget _bombBoard(){
     return _panel('💣 ساحة 5×5',[
       const Text('تحرك على الخانات وضع القنابل في طريقك.',style:TextStyle(fontSize:12)),
-      GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:25,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5),itemBuilder:(c,i)=>InkWell(onTap:(){setState((){if(_bombs.contains(i)){_bombs.remove(i);_score+=3;_message='انفجرت القنبلة وفتحت الطريق!';}else{_selected=i;_message='انتقلت إلى خانة '+(i+1).toString();}});},child:Container(margin:const EdgeInsets.all(3),decoration:BoxDecoration(color:_selected==i?Colors.green:_bombs.contains(i)?Colors.deepOrange:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(7)),child:Center(child:Text(_bombs.contains(i)?'💣':i==_selected?'🧍':'',style:_big)))),
+      GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:25,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5),itemBuilder:(c,i)=>InkWell(onTap:(){setState((){if(_bombs.contains(i)){_bombs.remove(i);_score+=3;_message='انفجرت القنبلة وفتحت الطريق!';}else{_selected=i;_message='انتقلت إلى خانة '+(i+1).toString();}});},child:Container(margin:const EdgeInsets.all(3),decoration:BoxDecoration(color:_selected==i?Colors.green:_bombs.contains(i)?Colors.deepOrange:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(7)),child:Center(child:Text(_bombs.contains(i)?'💣':i==_selected?'🧍':'',style:_big))))) ,
       _button('ضع قنبلة',(){if(_selected==null)return;setState((){_bombs.add(_selected!);_message='وضعت قنبلة.';});}),
     ]);
   }
