@@ -4,8 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Uploads media to a user's own folder after obtaining the Supabase-compatible
-/// Firebase custom claim on the trusted server.
+/// Uploads media to the signed-in Firebase user's own Supabase Storage folder.
+/// Storage RLS verifies the Firebase JWT issuer, audience and UID.
 Future<String> uploadForumMedia(
   XFile file, {
   required String folder,
@@ -37,8 +37,7 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Claims are provisioned with the local Firebase Admin SDK migration script.
-  // Uploads therefore do not depend on a billable Cloud Function deployment.
+  // Refresh the Firebase ID token before sending it to Supabase Third-party Auth.
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
     throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
