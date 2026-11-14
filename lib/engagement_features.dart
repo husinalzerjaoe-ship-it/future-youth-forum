@@ -1,5 +1,6 @@
 import 'leaderboard_widget.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -21,11 +22,20 @@ class EngagementHubPage extends StatelessWidget {
 class _CheckIn extends StatefulWidget {const _CheckIn();@override State<_CheckIn> createState()=>_CheckInState();}
 class _CheckInState extends State<_CheckIn>{
  bool busy=false;String? msg;
- String get today{final d=DateTime.now();return '${d.year}-${d.month}-${d.day}';}
  Future<void> claim()async{
-  if(busy)return;setState(()=>busy=true);bool got=false;
-  try{final ref=_db.collection('publicProfiles').doc(_uid);await _db.runTransaction((t)async{final s=await t.get(ref);final d=s.data()??{};if(d['lastCheckIn']==today)return; t.set(ref,{'points':((d['points'] as num?)?.toInt()??0)+10,'lastCheckIn':today,'checkInCount':((d['checkInCount'] as num?)?.toInt()??0)+1},SetOptions(merge:true));got=true;});if(mounted)setState(()=>msg=got?'مبروك! حصلت على 10 نقاط 🎉':'استلمت مكافأة اليوم بالفعل، ارجع باچر!');}
-  catch(_){if(mounted)setState(()=>msg='تعذر تسجيل النقاط؛ تحقق من قواعد Firestore.');}finally{if(mounted)setState(()=>busy=false);}
+  if(busy)return;
+  setState(()=>busy=true);
+  try{
+   final result=await FirebaseFunctions.instance.httpsCallable('claimDailyCheckIn').call();
+   final data=Map<String,dynamic>.from(result.data as Map);
+   if(mounted)setState(()=>msg=data['awarded']==true?'مبروك! حصلت على 10 نقاط 🎉':'استلمت مكافأة اليوم بالفعل، ارجع باچر!');
+  } on FirebaseFunctionsException catch(e){
+   if(mounted)setState(()=>msg=e.code=='not-found'
+     ?'خدمة المكافأة اليومية غير منشورة بعد على Firebase. يلزم نشر Cloud Functions.'
+     :'تعذر استلام النقاط (${e.code}). حاول لاحقاً.');
+  } catch(_){
+   if(mounted)setState(()=>msg='تعذر تسجيل النقاط. تحقق من اتصالك بالخدمة.');
+  } finally {if(mounted)setState(()=>busy=false);}
  }
  @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('🎁 مكافأة الدخول اليومي',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),const Text('كل يوم تدخل تحصل على 10 نقاط.'),FilledButton(onPressed:busy?null:claim,child:Text(busy?'لحظة...':'استلم نقاط اليوم')),if(msg!=null)Text(msg!)])));
 }
