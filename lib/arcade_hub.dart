@@ -6,6 +6,7 @@ import 'multiplayer_arcade.dart';
 import 'football_quiz.dart';
 import 'arcade_minigames.dart';
 import 'arcade_penalty.dart';
+import 'social_party_games.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -150,6 +151,17 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PenaltyShootoutPage())),
         ),
       ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.theater_comedy_rounded)),
+          title: const Text('ألعاب السهرة الجماعية', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('منو الجاسوس • الذئب • ارسم وخمّن • دمج الفواكه • سباق النرد • تحدي الخداع'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SocialPartyGamesPage())),
+        ),
+      ),
+      const SizedBox(height: 10),
       const SizedBox(height: 10),
       _section('اختبر معلوماتك بالأنمي','جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
       _section('حجر ورقة مقص','تحدّى الكمبيوتر واربح 3 نقاط',Icons.sports_esports,Colors.orange,_rpsCard()),
