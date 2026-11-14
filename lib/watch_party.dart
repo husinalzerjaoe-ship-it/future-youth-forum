@@ -271,7 +271,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
 
   Future<void> _seekBy(int seconds) async {
     if (!_isHost) return;
-    final next = ((_awaitPosition()) + seconds).clamp(0, 864000).toDouble();
+    final current = await _currentPosition();
+    final next = (current + seconds).clamp(0, 864000).toDouble();
     if (_isYoutube && _youtube != null) {
       await _youtube!.seekTo(seconds: next, allowSeekAhead: true);
     } else if (_video?.value.isInitialized == true) {
@@ -280,10 +281,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     await _publish(_room['status'] == 'playing' ? 'playing' : 'paused');
   }
 
-  double _awaitPosition() {
-    if (_isYoutube) return _room['positionSeconds'] is num ? (_room['positionSeconds'] as num).toDouble() : 0;
-    return _video?.value.position.inSeconds.toDouble() ?? 0;
-  }
 
   @override
   void dispose() {
