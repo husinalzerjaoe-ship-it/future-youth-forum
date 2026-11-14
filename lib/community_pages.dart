@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -258,6 +261,9 @@ class RegionChatPage extends StatefulWidget {
 class _RegionChatPageState extends State<RegionChatPage> {
  final t=TextEditingController();
  final picker=ImagePicker();
+ final AudioRecorder voiceRecorder=AudioRecorder();
+ bool recordingVoice=false;
+ String? voicePath;
  bool busy=false;
  String? error;
  int backgroundIndex=0;
@@ -295,15 +301,15 @@ class _RegionChatPageState extends State<RegionChatPage> {
   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(choice=='unban'?'تم رفع الحظر':choice=='kick'?'تم الطرد المؤقت':'تم تطبيق الحظر')));
  }
 
- Future<void> send({String text='',String? imageUrl,String type='text'}) async {
-  if((text.trim().isEmpty&&imageUrl==null)||busy)return;
+ Future<void> send({String text='',String? imageUrl,String? audioUrl,String type='text'}) async {
+  if((text.trim().isEmpty&&imageUrl==null&&audioUrl==null)||busy)return;
   final me=FirebaseAuth.instance.currentUser!;
   if(await blocked(me.uid)){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أنت ممنوع من هذه الغرفة حالياً.')));return;}
   setState(()=>busy=true);
   try{
    final profile=await db2.collection('publicProfiles').doc(me.uid).get();
    await db2.collection('regionalChats').doc(widget.id).collection('messages').add({
-    'text':text.trim(),'type':type,if(imageUrl!=null)'imageUrl':imageUrl,
+    'text':text.trim(),'type':audioUrl!=null?'voice':type,if(imageUrl!=null)'imageUrl':imageUrl,if(audioUrl!=null)'audioUrl':audioUrl,
     'senderId':me.uid,'senderRole':founder?'founder':'member',
     'senderName':profile.data()?['name']??me.displayName??'عضو','createdAt':FieldValue.serverTimestamp()});
    if(text.isNotEmpty)t.clear();
@@ -311,6 +317,36 @@ class _RegionChatPageState extends State<RegionChatPage> {
   finally{if(mounted)setState(()=>busy=false);}
  }
 
+ Future<void> toggleVoiceRecording() async {
+  if(recordingVoice){await finishVoiceRecording();return;}
+  try{
+   if(!await voiceRecorder.hasPermission()){if(mounted)setState(()=>error='اسمح للتطبيق باستخدام المايك.');return;}
+   final dir=await getTemporaryDirectory();
+   final path=dir.path+'/regional_voice_'+FirebaseAuth.instance.currentUser!.uid+'_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
+   await voiceRecorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:128000,sampleRate:44100),path:path);
+   if(mounted)setState(()=>{voicePath=path;recordingVoice=true;error=null});
+  }catch(e){if(mounted)setState(()=>error='تعذر بدء تسجيل الصوت: $e');}
+ }
+ Future<void> finishVoiceRecording() async {
+  if(!recordingVoice)return;
+  String? path;
+  try{
+   path=await voiceRecorder.stop();
+   if(mounted)setState(()=>recordingVoice=false);
+   final saved=path??voicePath;
+   if(saved==null||!await File(saved).exists()||await File(saved).length()<500){if(mounted)setState(()=>error='التسجيل قصير أو غير صالح.');return;}
+   if(mounted)setState(()=>busy=true);
+   final url=await uploadForumMedia(XFile(saved),folder:'regional-chat',roomId:widget.id);
+   if(mounted)setState(()=>busy=false);
+   await send(audioUrl:url,type:'voice');
+  }catch(e){if(mounted)setState(()=>error='تعذر إرسال الفويس: $e');}
+  finally{
+   final saved=path??voicePath;
+   if(saved!=null){try{final file=File(saved);if(await file.exists())await file.delete();}catch(_){}}
+   voicePath=null;
+   if(mounted)setState(()=>{recordingVoice=false;busy=false});
+  }
+ }
  Future<void> sendImage() async {
   try{
    final file=await picker.pickImage(source:ImageSource.gallery);
@@ -352,18 +388,29 @@ class _RegionChatPageState extends State<RegionChatPage> {
     border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
     boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
-     if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
-     if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
-    ]),
+    if((d['senderId'] as String? ?? '').isNotEmpty)
+     StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+      stream:db2.collection('publicProfiles').doc(d['senderId'] as String).snapshots(),
+      builder:(ctx,profile){
+       final data=profile.data?.data()??{};
+       final name=data['name'] as String? ?? d['senderName'] as String? ?? 'عضو';
+       final photo=data['photoUrl'] as String? ?? '';
+       return Row(mainAxisSize:MainAxisSize.min,children:[
+        CircleAvatar(radius:14,backgroundColor:p.withValues(alpha:.12),backgroundImage:photo.startsWith('https://')?NetworkImage(photo):null,child:photo.startsWith('https://')?null:Text(name.isEmpty?'؟':name.characters.first,style:const TextStyle(fontSize:11))),
+        const SizedBox(width:6),
+        Flexible(child:Text(name,style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
+        if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
+        if(founder && !mine)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',name))
+       ]);
+      }),
+    if(type=='voice'&&d['audioUrl'] is String)_RegionalVoicePlayer(url:d['audioUrl'] as String),
     if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
     if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
     if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
    ])));
  }
 
- @override void dispose(){t.dispose();super.dispose();}
+ @override void dispose(){t.dispose();voiceRecorder.dispose();super.dispose();}
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
   appBar:AppBar(title:Text(widget.title),actions:[
    IconButton(tooltip:'خلفية الغرفة',icon:const Icon(Icons.wallpaper),onPressed:chooseBackground),
@@ -381,9 +428,11 @@ class _RegionChatPageState extends State<RegionChatPage> {
      return ListView.builder(reverse:true,padding:const EdgeInsets.all(12),itemCount:s.data!.docs.length,
       itemBuilder:(c,i){final d=s.data!.docs[i].data();return bubble(d,d['senderId']==me);});
     }))),
+   if(recordingVoice)const Padding(padding:EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text('🔴 جاري تسجيل الفويس — اضغط المايك للإيقاف والإرسال',style:TextStyle(color:Colors.red,fontWeight:FontWeight.bold,fontSize:12))),
    if(error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text(error!,style:const TextStyle(color:Colors.red,fontSize:11))),
    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:6,vertical:6),child:SafeArea(top:false,child:Row(children:[
     IconButton(onPressed:busy?null:sendImage,tooltip:'صورة أو GIF',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:toggleVoiceRecording,tooltip:recordingVoice?'إيقاف وإرسال':'تسجيل فويس',icon:Icon(recordingVoice?Icons.stop_circle:Icons.mic,color:recordingVoice?Colors.red:p)),
     IconButton(onPressed:busy?null:showStickers,tooltip:'ملصقات',icon:const Icon(Icons.emoji_emotions,color:Color(0xFFE6A52C))),
     Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(text:t.text),
      decoration:const InputDecoration(hintText:'اكتب رسالتك...',counterText:'',border:OutlineInputBorder()))),
@@ -479,4 +528,26 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    ),
   ),
  );
+}
+
+class _RegionalVoicePlayer extends StatefulWidget {
+ final String url;
+ const _RegionalVoicePlayer({required this.url});
+ @override State<_RegionalVoicePlayer> createState()=>_RegionalVoicePlayerState();
+}
+class _RegionalVoicePlayerState extends State<_RegionalVoicePlayer>{
+ late final AudioPlayer player;
+ bool failed=false;
+ @override void initState(){super.initState();player=AudioPlayer();player.setUrl(widget.url).catchError((_){if(mounted)setState(()=>failed=true);return null;});}
+ @override void dispose(){player.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>Row(mainAxisSize:MainAxisSize.min,children:[
+  StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(c,s){
+   final playing=s.data?.playing==true;
+   return IconButton(visualDensity:VisualDensity.compact,onPressed:failed?null:()async{
+    try{if(playing){await player.pause();}else{if(player.processingState==ProcessingState.completed)await player.seek(Duration.zero);await player.play();}}
+    catch(_){if(mounted)setState(()=>failed=true);}
+   },icon:Icon(failed?Icons.error_outline:playing?Icons.pause_circle:Icons.play_circle,color:p,size:30));
+  }),
+  const Text('رسالة صوتية',style:TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF30265E))),
+ ]);
 }
