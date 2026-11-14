@@ -22,6 +22,8 @@ resource.write_text("""<?xml version="1.0" encoding="utf-8"?>
 """, encoding="utf-8")
 
 text = manifest.read_text(encoding="utf-8")
+if "android.permission.WRITE_EXTERNAL_STORAGE" not in text:
+    text = text.replace("<application", '    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n    <application', 1)
 text = text.replace('android:icon="@mipmap/ic_launcher"', 'android:icon="@drawable/ic_launcher_logo"')
 text = text.replace('android:roundIcon="@mipmap/ic_launcher"', 'android:roundIcon="@drawable/ic_launcher_logo"')
 manifest.write_text(text, encoding="utf-8")

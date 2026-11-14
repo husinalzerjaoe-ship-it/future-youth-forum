@@ -669,12 +669,14 @@ class _MembershipCard extends StatelessWidget {
     final label = switch (tier.toLowerCase()) {
       'gold' || 'ذهبية' => 'عضوية ذهبية',
       'silver' || 'فضية' => 'عضوية فضية',
+      'diamond' || 'ماسية' => 'عضوية ماسية',
       'legendary' || 'أسطورية' => 'عضوية أسطورية',
       'premium' || 'مميزة' => 'عضوية مميزة',
       _ => 'عضوية مشتركة',
     };
     final color = tier.toLowerCase() == 'gold' || tier == 'ذهبية' ? const Color(0xFFFFB52E)
-      : tier.toLowerCase() == 'silver' || tier == 'فضية' ? const Color(0xFF8FA9C8) : brand;
+      : tier.toLowerCase() == 'silver' || tier == 'فضية' ? const Color(0xFF8FA9C8)
+      : tier.toLowerCase() == 'diamond' || tier == 'ماسية' ? const Color(0xFF24A6C7) : brand;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(color: color.withValues(alpha: .13), border: Border.all(color: color, width: 1.5), borderRadius: BorderRadius.circular(16)),

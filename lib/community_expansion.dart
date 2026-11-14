@@ -133,6 +133,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _playbackSubscription;
   bool _usingWebView = false;
   bool _isYouTube = false;
+  bool _sharedPlaying = false;
   bool _videoLoading = true;
   bool _applyingRemotePlayback = false;
   String? _videoError;
@@ -264,6 +265,7 @@ function onYouTubeIframeAPIReady(){
     if (data == null || data['playbackUpdatedBy'] == uid || _applyingRemotePlayback) return;
     final playing = data['playbackPlaying'] == true;
     final position = (data['playbackPositionMs'] as num?)?.toInt() ?? 0;
+    _sharedPlaying = playing;
     _applyingRemotePlayback = true;
     try {
       if (_usingWebView && _webController != null) {
@@ -298,7 +300,7 @@ function onYouTubeIframeAPIReady(){
       } else if (_videoController?.value.isInitialized == true) {
         if (playing) await _videoController!.play(); else await _videoController!.pause();
       }
-      if (mounted) setState(() {});
+      if (mounted) setState(() => _sharedPlaying = playing);
       await party.update({'playbackPlaying': playing, 'playbackPositionMs': position, 'playbackUpdatedAt': FieldValue.serverTimestamp(), 'playbackUpdatedBy': uid});
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('التشغيل المحلي يعمل، لكن مزامنة الأصدقاء تحتاج نشر قواعد Firestore المحدّثة: $e')));
@@ -308,8 +310,14 @@ function onYouTubeIframeAPIReady(){
     if (_usingWebView && _webController != null) {
       if (_isYouTube) {
         await _webController!.runJavaScript('if(window.player){window.player.seekTo(Math.max(0,window.player.getCurrentTime()+$seconds),true);}');
+        final raw = await _webController!.runJavaScriptReturningResult('window.player ? window.player.getCurrentTime() : 0');
+        final current = double.tryParse(raw.toString().replaceAll('"', '')) ?? 0;
+        try { await party.update({'playbackPositionMs': (current * 1000).round(), 'playbackUpdatedAt': FieldValue.serverTimestamp(), 'playbackUpdatedBy': uid}); } catch (_) {}
       } else {
         await _webController!.runJavaScript("(function(){var v=document.querySelector('video');if(v)v.currentTime=Math.max(0,v.currentTime+$seconds);})();");
+        final raw = await _webController!.runJavaScriptReturningResult('document.querySelector("video") ? document.querySelector("video").currentTime : 0');
+        final current = double.tryParse(raw.toString().replaceAll('"', '')) ?? 0;
+        try { await party.update({'playbackPositionMs': (current * 1000).round(), 'playbackUpdatedAt': FieldValue.serverTimestamp(), 'playbackUpdatedBy': uid}); } catch (_) {}
       }
       return;
     }
@@ -374,7 +382,7 @@ function onYouTubeIframeAPIReady(){
               : const Text('البث غير متاح حالياً', style: TextStyle(color: Colors.white)))),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), child: Row(children: [
           IconButton(tooltip: 'رجوع 10 ثوانٍ', onPressed: () => _seekBy(-10), icon: const Icon(Icons.replay_10)),
-          IconButton(tooltip: 'تشغيل أو إيقاف للجميع', onPressed: () => _publishPlayback(!(_videoController?.value.isPlaying ?? false)), icon: const Icon(Icons.sync)),
+          IconButton(tooltip: 'تشغيل أو إيقاف للجميع', onPressed: () => _publishPlayback(!_sharedPlaying), icon: Icon(_sharedPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill)),
           IconButton(tooltip: 'تقديم 10 ثوانٍ', onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10)),
           const Expanded(child: Text('أزرار المزامنة ترسل التشغيل والإيقاف والتقديم إلى أعضاء الغرفة', style: TextStyle(fontSize: 11), textAlign: TextAlign.center)),
         ])),
