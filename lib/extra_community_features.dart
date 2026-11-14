@@ -273,6 +273,46 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:Text(current>=0?tracks[current].name:'مشغل الموسيقى'),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
    })),
    const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • الملفات المنشورة بعد موافقة الإدارة'))),
+   // Pending tracks remain visible to their uploader; the founder can review them here.
+   StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    stream: FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com'
+      ? db.collection('sharedFiles').where('status',isEqualTo:'pending').limit(100).snapshots()
+      : db.collection('sharedFiles').where('uploaderId',isEqualTo:uid).limit(100).snapshots(),
+    builder:(context,pendingSnapshot){
+     if(pendingSnapshot.hasError)return const SizedBox.shrink();
+     if(!pendingSnapshot.hasData)return const SizedBox.shrink();
+     final pendingDocs=pendingSnapshot.data!.docs.where((d){
+      final x=d.data();
+      final audio=['mp3','m4a','aac','wav','ogg','flac'].contains((x['extension']??'').toString().toLowerCase());
+      return audio && x['status']=='pending' &&
+        (FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com' || x['uploaderId']==uid);
+     }).toList();
+     if(pendingDocs.isEmpty)return const SizedBox.shrink();
+     return Card(child:Padding(padding:const EdgeInsets.all(10),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      const Text('أغانٍ بانتظار الموافقة',style:TextStyle(fontWeight:FontWeight.bold)),
+      ...pendingDocs.map((d){
+       final x=d.data();
+       final founder=FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com';
+       return ListTile(
+        dense:true,
+        leading:const Icon(Icons.hourglass_top,color:Colors.orange),
+        title:Text(x['title'] as String? ?? 'ملف صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
+        subtitle:Text(founder?'بانتظار مراجعتك':'بانتظار موافقة الإدارة'),
+        trailing:founder?Wrap(mainAxisSize:MainAxisSize.min,children:[
+         IconButton(tooltip:'قبول ونشر',icon:const Icon(Icons.check_circle,color:Colors.green),onPressed:()async{
+          try{await d.reference.update({'status':'approved','reviewedBy':uid,'reviewedAt':FieldValue.serverTimestamp()});}
+          catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر اعتماد الأغنية: $e')));}
+         }),
+         IconButton(tooltip:'رفض',icon:const Icon(Icons.cancel,color:Colors.red),onPressed:()async{
+          try{await d.reference.update({'status':'rejected','reviewedBy':uid,'reviewedAt':FieldValue.serverTimestamp()});}
+          catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر رفض الأغنية: $e')));}
+         }),
+        ]):const Icon(Icons.schedule,color:Colors.orange),
+       );
+      }),
+     ])));
+    },
+   ),
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db.collection('sharedFiles').where('status',isEqualTo:'approved').limit(150).snapshots(),builder:(context,s){
     if(s.hasError)return const Center(child:Text('تعذر تحميل الأغاني المنشورة'));
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
