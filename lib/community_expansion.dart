@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 const _interestNames = ['الأنمي والمانغا', 'كرة القدم', 'الشعر والأدب', 'الألعاب', 'التقنية', 'التصوير والفن'];
 const _interestIcons = [Icons.movie_filter_outlined, Icons.sports_soccer, Icons.menu_book_outlined, Icons.sports_esports_outlined, Icons.memory_outlined, Icons.palette_outlined];
@@ -46,8 +46,8 @@ class _WatchPartiesPageState extends State<WatchPartiesPage> {
         content: Form(key: form, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextFormField(controller: title, maxLength: 60, decoration: const InputDecoration(labelText: 'اسم الجلسة'), validator: (v) => v == null || v.trim().length < 3 ? 'اكتب اسماً من 3 أحرف' : null),
           TextFormField(controller: match, maxLength: 100, decoration: const InputDecoration(labelText: 'المباراة')),
-          TextFormField(controller: stream, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط البث الرسمي أو المرخّص', hintText: 'https://...'), validator: (v) { final u = Uri.tryParse((v ?? '').trim()); return u == null || u.scheme != 'https' || u.host.isEmpty ? 'أدخل رابط HTTPS صحيحاً' : null; }),
-          const Text('البث يفتح عبر الجهة المالكة للحقوق، والدردشة الجماعية تبقى داخل التطبيق.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          TextFormField(controller: stream, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط البث المباشر المرخّص', hintText: 'رابط HLS أو MP4 من مزوّد الحقوق'), validator: (v) { final u = Uri.tryParse((v ?? '').trim()); return u == null || u.scheme != 'https' || u.host.isEmpty ? 'أدخل رابط HTTPS صحيحاً' : null; }),
+          const Text('أدخل رابط تشغيل مباشر يوفّره صاحب الحقوق ويسمح بتضمينه داخل التطبيق (HLS أو MP4). رابط صفحة الموقع وحده قد لا يعمل.', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ]))),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(ctx, form.currentState?.validate() ?? false), child: const Text('إنشاء'))],
       ),
@@ -101,12 +101,38 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   final db = FirebaseFirestore.instance;
   final message = TextEditingController();
   bool busy = false;
+  VideoPlayerController? _videoController;
+  bool _videoLoading = true;
+  String? _videoError;
   String get uid => FirebaseAuth.instance.currentUser!.uid;
   DocumentReference<Map<String, dynamic>> get party => db.collection('watchParties').doc(widget.partyId);
   @override
-  void initState() { super.initState(); party.update({'members': FieldValue.arrayUnion([uid])}).catchError((_) {}); }
+  void initState() {
+    super.initState();
+    party.update({'members': FieldValue.arrayUnion([uid])}).catchError((_) {});
+    _initializeVideo();
+  }
+  Future<void> _initializeVideo() async {
+    final raw = widget.party['streamUrl'] as String? ?? '';
+    final uri = Uri.tryParse(raw);
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+      if (mounted) setState(() { _videoLoading = false; _videoError = 'رابط البث غير صالح.'; });
+      return;
+    }
+    final controller = VideoPlayerController.networkUrl(uri);
+    _videoController = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(false);
+      if (mounted) setState(() { _videoLoading = false; });
+    } catch (_) {
+      await controller.dispose();
+      if (identical(_videoController, controller)) _videoController = null;
+      if (mounted) setState(() { _videoLoading = false; _videoError = 'تعذر تشغيل هذا المصدر. تأكد أنه رابط بث مباشر مرخّص بصيغة مدعومة وليس رابط صفحة ويب.'; });
+    }
+  }
   @override
-  void dispose() { message.dispose(); super.dispose(); }
+  void dispose() { message.dispose(); _videoController?.dispose(); super.dispose(); }
   Future<void> send() async {
     final value = message.text.trim();
     if (value.isEmpty || busy) return;
@@ -121,10 +147,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة.')));
     } finally { if (mounted) setState(() => busy = false); }
   }
-  Future<void> openStream() async {
-    final uri = Uri.tryParse(widget.party['streamUrl'] as String? ?? '');
-    if (uri != null && uri.scheme == 'https') await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
   @override
   Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
     appBar: AppBar(title: Text(widget.party['title'] ?? 'استاد الأصدقاء'), actions: [
@@ -134,12 +156,25 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       }),
     ]),
     body: Column(children: [
-      Card(margin: const EdgeInsets.all(12), child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(widget.party['match'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 8),
-        FilledButton.icon(onPressed: openStream, icon: const Icon(Icons.play_circle_fill), label: const Text('افتح البث الرسمي')),
-        const Text('يفتح البث في موقع أو تطبيق مزوّد الخدمة. الدردشة تبقى هنا.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-      ]))),
+      Card(margin: const EdgeInsets.fromLTRB(12, 12, 12, 6), clipBehavior: Clip.antiAlias, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 8), child: Text(widget.party['match'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+        AspectRatio(aspectRatio: 16 / 9, child: Container(color: Colors.black, alignment: Alignment.center, child: _videoLoading
+          ? const CircularProgressIndicator(color: Colors.white)
+          : _videoError != null
+            ? Padding(padding: const EdgeInsets.all(16), child: Text(_videoError!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)))
+            : _videoController != null && _videoController!.value.isInitialized
+              ? Stack(alignment: Alignment.bottomCenter, children: [
+                  Center(child: AspectRatio(aspectRatio: _videoController!.value.aspectRatio, child: VideoPlayer(_videoController!))),
+                  VideoProgressIndicator(_videoController!, allowScrubbing: true, padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12), colors: const VideoProgressColors(playedColor: Colors.deepPurpleAccent, bufferedColor: Colors.white54, backgroundColor: Colors.white24)),
+                  Positioned(right: 8, bottom: 12, child: IconButton.filledTonal(onPressed: () { setState(() { _videoController!.value.isPlaying ? _videoController!.pause() : _videoController!.play(); }); }, icon: Icon(_videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow))),
+                ])
+              : const Text('البث غير متاح حالياً', style: TextStyle(color: Colors.white)))),
+        Padding(padding: const EdgeInsets.all(10), child: Row(children: const [
+          Icon(Icons.verified_user_outlined, size: 16, color: Colors.green),
+          SizedBox(width: 6),
+          Expanded(child: Text('استخدم فقط بثاً يملك المنتدى إذناً بعرضه داخل التطبيق', style: TextStyle(fontSize: 11, color: Colors.grey))),
+        ])),
+      ])),
       Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: party.collection('messages').orderBy('createdAt').limit(200).snapshots(),
         builder: (context, s) {
