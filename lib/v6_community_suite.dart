@@ -32,6 +32,7 @@ class V6CommunitySuitePage extends StatelessWidget {
         _SuiteTile(icon: Icons.groups_rounded, title: 'الأندية ومجموعات الاهتمام', subtitle: 'أنشئ نادياً أو انضم إلى مجتمع يشاركك اهتماماتك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ForumClubsPage()))),
         _SuiteTile(icon: Icons.flag_rounded, title: 'مهامي وتحدياتي اليومية', subtitle: 'مهام شخصية وسجل إنجاز محلي على جهازك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DailyMissionsPage()))),
         _SuiteTile(icon: Icons.favorite_rounded, title: 'جدار الامتنان', subtitle: 'شارك كلمة شكر أو رسالة إيجابية مع الجميع', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GratitudeWallPage()))),
+        _SuiteTile(icon: Icons.auto_graph_rounded, title: 'مساحتي الشخصية', subtitle: 'سجّل مزاجك وأهدافك وعاداتك وملاحظاتك اليومية', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PersonalGrowthPage()))),
         _SuiteTile(icon: Icons.shield_rounded, title: 'مركز السلامة والخصوصية', subtitle: 'إرشادات سريعة لحماية حسابك وتفاعلك', onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const V6SafetyPage()))),
       ]),
     ),
@@ -315,4 +316,119 @@ class _SafetyTip extends StatelessWidget {
   const _SafetyTip({required this.icon, required this.title, required this.body});
   @override
   Widget build(BuildContext context) => Card(child: ListTile(leading: Icon(icon, color: _v6Brand), title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(body)));
+}
+
+
+class PersonalGrowthPage extends StatefulWidget {
+  const PersonalGrowthPage({super.key});
+  @override State<PersonalGrowthPage> createState() => _PersonalGrowthPageState();
+}
+
+class _PersonalGrowthPageState extends State<PersonalGrowthPage> {
+  static const moods = ['مبسوط 😄', 'مرتاح 🙂', 'عادي 😐', 'متعب 😔', 'متوتر 😣'];
+  static const habits = ['شربت ماء كفاية', 'قرأت أو تعلمت شيئاً', 'تحركت أو مارست الرياضة', 'تواصلت مع شخص أحبه', 'أنجزت مهمة مهمة'];
+  final note = TextEditingController();
+  final goal = TextEditingController();
+  String mood = moods[1];
+  Set<int> checked = {};
+  List<String> goals = [];
+  List<String> notes = [];
+  bool ready = false;
+  String get today {
+    final d = DateTime.now();
+    return '${d.year}-${d.month.toString().padLeft(2,'0')}-${d.day.toString().padLeft(2,'0')}';
+  }
+
+  @override void initState() { super.initState(); _load(); }
+  @override void dispose() { note.dispose(); goal.dispose(); super.dispose(); }
+
+  Future<void> _load() async {
+    final p = await SharedPreferences.getInstance();
+    mood = p.getString('growth_mood_$today') ?? moods[1];
+    checked = (p.getString('growth_habits_$today') ?? '').split(',').where((x) => x.isNotEmpty)
+      .map((x) => int.tryParse(x) ?? -1).where((x) => x >= 0 && x < habits.length).toSet();
+    goals = p.getStringList('growth_goals') ?? [];
+    notes = p.getStringList('growth_notes') ?? [];
+    if (mounted) setState(() => ready = true);
+  }
+
+  Future<void> _saveMood() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('growth_mood_$today', mood);
+    await p.setString('growth_habits_$today', checked.join(','));
+  }
+
+  Future<void> _addGoal() async {
+    final v = goal.text.trim();
+    if (v.isEmpty) return;
+    goals.insert(0, v);
+    goal.clear();
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList('growth_goals', goals);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _addNote() async {
+    final v = note.text.trim();
+    if (v.isEmpty) return;
+    notes.insert(0, '$today • $v');
+    note.clear();
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList('growth_notes', notes.take(50).toList());
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _removeGoal(int i) async {
+    goals.removeAt(i);
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList('growth_goals', goals);
+    if (mounted) setState(() {});
+  }
+
+  @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl,
+    child: Scaffold(appBar: AppBar(title: const Text('مساحتي الشخصية')),
+      body: !ready ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(14), children: [
+        Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: const LinearGradient(colors: [Color(0xFF171936), _v6Brand, Color(0xFF24AFC5)])),
+          child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('كل يوم فرصة جديدة 🌱', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+            SizedBox(height: 6),
+            Text('مساحة خاصة لترتيب أفكارك ومتابعة تقدمك. بياناتك محفوظة على جهازك.', style: TextStyle(color: Colors.white70)),
+          ])),
+        const SizedBox(height: 14),
+        Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('شلون مزاجك اليوم؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: moods.map((m) => ChoiceChip(label: Text(m), selected: mood == m,
+            onSelected: (_) { setState(() => mood = m); _saveMood(); })).toList()),
+          const SizedBox(height: 14),
+          const Text('عاداتي الإيجابية اليوم', style: TextStyle(fontWeight: FontWeight.bold)),
+          ...List.generate(habits.length, (i) => CheckboxListTile(dense: true, contentPadding: EdgeInsets.zero,
+            value: checked.contains(i), title: Text(habits[i]), onChanged: (v) {
+              setState(() { if (v == true) { checked.add(i); } else { checked.remove(i); } });
+              _saveMood();
+            })),
+          LinearProgressIndicator(value: checked.length / habits.length),
+          const SizedBox(height: 5),
+          Text('${checked.length} من ${habits.length} عادات مكتملة'),
+        ]))),
+        Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('أهدافي الصغيرة 🎯', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          const SizedBox(height: 8),
+          Row(children: [Expanded(child: TextField(controller: goal, maxLength: 100, decoration: const InputDecoration(hintText: 'مثلاً: أتعلم مهارة جديدة', counterText: ''))),
+            IconButton.filled(onPressed: _addGoal, icon: const Icon(Icons.add))]),
+          ...goals.asMap().entries.map((e) => ListTile(dense: true, contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.flag_outlined), title: Text(e.value), trailing: IconButton(icon: const Icon(Icons.close), onPressed: () => _removeGoal(e.key)))),
+          if (goals.isEmpty) const Text('أضف هدفاً صغيراً تبدأ به اليوم.', style: TextStyle(color: Colors.grey)),
+        ]))),
+        Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('دفتر ملاحظاتي ✍️', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+          TextField(controller: note, maxLength: 500, maxLines: 3, decoration: const InputDecoration(hintText: 'اكتب فكرة أو ذكرى أو شيئاً تريد تذكره...')),
+          Align(alignment: Alignment.centerLeft, child: FilledButton.icon(onPressed: _addNote, icon: const Icon(Icons.save), label: const Text('حفظ الملاحظة'))),
+          ...notes.take(10).map((n) => Card(color: Theme.of(context).colorScheme.surfaceContainerLow, child: Padding(padding: const EdgeInsets.all(10), child: Text(n)))),
+          if (notes.isEmpty) const Text('ملاحظاتك الخاصة تظهر هنا.', style: TextStyle(color: Colors.grey)),
+        ]))),
+      ]),
+    ));
 }
