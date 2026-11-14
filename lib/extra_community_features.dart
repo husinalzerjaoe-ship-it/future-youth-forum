@@ -298,7 +298,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
         leading:const Icon(Icons.hourglass_top,color:Colors.orange),
         title:Text(x['title'] as String? ?? 'ملف صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
         subtitle:Text(founder?'بانتظار مراجعتك':'بانتظار موافقة الإدارة'),
-        trailing:founder?Wrap(mainAxisSize:MainAxisSize.min,children:[
+        trailing:founder?Wrap(children:[
          IconButton(tooltip:'قبول ونشر',icon:const Icon(Icons.check_circle,color:Colors.green),onPressed:()async{
           try{await d.reference.update({'status':'approved','reviewedBy':uid,'reviewedAt':FieldValue.serverTimestamp()});}
           catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر اعتماد الأغنية: $e')));}
