@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:livekit_client/livekit_client.dart';
+import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LiveKitCallsPage extends StatefulWidget {
@@ -18,8 +18,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   static const _serverUrl = 'wss://youth-forum-future-lu43byvc.livekit.cloud';
   final _roomController = TextEditingController();
   final _endpointController = TextEditingController();
-  Room? _room;
-  EventsListener<RoomEvent>? _listener;
+  lk.Room? _room;
+  lk.EventsListener<lk.RoomEvent>? _listener;
   bool _connecting = false;
   bool _videoEnabled = false;
   bool _microphoneEnabled = true;
@@ -126,9 +126,9 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
       if (token.isEmpty || !serverUrl.startsWith('wss://')) {
         throw Exception('استجابة خادم المكالمات غير مكتملة.');
       }
-      final room = Room();
+      final room = lk.Room();
       final listener = room.createListener();
-      listener.on<RoomDisconnectedEvent>((_) {
+      listener.on<lk.RoomDisconnectedEvent>((_) {
         if (mounted && identical(_room, room)) {
           setState(() => _error = 'انقطع الاتصال بالغرفة.');
         }
@@ -136,7 +136,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
       await room.connect(
         serverUrl,
         token,
-        roomOptions: const RoomOptions(adaptiveStream: true, dynacast: true),
+        roomOptions: const lk.RoomOptions(adaptiveStream: true, dynacast: true),
       );
       await room.localParticipant?.setMicrophoneEnabled(true);
       if (_videoEnabled) {
@@ -154,7 +154,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
         _connecting = false;
       });
       room.addListener(_onRoomChanged);
-      await AudioManager.instance.setSpeakerOutputPreferred(true);
+      await lk.AudioManager.instance.setSpeakerOutputPreferred(true);
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -209,12 +209,12 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     if (mounted) setState(() => _error = null);
   }
 
-  Widget _participantTile(Participant participant, {required bool local}) {
+  Widget _participantTile(lk.Participant participant, {required bool local}) {
     Widget? video;
     for (final publication in participant.videoTracks.values) {
       final track = publication.track;
-      if (publication.subscribed && track is VideoTrack && !publication.isScreenShare) {
-        video = VideoTrackRenderer(track);
+      if (publication.subscribed && track is lk.VideoTrack && !publication.isScreenShare) {
+        video = lk.VideoTrackRenderer(track);
         break;
       }
     }
@@ -261,8 +261,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   @override
   Widget build(BuildContext context) {
     final room = _room;
-    final connected = room != null && room.connectionState == ConnectionState.connected;
-    final participants = <Participant>[
+    final connected = room != null && room.connectionState == lk.ConnectionState.connected;
+    final participants = <lk.Participant>[
       if (room?.localParticipant != null) room!.localParticipant!,
       ...?room?.remoteParticipants.values,
     ];
