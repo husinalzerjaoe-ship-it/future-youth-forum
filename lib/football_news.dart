@@ -28,12 +28,20 @@ class FootballNewsPage extends StatefulWidget {
 
 class _FootballNewsPageState extends State<FootballNewsPage> {
   int _selectedTab = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   late Future<List<_FootballNewsItem>> _newsFuture;
 
   @override
   void initState() {
     super.initState();
     _newsFuture = _loadNews(0);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<List<_FootballNewsItem>> _loadNews(int tab) async {
@@ -153,14 +161,35 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'ابحث عن فريق أو لاعب أو خبر...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+                  tooltip: 'مسح البحث',
+                  onPressed: () { _searchController.clear(); setState(() => _searchQuery = ''); },
+                  icon: const Icon(Icons.close),
+                ),
+                filled: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              ),
+            ),
+          ),
           Expanded(
             child: FutureBuilder<List<_FootballNewsItem>>(
               future: _newsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) return const Center(child: CircularProgressIndicator());
                 if (snapshot.hasError) return _NewsMessage(icon: Icons.wifi_off_rounded, message: 'تعذر تحميل الأخبار حالياً. اسحب للأسفل للمحاولة مجدداً.', onRetry: _refresh);
-                final items = snapshot.data ?? const <_FootballNewsItem>[];
-                if (items.isEmpty) return _NewsMessage(icon: Icons.newspaper_rounded, message: 'ما وصلتنا أخبار حالياً. تأكد من الإنترنت وحاول مرة ثانية.', onRetry: _refresh);
+                final allItems = snapshot.data ?? const <_FootballNewsItem>[];
+                final query = _searchQuery.trim().toLowerCase();
+                final items = allItems.where((item) => query.isEmpty || item.title.toLowerCase().contains(query) || item.source.toLowerCase().contains(query)).toList();
+                if (items.isEmpty) return _NewsMessage(icon: Icons.search_off_rounded, message: query.isEmpty ? 'ما وصلتنا أخبار حالياً. تأكد من الإنترنت وحاول مرة ثانية.' : 'ما لقينا أخبار تطابق بحثك.', onRetry: _refresh);
                 return RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(
