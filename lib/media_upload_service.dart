@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,6 +18,8 @@ Future<String> uploadForumMedia(
   switch (folder) {
     case 'anime-wallpapers':
     case 'public-chat':
+    case 'posts':
+    case 'voice-messages':
     case 'stories':
     case 'private-chat':
     case 'chat-backgrounds':
@@ -36,22 +37,27 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Existing accounts may predate the onUserCreated trigger. This callable
-  // safely adds role=authenticated to the current user's custom claims.
-  await FirebaseFunctions.instance
-      .httpsCallable('ensureSupabaseAuthenticatedRole')
-      .call();
-
+  // Claims are provisioned with the local Firebase Admin SDK migration script.
+  // Uploads therefore do not depend on a billable Cloud Function deployment.
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
     throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
   }
-  final payload = token.split('.')[1];
-  final claims = jsonDecode(
-    utf8.decode(base64Url.decode(base64Url.normalize(payload))),
-  ) as Map<String, dynamic>;
+  Map<String, dynamic> claims;
+  try {
+    final payload = token.split('.')[1];
+    claims = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(payload))),
+    ) as Map<String, dynamic>;
+  } catch (_) {
+    throw StateError('رمز Firebase غير صالح. سجّل خروج وادخل من جديد.');
+  }
+  if (claims['sub'] != user.uid || claims['aud'] != 'futureyouth-69f8a'
+      || claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8a') {
+    throw StateError('هوية Firebase لا تطابق مشروع التطبيق. راجع إعداد Firebase Third-party Auth في Supabase.');
+  }
   if (claims['role'] != 'authenticated') {
-    throw StateError('صلاحية التخزين لم تتحدث بعد. أعد المحاولة بعد لحظات.');
+    throw StateError('حسابك يحتاج صلاحية رفع الوسائط. شغّل سكربت منح الصلاحية من Cloud Shell (بدون نشر Functions أو تفعيل Blaze)، ثم سجّل خروج وادخل من جديد.');
   }
 
   final name = file.name.toLowerCase();
@@ -89,10 +95,19 @@ Future<String> uploadForumMedia(
 
   final path = '$prefix${DateTime.now().microsecondsSinceEpoch}.$ext';
   final storage = Supabase.instance.client.storage.from('forum-media');
-  await storage.uploadBinary(
-    path,
-    bytes,
-    fileOptions: FileOptions(contentType: contentType, upsert: false),
-  );
+  try {
+    await storage.uploadBinary(
+      path,
+      bytes,
+      fileOptions: FileOptions(contentType: contentType, upsert: false),
+    );
+  } on StorageException catch (e) {
+    final detail = e.message.toLowerCase();
+    if (detail.contains('firebase') || detail.contains('third-party')
+        || detail.contains('jwt') || detail.contains('unauthorized')) {
+      throw StateError('Supabase لم يتعرف على رمز Firebase. فعّل Firebase من Authentication → Third-Party Auth في مشروع Supabase ثم أعد تسجيل الدخول. (' + (e.statusCode ?? 'Auth').toString() + ')');
+    }
+    rethrow;
+  }
   return storage.getPublicUrl(path);
 }

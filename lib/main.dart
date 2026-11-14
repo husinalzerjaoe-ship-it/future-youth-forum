@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,7 +13,10 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'local_audio_handler.dart';
+import 'youtube_video_player.dart';
 import 'firebase_options.dart';
+import 'football_news.dart';
+import 'watch_party.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -40,7 +42,7 @@ class FutureYouthApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'ملتقى الأنمي',
+    title: 'ملتقى شباب المستقبل',
     themeMode: ThemeMode.system,
     theme: ThemeData(
       useMaterial3: true,
@@ -137,7 +139,7 @@ class _AuthPageState extends State<AuthPage> {
             child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Icon(Icons.groups_rounded, size: 58, color: brand),
               const SizedBox(height: 12),
-              const Text('ملتقى الأنمي', textAlign: TextAlign.center,
+              const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(registering ? 'أنشئ حسابك وابدأ المشاركة' : 'سجّل دخولك للمتابعة',
@@ -201,7 +203,7 @@ class _HomePageState extends State<HomePage> {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
-        title: const Text('ملتقى الأنمي'),
+        title: const Text('ملتقى شباب المستقبل'),
         actions: [
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
@@ -258,7 +260,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: IndexedStack(index: selected, children: const [PostsPage(), EnhancedPublicChatPage(), CommunityHubPage(), MyProfilePage()]),
+      body: IndexedStack(index: selected, children: [const PostsPage(), const EnhancedPublicChatPage(), const CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
@@ -275,6 +277,7 @@ class _HomePageState extends State<HomePage> {
 
 class PostsPage extends StatelessWidget {
   const PostsPage({super.key});
+
   Future<void> addPost(BuildContext context) async {
     final text = TextEditingController();
     final video = TextEditingController();
@@ -304,6 +307,45 @@ class PostsPage extends StatelessWidget {
     text.dispose();
     video.dispose();
   }
+  Future<void> addPhotoPost(BuildContext context) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88);
+    if (file == null) return;
+    final caption = TextEditingController();
+    final publish = await showDialog<bool>(context: context, builder: (ctx) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('نشر صورة'),
+        content: TextField(controller: caption, maxLines: 3, maxLength: 500,
+          decoration: const InputDecoration(labelText: 'اكتب تعليقاً للصورة (اختياري)', border: OutlineInputBorder())),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('نشر الصورة')),
+        ],
+      ),
+    ));
+    if (publish != true) { caption.dispose(); return; }
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final profile = await db.collection('publicProfiles').doc(user.uid).get();
+      final imageUrl = await uploadForumMedia(file, folder: 'posts');
+      await db.collection('posts').add({
+        'text': caption.text.trim(),
+        'imageUrl': imageUrl,
+        'mediaType': 'image',
+        'authorId': user.uid,
+        'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
+        'authorPhoto': profile.data()?['photoUrl'] ?? '',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر الصورة بنجاح')));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر نشر الصورة: $e')));
+    } finally {
+      caption.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
@@ -349,10 +391,47 @@ class PostsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.add), label: const Text('اكتب منشوراً')),
-            ]),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFEDE9FF), child: Icon(Icons.sports_soccer_rounded, color: Color(0xFF6554D9))),
+                title: const Text('أخبار كرة القدم', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('آخر الأخبار والانتقالات والعراق والدوريات والمنتخبات'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootballNewsPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFEDE9FF), child: Icon(Icons.live_tv_rounded, color: Color(0xFF6554D9))),
+                title: const Text('غرف يوتيوب والمشاهدة الجماعية', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('شاهدوا الفيديو معاً وتحدثوا داخل الغرفة مباشرة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFFFF0E4), child: Icon(Icons.camera_alt_rounded, color: Color(0xFFB96A28))),
+                title: const Text('ستوريات الملتقى', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('شاهد قصص الأعضاء أو انشر صورة وفيديو لمدة 24 ساعة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StoriesPage())),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                Wrap(spacing: 4, children: [
+                  TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.edit_outlined), label: const Text('اكتب منشوراً')),
+                  TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('نشر صورة')),
+                ]),
+              ],
+            ),
             if (posts.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('ماكو منشورات بعد. كن أول من ينشر!'))),
             ...posts.map((doc) {
               final d = doc.data();
@@ -361,8 +440,10 @@ class PostsPage extends StatelessWidget {
                   title: Text(d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
                 if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(fontSize: 16)),
-                if ((d['videoUrl'] as String? ?? '').startsWith('https://'))
-                  Padding(padding: const EdgeInsets.only(top: 8), child: SelectableText('🎬 رابط الفيديو: ${d['videoUrl']}')),
+                if ((d['imageUrl'] as String? ?? '').isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 10), child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(d['imageUrl'] as String, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الصورة'))))),
+                if ((d['videoUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: d['videoUrl'] as String)),
                 PostSocialActions(postId: doc.id, authorId: d['authorId'] as String? ?? ''),
               ])));
             }),
@@ -757,10 +838,8 @@ class MemberPosts extends StatelessWidget {
         return Card(clipBehavior: Clip.antiAlias, margin: const EdgeInsets.symmetric(vertical: 7),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if ((data['text'] as String? ?? '').isNotEmpty) Text(data['text'] as String, style: const TextStyle(fontSize: 16)),
-            if (videoUrl.startsWith('https://'))
-              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.play_circle_fill, color: brand, size: 34),
-                title: const Text('فيديو منشور'), subtitle: const Text('افتح رابط الفيديو'),
-                onTap: () async { final uri = Uri.tryParse(videoUrl); if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication); }),
+            if (videoUrl.trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: videoUrl)),
             PostSocialActions(postId: post.id, authorId: data['authorId'] as String? ?? ''),
           ])));
       }).toList());

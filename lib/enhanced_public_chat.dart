@@ -1,7 +1,11 @@
 
+import 'dart:io';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'advanced_features.dart';
@@ -21,6 +25,10 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  final AudioRecorder _voiceRecorder = AudioRecorder();
+  bool _recordingVoice = false;
+  DateTime? _voiceStartedAt;
+  String? _voiceTempPath;
   DateTime? _lastSuccessfulSend;
   String? _error;
   String? _pulseMessageId;
@@ -31,7 +39,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
   DocumentSnapshot<Map<String, dynamic>>? _reply;
   int _background = 0xFFF5F3FF;
-  static const _backgrounds = [0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5];
+  static const _backgrounds = [0xFFF5F3FF,0xFFEAF6FF,0xFFFFF3E8,0xFFF0F7F1,0xFF171936,0xFFFFF0F5,0xFFEDE7F6,0xFFE0F2F1,0xFFFFF8E1,0xFFE3F2FD,0xFF263238,0xFFFCE4EC];
   static const _stickers = ['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍','🌟','💯','🥳','🤝'];
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   DocumentReference<Map<String,dynamic>> get _presence => _chatDb.collection('chatPresence').doc(_uid);
@@ -42,13 +50,13 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Future<void> _loadBackground() async {
     try { final d=await _chatDb.collection('chatPreferences').doc(_uid).get(); final c=d.data()?['background']; if(mounted && c is int && _backgrounds.contains(c)) setState(()=>_background=c); } catch (_) {}
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); _voiceRecorder.dispose(); super.dispose(); }
 
   Future<String> _name() async {
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
     return p.data()?['name'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
   }
-  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false}) async {
+  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false,int? durationSeconds}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
     final now = DateTime.now();
     final last = _lastSuccessfulSend;
@@ -76,9 +84,13 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         return;
       }
       final senderName = await _name();
+      final membership = (await _chatDb.collection('memberships').doc(_uid).get()).data() ?? {};
+      final expiry = membership['expiresAt'];
+      final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
       await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)'imageUrl':mediaUrl,
+        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
+        if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
@@ -98,7 +110,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       }
       _lastSuccessfulSend = DateTime.now();
       _text.clear(); _reply=null;
-      await _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_) {});
+      await _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_) => null);
     } catch (_) { if(mounted)setState(()=>_error='تعذر إرسال الرسالة. تحقق من قواعد Firestore والتخزين.'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
@@ -111,6 +123,51 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _toggleVoiceRecording() async {
+    if (_sending) return;
+    if (!_recordingVoice) {
+      try {
+        if (!await _voiceRecorder.hasPermission()) {
+          _snack('اسمح للتطبيق باستخدام المايك حتى تسجل فويس');
+          return;
+        }
+        final dir = await Directory.systemTemp.createTemp('forum_voice_');
+        final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _voiceRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100),
+          path: path,
+        );
+        if (mounted) setState(() { _recordingVoice = true; _voiceStartedAt = DateTime.now(); _voiceTempPath = path; });
+      } catch (e) {
+        _snack('تعذر تشغيل التسجيل: $e');
+      }
+      return;
+    }
+    try {
+      final path = await _voiceRecorder.stop();
+      final started = _voiceStartedAt;
+      if (mounted) setState(() { _recordingVoice = false; _voiceStartedAt = null; });
+      final filePath = path ?? _voiceTempPath;
+      if (filePath == null || started == null) return;
+      final seconds = DateTime.now().difference(started).inSeconds;
+      if (seconds < 1) { _snack('التسجيل قصير جداً'); return; }
+      if (seconds > 180) { _snack('الحد الأقصى للرسالة الصوتية 3 دقائق'); return; }
+      final file = File(filePath);
+      if (!await file.exists() || await file.length() == 0) { _snack('ملف التسجيل فارغ'); return; }
+      if (mounted) setState(() => _sending = true);
+      final url = await uploadForumMedia(
+        XFile(filePath, name: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a'),
+        folder: 'public-chat',
+      );
+      await _send(body: 'رسالة صوتية', mediaUrl: url, type: 'voice', uploadInProgress: true, durationSeconds: seconds);
+      try { await file.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() { _recordingVoice = false; _voiceStartedAt = null; _error = 'تعذر إرسال الفويس: $e'; });
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   Future<void> _showStickers() async {
     final v=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('الملصقات',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
@@ -126,11 +183,40 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final d=doc.data()??{}; final mine=d['senderId']==_uid; final staff=_isFounder || (await _chatDb.collection('chatModerators').doc(_uid).get()).exists;
     final a=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Column(mainAxisSize:MainAxisSize.min,children:[
       ListTile(leading:const Icon(Icons.reply),title:const Text('رد'),onTap:()=>Navigator.pop(c,'reply')),
+      if((d['text'] as String? ?? '').trim().isNotEmpty)ListTile(leading:const Icon(Icons.copy),title:const Text('نسخ الرسالة'),onTap:()=>Navigator.pop(c,'copy')),
+      if(!mine)ListTile(leading:const Icon(Icons.flag_outlined,color:Colors.deepOrange),title:const Text('إبلاغ عن الرسالة'),onTap:()=>Navigator.pop(c,'report')),
       if(mine&&d['type']=='text')ListTile(leading:const Icon(Icons.edit),title:const Text('تعديل'),onTap:()=>Navigator.pop(c,'edit')),
       if(staff)ListTile(leading:const Icon(Icons.push_pin),title:Text(d['isPinned']==true?'إلغاء التثبيت':'تثبيت'),onTap:()=>Navigator.pop(c,'pin')),
       if(mine||staff)ListTile(leading:const Icon(Icons.delete,color:Colors.red),title:const Text('حذف'),onTap:()=>Navigator.pop(c,'delete')),
     ])));
     if(a=='reply'&&mounted)setState(()=>_reply=doc);
+    if(a=='copy'){
+      await Clipboard.setData(ClipboardData(text:(d['text'] as String? ?? '').trim()));
+      _snack('تم نسخ الرسالة');
+    }
+    if(a=='report'&&!mine&&mounted){
+      final reason=TextEditingController();
+      final selected=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(
+        title:const Text('الإبلاغ عن رسالة'),
+        content:Column(mainAxisSize:MainAxisSize.min,children:[
+          const Text('اختر سبب الإبلاغ أو اكتب تفاصيل إضافية'),
+          const SizedBox(height:8),
+          Wrap(spacing:6,children:['إساءة أو تنمّر','محتوى غير لائق','إزعاج أو رسائل متكررة','انتحال شخصية'].map((v)=>ActionChip(label:Text(v),onPressed:()=>Navigator.pop(c,v))).toList()),
+          TextField(controller:reason,maxLength:180,maxLines:2,decoration:const InputDecoration(labelText:'تفاصيل إضافية (اختياري)')),
+        ]),
+        actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(c,reason.text.trim()),child:const Text('إرسال البلاغ'))],
+      )));
+      if(selected!=null){
+        final reportReason='رسالة ${doc.id}: ${selected.isEmpty?'مراجعة الرسالة':selected}';
+        await _chatDb.collection('reports').add({
+          'reporterId':_uid,'targetId':(d['senderId']??'').toString(),
+          'reason':reportReason.substring(0,reportReason.length.clamp(0,300)),
+          'status':'new','createdAt':FieldValue.serverTimestamp(),
+        });
+        _snack('وصل بلاغك للإدارة، شكراً لتنبيهنا');
+      }
+      reason.dispose();
+    }
     if(a=='pin'&&staff)await doc.reference.update({'isPinned':d['isPinned']!=true,'pinnedBy':_uid});
     if(a=='delete'&&(mine||staff))await doc.reference.delete();
     if(a=='edit'&&mounted){
@@ -313,7 +399,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         _snack('وصل بلاغك للإدارة');
       }
     } else if (action == 'block') {
-      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'name': memberName, 'createdAt': FieldValue.serverTimestamp()});
+      await _chatDb.collection('userBlocks').doc('${_uid}_${memberUid}').set({'blockerId': _uid, 'blockedId': memberUid, 'blockedName': memberName, 'createdAt': FieldValue.serverTimestamp()});
       _snack('تم حظر العضو عندك');
     } else if (action == 'mute' && staff) {
       await _moderateMember(memberUid, memberName, 'mute');
@@ -341,11 +427,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
     final d=doc.data()??{};final mine=d['senderId']==_uid;final sender=(d['senderId']??'').toString();
     final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
+    final tier=(d['membershipTier']??'').toString().toLowerCase();
+    final tierColor = switch (tier) { 'gold' => const Color(0xFFD49A16), 'silver' => const Color(0xFF8795A1), 'diamond' => const Color(0xFF24A6C7), 'legendary' => const Color(0xFF9A62D8), _ => null };
+    final tierLabel = switch (tier) { 'gold' => 'ذهبية', 'silver' => 'فضية', 'diamond' => 'ماسية', 'legendary' => 'أسطورية', _ => 'مميزة' };
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
       constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
-      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(mine?const Color(0xFFE8E2FF):Colors.white),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):_chatBrand.withValues(alpha:.42),width:founder?2.6:1),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
+      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(tierColor!=null?tierColor.withValues(alpha:.13):(mine?const Color(0xFFE8E2FF):Colors.white)),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.7),width:founder?2.6:(tierColor!=null?2:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -358,14 +447,16 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           ),
           const SizedBox(width:8),
           Flexible(child:GestureDetector(onTap:()=>_showMemberActions(d),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):const Color(0xFF4532A8))),
+            Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):(tierColor??const Color(0xFF4532A8)))),
             if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
+            if(!founder && tier.isNotEmpty)Text('عضوية $tierLabel',style:TextStyle(fontSize:10,color:tierColor,fontWeight:FontWeight.w900)),
             if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
           ]))),
           if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:19),
         ]),
         const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
+        if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
@@ -393,12 +484,24 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
-    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),builder:(c,s){
-      if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
-      if(!s.hasData)return const Center(child:CircularProgressIndicator());
-      if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
-      return ListView(reverse:true,padding:const EdgeInsets.all(12),children:s.data!.docs.map(_bubble).toList());
-    }))),
+    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+      stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
+      builder:(context,blocks){
+        if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
+        if(!blocks.hasData)return const Center(child:CircularProgressIndicator());
+        final blockedIds=blocks.data!.docs.map((d)=>(d.data()['blockedId']??'').toString()).where((id)=>id.isNotEmpty).toSet();
+        return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+          stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),
+          builder:(c,s){
+            if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
+            if(!s.hasData)return const Center(child:CircularProgressIndicator());
+            final visible=s.data!.docs.where((d)=>!blockedIds.contains((d.data()['senderId']??'').toString())).toList();
+            if(visible.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
+            return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
+          },
+        );
+      },
+    ))),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatTyping').where('typing',isEqualTo:true).snapshots(),builder:(c,s){
       final n=(s.data?.docs??[]).where((d)=>d.id!=_uid).length;
       return n>0?const Padding(padding:EdgeInsets.all(3),child:Text('أحد الأعضاء يكتب الآن...',style:TextStyle(fontSize:11,color:_chatBrand))):const SizedBox.shrink();
@@ -408,6 +511,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
       IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
+      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
         onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
         onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
@@ -461,4 +565,46 @@ class ChatMemberProfilePage extends StatelessWidget {
       ]);
     }),
   ));
+}
+
+class _VoiceMessagePlayer extends StatefulWidget {
+  final String url;
+  final int durationSeconds;
+  const _VoiceMessagePlayer({required this.url,required this.durationSeconds});
+  @override State<_VoiceMessagePlayer> createState()=>_VoiceMessagePlayerState();
+}
+class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
+  late final AudioPlayer _player;
+  @override void initState() {
+    super.initState();
+    _player=AudioPlayer();
+    _player.setUrl(widget.url).catchError((_) => null);
+  }
+  @override void dispose() { _player.dispose(); super.dispose(); }
+  String _time(Duration d) {
+    final m=d.inMinutes.toString().padLeft(2,'0');
+    final s=(d.inSeconds%60).toString().padLeft(2,'0');
+    return '$m:$s';
+  }
+  @override Widget build(BuildContext context)=>Container(
+    width:230,padding:const EdgeInsets.symmetric(horizontal:8,vertical:5),
+    decoration:BoxDecoration(color:const Color(0xFFEEE9FF),borderRadius:BorderRadius.circular(14)),
+    child:Row(children:[
+      StreamBuilder<PlayerState>(stream:_player.playerStateStream,builder:(context,s){
+        final playing=s.data?.playing??false;
+        return IconButton(onPressed:()=>playing?_player.pause():_player.play(),icon:Icon(playing?Icons.pause_circle_filled:Icons.play_circle_fill,color:_chatBrand,size:34));
+      }),
+      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const Text('رسالة صوتية',style:TextStyle(fontWeight:FontWeight.bold,fontSize:12)),
+        StreamBuilder<Duration>(stream:_player.positionStream,builder:(context,s){
+          final pos=s.data??Duration.zero;
+          final total=_player.duration??Duration(seconds:widget.durationSeconds);
+          return Column(children:[
+            Slider(value:pos.inMilliseconds.toDouble().clamp(0,total.inMilliseconds>0?total.inMilliseconds.toDouble():1).toDouble(),min:0,max:total.inMilliseconds>0?total.inMilliseconds.toDouble():1,onChanged:(v)=>_player.seek(Duration(milliseconds:v.toInt()))),
+            Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(_time(pos),style:const TextStyle(fontSize:10)),Text(_time(total),style:const TextStyle(fontSize:10))]),
+          ]);
+        }),
+      ])),
+    ]),
+  );
 }
