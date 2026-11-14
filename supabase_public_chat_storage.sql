@@ -5,7 +5,7 @@ values (
   'forum-media',
   true,
   104857600,
-  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf','audio/mpeg','audio/mp4','audio/aac','audio/wav','audio/ogg','audio/flac']
+  array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','audio/mp4','audio/aac','audio/mpeg','audio/wav','audio/ogg','audio/flac','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf']
 )
 on conflict (id) do update set
   public = excluded.public,
@@ -24,16 +24,13 @@ using (bucket_id = 'forum-media');
 drop policy if exists "Forum members upload own media" on storage.objects;
 create policy "Forum members upload own media"
 on storage.objects for insert
-to anon, authenticated
+to authenticated
 with check (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
-  and auth.jwt()->>'sub' is not null
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','private-chat',
+        'public-chat','profiles','stories','private-chat','voice-messages',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -48,16 +45,13 @@ with check (
 drop policy if exists "Forum members update own media" on storage.objects;
 create policy "Forum members update own media"
 on storage.objects for update
-to anon, authenticated
+to authenticated
 using (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
-  and auth.jwt()->>'sub' is not null
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','private-chat',
+        'public-chat','profiles','stories','private-chat','voice-messages',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -70,13 +64,10 @@ using (
 )
 with check (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
-  and auth.jwt()->>'sub' is not null
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','private-chat',
+        'public-chat','profiles','stories','private-chat','voice-messages',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -91,16 +82,13 @@ with check (
 drop policy if exists "Forum members delete own media" on storage.objects;
 create policy "Forum members delete own media"
 on storage.objects for delete
-to anon, authenticated
+to authenticated
 using (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
-  and auth.jwt()->>'sub' is not null
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','private-chat',
+        'public-chat','profiles','stories','private-chat','voice-messages',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
