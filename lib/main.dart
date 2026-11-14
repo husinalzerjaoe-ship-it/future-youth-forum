@@ -340,9 +340,14 @@ class PostsPage extends StatelessWidget {
                       style: TextStyle(color: Color(0xFFFFD66B), fontSize: 16, fontWeight: FontWeight.bold, height: 1.6)),
                     SizedBox(height: 12),
                     Text(
-                      'أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.\\n\\n'
-                      'وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.\\n\\n'
-                      'قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.\\n— Alfredo | المطوّر 👑',
+                      'أنا ألفريدو، مطوّر هذا الملتقى. لم أصنع هذا المكان لأكون اسماً عابراً بين الأسماء، بل لأترك في كل زاوية بصمة من فكري وطموحي. لا أحتاج إلى مقارنة نفسي بأحد؛ فلكل شخص طريقه، وأنا اخترت لنفسي طريقاً لا يشبه طرق الآخرين. حين أضع فكرة في رأسي أسعى لتحويلها إلى واقع، وحين أختار التميّز لا أنتظر إذناً من أحد.\
+\
+'
+                      'وأنت عزيزي العضو، أهلاً بك في عالمنا. لا تجعل وجودك مجرد اسم في قائمة الأعضاء؛ شارك، اكتب، ساعد غيرك، واصنع لك حكاية جميلة. هنا نلتقي على حب الأنمي، ونتبادل الأفكار والضحكات والذكريات. احترم الآخرين، واجعل اختلافك مساحة للتعلّم لا سبباً للخصام.\
+\
+'
+                      'قد أعتز بما صنعت، لكن قيمة الملتقى الحقيقية تكبر بوجودكم وتفاعلكم. أتمنى لكم وقتاً ممتعاً وتجربة تليق بكم.\
+— Alfredo | المطوّر 👑',
                       style: TextStyle(color: Colors.white, fontSize: 14, height: 1.8)),
                   ],
                 ),
@@ -661,7 +666,8 @@ class EditProfilePage extends StatefulWidget {
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 class _EditProfilePageState extends State<EditProfilePage> {
-  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController(), cover = TextEditingController();\n  String avatarFrame = 'none';
+  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController(), cover = TextEditingController();
+  String avatarFrame = 'none';
   bool loading = true, saving = false, uploadingPhoto = false;
   @override
   void initState() {
@@ -670,7 +676,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final d = s.data() ?? {};
       name.text = d['name'] as String? ?? '';
       bio.text = d['bio'] as String? ?? '';
-      photo.text = d['photoUrl'] as String? ?? '';\n      cover.text = d['coverUrl'] as String? ?? '';\n      avatarFrame = d['avatarFrame'] as String? ?? 'none';
+      photo.text = d['photoUrl'] as String? ?? '';
+      cover.text = d['coverUrl'] as String? ?? '';
+      avatarFrame = d['avatarFrame'] as String? ?? 'none';
       if (mounted) setState(() => loading = false);
     });
   }
