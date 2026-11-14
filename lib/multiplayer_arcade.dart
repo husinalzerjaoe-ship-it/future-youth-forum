@@ -40,18 +40,22 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
-  Future<void> _joinRoom([String? roomId]) async {
+  Future<bool> _joinRoom([String? roomId]) async {
     final id = (roomId ?? _code.text).trim();
-    if (id.isEmpty || _busy) return;
+    if (!RegExp(r'^\d{6}$').hasMatch(id) || _busy) {
+      if (mounted) _toast('اكتب رمز غرفة صحيحاً من 6 أرقام');
+      return false;
+    }
     setState(() => _busy = true);
+    var joined = false;
     try {
       final ref = _db.collection('gameRooms').doc(id);
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
-        if (!snap.exists) throw Exception('الغرفة غير موجودة');
+        if (!snap.exists) throw Exception('الغرفة غير موجودة أو انتهت');
         final data = snap.data()!;
         final members = List<String>.from(data['members'] ?? []);
-        if (members.contains(_uid)) return;
+        if (members.contains(_uid)) { joined = true; return; }
         if (data['game'] != 'xo' || data['status'] != 'waiting' || members.length >= 2) {
           throw Exception('الغرفة مكتملة أو بدأت اللعبة');
         }
@@ -60,12 +64,15 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
           'memberNames.' + _uid: _name,
           'status': 'playing', 'updatedAt': FieldValue.serverTimestamp(),
         });
+        joined = true;
       });
-      if (!mounted) return;
+      if (!mounted) return joined;
       _code.clear();
-      Navigator.push(context, MaterialPageRoute(builder: (_) => OnlineXoRoomPage(roomId: id)));
+      if (joined) Navigator.push(context, MaterialPageRoute(builder: (_) => OnlineXoRoomPage(roomId: id)));
+      return joined;
     } catch (e) {
       _toast('ما كدرنا ننضم: ' + e.toString().replaceFirst('Exception: ', ''));
+      return false;
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
@@ -121,8 +128,8 @@ class _MultiplayerArcadePageState extends State<MultiplayerArcadePage> {
                 trailing: FilledButton(
                   onPressed: _busy ? null : () async {
                     final roomId = data['roomId']?.toString() ?? '';
-                    await _joinRoom(roomId);
-                    if (mounted) await invite.reference.update({'status': 'accepted'});
+                    final joined = await _joinRoom(roomId);
+                    if (joined && mounted) await invite.reference.update({'status': 'accepted'});
                   },
                   child: const Text('انضم'),
                 ),
