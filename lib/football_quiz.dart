@@ -1,5 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 class _Fact { final String q,a,e; final List<String> w; const _Fact(this.q,this.a,this.w,this.e); }
 const _facts = <_Fact>[
@@ -97,8 +100,135 @@ class _FootballQuizPageState extends State<FootballQuizPage>{
     if(_selected!=null)Padding(padding:const EdgeInsets.symmetric(vertical:8),child:Text((_selected==_bank[_at].correct?'إجابة صحيحة +10 🏆\n':'إجابة غير صحيحة.\n')+_bank[_at].explanation,style:const TextStyle(fontWeight:FontWeight.w600))),
     FilledButton(onPressed:_selected==null?null:_next,child:const Text('السؤال التالي')),
    ]))),
+    const SizedBox(height:12),
+    FilledButton.icon(
+      onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const FootballQuizOnlinePage())),
+      icon:const Icon(Icons.groups_rounded),
+      label:const Text('تحدي كرة القدم أونلاين — 2 إلى 4 لاعبين'),
+    ),
    const Text('الأسئلة مبنية على حقائق بطولات ونتائج تاريخية، مع صيغ تحدٍّ متعددة لكل معلومة.',style:TextStyle(color:Colors.grey,fontSize:12)),
   ]),
  ));
 }
 class _Q{final String text,explanation;final List<String> options;final int correct;const _Q(this.text,this.options,this.correct,this.explanation);}
+
+class FootballQuizOnlinePage extends StatefulWidget {
+ const FootballQuizOnlinePage({super.key});
+ @override State<FootballQuizOnlinePage> createState()=>_FootballQuizOnlinePageState();
+}
+class _FootballQuizOnlinePageState extends State<FootballQuizOnlinePage>{
+ final _db=FirebaseFirestore.instance;
+ final _code=TextEditingController();
+ bool _busy=false;
+ String get _uid=>FirebaseAuth.instance.currentUser!.uid;
+ String get _name=>FirebaseAuth.instance.currentUser?.displayName??'لاعب';
+ void _msg(String s)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));
+ @override void dispose(){_code.dispose();super.dispose();}
+ Future<void> _create()async{
+  if(_busy)return;setState(()=>_busy=true);
+  try{
+   final ref=_db.collection('gameRooms').doc();
+   await ref.set({'game':'football_quiz','hostId':_uid,'members':[_uid],'memberNames':{_uid:_name},'status':'waiting','round':0,'answers':{},'scores':{_uid:0},'createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()});
+   if(!mounted)return;Navigator.push(context,MaterialPageRoute(builder:(_)=>_FootballQuizMatchPage(roomId:ref.id)));
+  }catch(e){_msg('تعذر إنشاء الغرفة: '+e.toString());}finally{if(mounted)setState(()=>_busy=false);}
+ }
+ Future<void> _join()async{
+  final id=_code.text.trim();if(id.isEmpty||_busy)return;setState(()=>_busy=true);
+  try{
+   final ref=_db.collection('gameRooms').doc(id);
+   await _db.runTransaction((tx)async{
+    final snap=await tx.get(ref);if(!snap.exists)throw Exception('الغرفة غير موجودة');
+    final d=snap.data()!;final members=List<String>.from(d['members']??[]);
+    if(d['game']!='football_quiz'||d['status']!='waiting'||members.length>=4)throw Exception('الغرفة مكتملة أو بدأت');
+    if(!members.contains(_uid)){tx.update(ref,{'members':FieldValue.arrayUnion([_uid]),'memberNames.'+_uid:_name,'scores.'+_uid:0,'updatedAt':FieldValue.serverTimestamp()});}
+   });
+   if(!mounted)return;Navigator.push(context,MaterialPageRoute(builder:(_)=>_FootballQuizMatchPage(roomId:id)));
+  }catch(e){_msg('تعذر الانضمام: '+e.toString().replaceFirst('Exception: ',''));}finally{if(mounted)setState(()=>_busy=false);}
+ }
+ @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('تحدي كرة القدم الجماعي')),
+  body:ListView(padding:const EdgeInsets.all(16),children:[
+   const Text('كوّن فريقاً من 2 إلى 4 لاعبين. كل لاعب يجاوب من جهازه، والنقاط تتحدث مباشرة.',style:TextStyle(fontSize:16)),
+   const SizedBox(height:14),
+   FilledButton.icon(onPressed:_busy?null:_create,icon:const Icon(Icons.add),label:const Text('إنشاء غرفة تحدي')),
+   const SizedBox(height:12),
+   TextField(controller:_code,decoration:const InputDecoration(labelText:'رمز غرفة صديقك',border:OutlineInputBorder())),
+   const SizedBox(height:8),
+   OutlinedButton.icon(onPressed:_busy?null:_join,icon:const Icon(Icons.login),label:const Text('انضم للغرفة')),
+  ]),
+ ));
+}
+
+class _FootballQuizMatchPage extends StatefulWidget{
+ final String roomId;const _FootballQuizMatchPage({required this.roomId});
+ @override State<_FootballQuizMatchPage> createState()=>_FootballQuizMatchPageState();
+}
+class _FootballQuizMatchPageState extends State<_FootballQuizMatchPage>{
+ final _db=FirebaseFirestore.instance;bool _busy=false;
+ String get _uid=>FirebaseAuth.instance.currentUser!.uid;
+ DocumentReference<Map<String,dynamic>> get _ref=>_db.collection('gameRooms').doc(widget.roomId);
+ Future<void> _start(Map<String,dynamic>d)async{
+  if(d['hostId']!=_uid|| (d['members'] as List).length<2)return;
+  await _ref.update({'status':'playing','updatedAt':FieldValue.serverTimestamp()});
+ }
+ Future<void> _answer(int choice,Map<String,dynamic>d,_Fact fact,List<String> options)async{
+  if(_busy||d['status']!='playing')return;
+  final answers=Map<String,dynamic>.from(d['answers']??{});
+  if(answers.containsKey(_uid))return;
+  setState(()=>_busy=true);
+  try{
+   await _db.runTransaction((tx)async{
+    final snap=await tx.get(_ref);final x=snap.data()!;
+    final a=Map<String,dynamic>.from(x['answers']??{});
+    if(a.containsKey(_uid)||x['status']!='playing')return;
+    final scores=Map<String,dynamic>.from(x['scores']??{});
+    final old=(scores[_uid] as num?)?.toInt()??0;
+    tx.update(_ref,{'answers.'+_uid:choice,'scores.'+_uid:old+(options[choice]==fact.a?10:0),'updatedAt':FieldValue.serverTimestamp()});
+   });
+  }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الإجابة: '+e.toString())));}
+  finally{if(mounted)setState(()=>_busy=false);}
+ }
+ Future<void> _next(Map<String,dynamic>d)async{
+  if(_busy||d['hostId']!=_uid)return;
+  final members=List<String>.from(d['members']??[]);final answers=Map<String,dynamic>.from(d['answers']??{});
+  if(answers.length<members.length)return;
+  setState(()=>_busy=true);
+  try{final round=(d['round'] as num? ??0).toInt()+1;await _ref.update({'round':round,'answers':{},'status':round>=20?'finished':'playing','updatedAt':FieldValue.serverTimestamp()});}
+  finally{if(mounted)setState(()=>_busy=false);}
+ }
+ @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('مواجهة معلومات كرة القدم')),
+  body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_ref.snapshots(),builder:(context,s){
+   if(s.hasError)return const Center(child:Text('تعذر الاتصال بالغرفة؛ راجع قواعد Firestore.'));
+   if(!s.hasData)return const Center(child:CircularProgressIndicator());
+   if(!s.data!.exists)return const Center(child:Text('الغرفة غير موجودة.'));
+   final d=s.data!.data()!;final members=List<String>.from(d['members']??[]);final names=Map<String,dynamic>.from(d['memberNames']??{});final scores=Map<String,dynamic>.from(d['scores']??{});final answers=Map<String,dynamic>.from(d['answers']??{});
+   final round=(d['round'] as num? ??0).toInt();final fact=_facts[round%_facts.length];final opts=<String>[fact.a,...fact.w]..shuffle(Random(fact.a.hashCode+round*97));
+   final mine=answers.containsKey(_uid);final status=d['status'];
+   return ListView(padding:const EdgeInsets.all(16),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(12),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+     const Text('رمز الدعوة',textAlign:TextAlign.center),
+     SelectableText(widget.roomId,textAlign:TextAlign.center,style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
+     TextButton.icon(onPressed:(){Clipboard.setData(ClipboardData(text:widget.roomId));ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نسخ الرمز')));},icon:const Icon(Icons.copy),label:const Text('نسخ الرمز')),
+     Text('اللاعبون: ${members.length}/4'),
+    ]))),
+    const SizedBox(height:8),
+    ...members.map((id)=>ListTile(dense:true,leading:const Icon(Icons.person),title:Text((names[id]??'لاعب').toString()),trailing:Text('${(scores[id] as num? ??0).toInt()} نقطة'))),
+    if(status=='waiting')...[
+     const Text('بانتظار بدء المضيف. تحتاج الغرفة لاعبين على الأقل.',textAlign:TextAlign.center),
+     if(d['hostId']==_uid)FilledButton(onPressed:members.length>=2?_busy?null:()=>_start(d):null,child:const Text('ابدأ التحدي')),
+    ]else if(status=='playing')...[
+     Text('السؤال ${round+1} من 20',style:const TextStyle(color:Colors.grey)),
+     Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      Text(fact.q,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+      const SizedBox(height:12),
+      ...List.generate(4,(i)=>Padding(padding:const EdgeInsets.only(bottom:7),child:OutlinedButton(onPressed:mine||_busy?null:()=>_answer(i,d,fact,opts),child:Text(opts[i])))),
+      Text(mine?'تم تسجيل إجابتك. انتظر بقية اللاعبين.':'اختر إجابتك؛ بعد الاختيار لا يمكن تغييره.'),
+      Text('الإجابات: ${answers.length}/${members.length}'),
+      if(d['hostId']==_uid)FilledButton(onPressed:answers.length==members.length&&!_busy?()=>_next(d):null,child:const Text('السؤال التالي')),
+     ]))),
+    ]else const Center(child:Text('انتهى التحدي! راجعوا جدول النقاط أعلاه 🏆')),
+   ]);
+  }),
+ ));
+}
