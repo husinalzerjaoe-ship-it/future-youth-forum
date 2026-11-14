@@ -556,6 +556,13 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
   {'title':"Ennio Morricone – Gabriel's Oboe",'artist':"Ennio Morricone",'category':"موسيقى تصويرية"},
   {'title':"Ramin Djawadi – Light of the Seven",'artist':"Ramin Djawadi",'category':"موسيقى تصويرية"},
  ];
+ List<Widget> _featuredCards()=>featuredTracks.map((track)=>Card(child:ListTile(
+  leading:const CircleAvatar(child:Icon(Icons.music_note)),
+  title:Text(track['title']!),
+  subtitle:Text('${track['artist']} • ${track['category']}'),
+  trailing:const Icon(Icons.open_in_new),
+  onTap:()=>openFeatured(track),
+ ))).toList();
  Future<void> openFeatured(Map<String,String> track) async {
   final query='${track['artist']} ${track['title']} official audio';
   final uri=Uri.https('www.youtube.com','/results',{'search_query':query});
@@ -615,17 +622,11 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
     stream:db2.collection('mediaLinks').orderBy('createdAt',descending:true).limit(100).snapshots(),
     builder:(c,s){
-     if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
+     if(s.hasError)return ListView(padding:const EdgeInsets.all(12),children:[const Text('تعذر تحميل روابط الأعضاء حالياً؛ دليل الموسيقى الجاهز متاح أدناه.'),..._featuredCards()]);
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
           return ListView(padding:const EdgeInsets.all(12),children:[
      Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 100 اختيار من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
-     ...featuredTracks.map((track)=>Card(child:ListTile(
-      leading:const CircleAvatar(child:Icon(Icons.music_note)),
-      title:Text(track['title']!),
-      subtitle:Text('${track['artist']} • ${track['category']}'),
-      trailing:const Icon(Icons.open_in_new),
-      onTap:()=>openFeatured(track),
-     ))),
+     ..._featuredCards(),
      ...s.data!.docs.map((doc){
       final d=doc.data();
       return Card(child:ListTile(
