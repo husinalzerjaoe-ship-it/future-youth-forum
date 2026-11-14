@@ -137,7 +137,7 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
    final dir=await getTemporaryDirectory();
    final path=dir.path+'/private_room_voice_'+uid+'_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
    await voiceRecorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:128000,sampleRate:44100),path:path);
-   if(mounted)setState(()=>{voicePath=path;recording=true});
+   if(mounted)setState(() { voicePath=path; recording=true; });
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر بدء التسجيل: $e')));}
  }
  Future<void> finishVoice() async {
@@ -157,7 +157,7 @@ class _PrivateRoomChatPageState extends State<PrivateRoomChatPage> {
    final saved=path??voicePath;
    if(saved!=null){try{final file=File(saved);if(await file.exists())await file.delete();}catch(_){}}
    voicePath=null;
-   if(mounted)setState(()=>{recording=false;busy=false});
+   if(mounted)setState(() { recording=false; busy=false; });
   }
  }
  @override void dispose(){text.dispose();voiceRecorder.dispose();super.dispose();}
