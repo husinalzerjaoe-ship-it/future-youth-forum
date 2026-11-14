@@ -8,7 +8,7 @@ import 'package:xml/xml.dart';
 const _footballTabs = <String>['آخر الأخبار', 'الانتقالات', 'العراق', 'أوروبا', 'الدوريات العربية', 'المنتخبات'];
 const _feedQueries = <List<String>>[
   ['أخبار كرة القدم -انتقالات -سوق الانتقالات', 'football soccer latest news'],
-  ['انتقالات كرة القدم', 'football transfers transfer market'],
+  ['انتقالات رسمية كرة القدم official confirmed transfer', 'official football transfers completed', 'مفاوضات انتقالات كرة القدم football transfer negotiations', 'شائعات انتقالات كرة القدم football transfer rumours'],
   ['أخبار كرة القدم العراقية', 'المنتخب العراقي كرة القدم'],
   ['الدوري الإنجليزي الدوري الإسباني دوري أبطال أوروبا', 'Premier League La Liga Champions League'],
   ['الدوري السعودي الدوري المصري الدوري العربي', 'Saudi Pro League Egyptian Premier League'],
@@ -37,7 +37,11 @@ class _FootballNewsPageState extends State<FootballNewsPage> {
   }
 
   Future<List<_FootballNewsItem>> _loadNews(int tab) async {
-    final results = await Future.wait(_feedQueries[tab].map((query) => _readFeed(query, _footballTabs[tab])));
+    final transferLabels = ['بحث: صفقات رسمية', 'بحث: صفقات مكتملة', 'بحث: مفاوضات', 'بحث: شائعات'];
+    final results = await Future.wait(List.generate(_feedQueries[tab].length, (index) {
+      final label = tab == 1 ? transferLabels[index] : _footballTabs[tab];
+      return _readFeed(_feedQueries[tab][index], label);
+    }));
     final seen = <String>{};
     final news = <_FootballNewsItem>[];
     for (final batch in results) {
