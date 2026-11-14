@@ -59,7 +59,7 @@ class _FutureArcadePageState extends State<FutureArcadePage> {
           ]),
         ))),
         SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.symmetric(horizontal:14),child:TextField(controller:_search,onChanged:(v)=>setState(()=>_query=v.trim()),decoration:InputDecoration(hintText:'ابحث عن لعبة...',prefixIcon:const Icon(Icons.search_rounded),filled:true,border:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide.none))))),
-        SliverToBoxAdapter(child:SizedBox(height:55,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),children:['الكل','2D','طاولة','ذكاء','جماعية','استراتيجية','أسئلة','خفيفة'].map((f)=>Padding(padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(f),selected:_filter==f,onSelected:(_)=>setState(()=>_filter=f))).toList()))),
+        SliverToBoxAdapter(child:SizedBox(height:55,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),children:['الكل','2D','طاولة','ذكاء','جماعية','استراتيجية','أسئلة','خفيفة'].map((f)=>Padding(padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(f),selected:_filter==f,onSelected:(_)=>setState(()=>_filter=f)))).toList()))),
         SliverPadding(padding:const EdgeInsets.all(14),sliver:SliverGrid(delegate:SliverChildBuilderDelegate((c,i)=>_ArcadeCard(game:shown[i]),childCount:shown.length),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,mainAxisSpacing:11,crossAxisSpacing:11,childAspectRatio:.88))),
         if(shown.isEmpty)const SliverToBoxAdapter(child:Padding(padding:EdgeInsets.all(30),child:Center(child:Text('ما لقينا لعبة بهذا الاسم.')))),
       ]),
