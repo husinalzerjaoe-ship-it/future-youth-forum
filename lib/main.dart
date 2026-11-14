@@ -46,7 +46,7 @@ class FutureYouthApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'ملتقى الأنمي',
+    title: 'ملتقى شباب المستقبل',
     themeMode: ThemeMode.system,
     theme: ThemeData(
       useMaterial3: true,
@@ -143,7 +143,7 @@ class _AuthPageState extends State<AuthPage> {
             child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               const Icon(Icons.groups_rounded, size: 58, color: brand),
               const SizedBox(height: 12),
-              const Text('ملتقى الأنمي', textAlign: TextAlign.center,
+              const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               Text(registering ? 'أنشئ حسابك وابدأ المشاركة' : 'سجّل دخولك للمتابعة',
@@ -207,7 +207,7 @@ class _HomePageState extends State<HomePage> {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
-        title: const Text('ملتقى الأنمي'),
+        title: const Text('ملتقى شباب المستقبل'),
         actions: [
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
