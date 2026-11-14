@@ -104,13 +104,15 @@ class _FruitMergePageState extends State<FruitMergePage>{
 class DiceRacePage extends StatefulWidget {const DiceRacePage({super.key});@override State<DiceRacePage> createState()=>_DiceRacePageState();}
 class _DiceRacePageState extends State<DiceRacePage>{
   List<String> names=['الأحمر','الأزرق'];List<int> pos=[0,0];int turn=0,dice=1;String? winner;final rng=Random();
+  void setup(List<String> p){setState((){names=p;pos=List.filled(p.length,0);turn=0;winner=null;dice=1;});}
   void roll(){if(winner!=null)return;setState((){dice=rng.nextInt(6)+1;pos[turn]=min(30,pos[turn]+dice);if(pos[turn]>=30)winner=names[turn];else turn=(turn+1)%names.length;});}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('سباق النرد')),body:ListView(padding:const EdgeInsets.all(16),children:[
+    Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>_Setup('إعداد السباق',2,4,setup))),icon:const Icon(Icons.group_add),label:const Text('إعداد اللاعبين'))),
     Text('الدور: \${winner??names[turn]} • النرد: \$dice',style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
     for(int i=0;i<names.length;i++)Card(child:ListTile(title:Text(names[i]),subtitle:LinearProgressIndicator(value:pos[i]/30),trailing:Text('\${pos[i]}/30'))),
     FilledButton(onPressed:winner==null?roll:null,child:Text(winner==null?'ارمِ النرد 🎲':'الفائز: \$winner')),
     TextButton(onPressed:()=>setState((){pos=List.filled(names.length,0);turn=0;winner=null;}),child:const Text('إعادة السباق')),
-    const Text('نسخة سباق خفيفة على نفس الجهاز، من 2 إلى 4 لاعبين بالإصدار الحالي.'),
+    const Text('سباق نرد خفيف على نفس الجهاز؛ اختاروا من 2 إلى 4 لاعبين من إعداد اللاعبين.'),
   ]));
 }
 
