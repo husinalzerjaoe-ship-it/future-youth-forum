@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'multiplayer_arcade.dart';
+import 'football_quiz.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -115,6 +116,16 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
           subtitle: const Text('غرف خاصة وتحديات مباشرة مع الأصدقاء'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MultiplayerArcadePage())),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.sports_soccer)),
+          title: const Text('تحدي معلومات كرة القدم', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('450 صيغة سؤال • بطولات • أندية • تاريخ كروي'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootballQuizPage())),
         ),
       ),
       const SizedBox(height: 10),
