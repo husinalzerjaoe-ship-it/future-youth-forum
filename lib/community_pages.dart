@@ -21,6 +21,9 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'watch_party.dart';
+import 'arcade_hub.dart';
+import 'inspiration_hub.dart';
+import 'match_center.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -41,6 +44,10 @@ class CommunityHubPage extends StatelessWidget {
    ('المشاهدة الجماعية','شاهدوا يوتيوب والبث المباشر معاً',Icons.groups_rounded,const WatchPartyLobbyPage()),
    ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
    ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
+   ('مدينة الألعاب','ألعاب مصغرة وتحديات جماعية وألعاب لوحية',Icons.videogame_asset_rounded,const ArcadeHubPage()),
+   ('مركز المباريات','مواعيد ونتائج ومتابعة أخبار الكرة',Icons.sports_soccer,const MatchCenterPage()),
+   ('أبراج وحساب العمر','احسب عمرك واكتشف برجك ومعلوماته الترفيهية',Icons.cake_outlined,const LifeToolsPage()),
+   ('إلهام يومي','أفكار واقتباسات ومحتوى إيجابي متجدد',Icons.lightbulb_outline,const InspirationHubPage()),
    ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
    ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
    ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
@@ -543,4 +550,67 @@ class _RegionVoicePlayerState extends State<_RegionVoicePlayer>{
    });
   })),
  ]));
+}
+
+
+/// أدوات شخصية خفيفة: حساب العمر والبرج الفلكي للترفيه فقط.
+class LifeToolsPage extends StatefulWidget {
+ const LifeToolsPage({super.key});
+ @override State<LifeToolsPage> createState()=>_LifeToolsPageState();
+}
+class _LifeToolsPageState extends State<LifeToolsPage> {
+ DateTime? birthday;
+ String get ageDetail {
+  final b=birthday!, now=DateTime.now();
+  var years=now.year-b.year, months=now.month-b.month, days=now.day-b.day;
+  if(days<0){final previous=DateTime(now.year,now.month,0);days+=previous.day;months--;}
+  if(months<0){months+=12;years--;}
+  return '$years سنة • $months شهر • $days يوم';
+ }
+ String get zodiac {
+  final d=birthday!; final m=d.month, day=d.day;
+  if((m==3&&day>=21)||(m==4&&day<=19))return 'الحمل ♈';
+  if((m==4&&day>=20)||(m==5&&day<=20))return 'الثور ♉';
+  if((m==5&&day>=21)||(m==6&&day<=20))return 'الجوزاء ♊';
+  if((m==6&&day>=21)||(m==7&&day<=22))return 'السرطان ♋';
+  if((m==7&&day>=23)||(m==8&&day<=22))return 'الأسد ♌';
+  if((m==8&&day>=23)||(m==9&&day<=22))return 'العذراء ♍';
+  if((m==9&&day>=23)||(m==10&&day<=22))return 'الميزان ♎';
+  if((m==10&&day>=23)||(m==11&&day<=21))return 'العقرب ♏';
+  if((m==11&&day>=22)||(m==12&&day<=21))return 'القوس ♐';
+  if((m==12&&day>=22)||(m==1&&day<=19))return 'الجدي ♑';
+  if((m==1&&day>=20)||(m==2&&day<=18))return 'الدلو ♒';
+  return 'الحوت ♓';
+ }
+ Future<void> chooseBirthday() async {
+  final now=DateTime.now();
+  final picked=await showDatePicker(context:context,initialDate:birthday??DateTime(now.year-18,now.month,now.day),firstDate:DateTime(1900),lastDate:now,helpText:'اختر تاريخ ميلادك');
+  if(picked!=null)setState(()=>birthday=picked);
+ }
+ @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('أدوات العمر والأبراج')),
+  body:ListView(padding:const EdgeInsets.all(18),children:[
+   Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    const Icon(Icons.cake_rounded,size:48,color:p),
+    const SizedBox(height:8),
+    const Text('حاسبة العمر',textAlign:TextAlign.center,style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
+    const Text('اعرف عمرك بالسنوات والأشهر والأيام',textAlign:TextAlign.center),
+    const SizedBox(height:16),
+    OutlinedButton.icon(onPressed:chooseBirthday,icon:const Icon(Icons.calendar_month),label:Text(birthday==null?'اختيار تاريخ الميلاد':'تاريخ الميلاد: \${birthday!.year}/\${birthday!.month}/\${birthday!.day}')),
+    if(birthday!=null)...[
+     const SizedBox(height:12),
+     Text(ageDetail,textAlign:TextAlign.center,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:p)),
+     Text('عمرك بالأيام تقريباً: \${DateTime.now().difference(birthday!).inDays} يوم',textAlign:TextAlign.center),
+     const Divider(height:28),
+     Text('برجك: $zodiac',textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),
+    ]
+   ]))),
+   const SizedBox(height:12),
+   const Card(child:Padding(padding:EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text('عن الأبراج',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+    SizedBox(height:8),
+    Text('الأبراج هنا للتسلية والتعرّف على التقسيمات الفلكية الشائعة فقط؛ لا تتنبأ بالمستقبل ولا تحدد الشخصية أو القرارات.'),
+   ]))),
+  ]),
+ ));
 }
