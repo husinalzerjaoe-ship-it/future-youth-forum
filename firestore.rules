@@ -746,8 +746,14 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 2000;
+          && request.resource.data.text.size() <= 2000
+          && (
+            (request.resource.data.type == 'voice'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*'))
+            || (request.resource.data.type != 'voice'
+              && request.resource.data.text.size() > 0)
+          );
         allow update: if false;
         allow delete: if request.auth != null
           && exists(/databases/$(database)/documents/privateRooms/$(roomId)/access/$(request.auth.uid))
