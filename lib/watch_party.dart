@@ -86,7 +86,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
         'visibility': _privateRoom ? 'private' : 'public',
-        'invitedUids': _privateRoom ? _invitedUids.toList() : <String>[],
+        'invitedUids': _privateRoom ? <String>{_uid, ..._invitedUids}.toList() : <String>[],
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
