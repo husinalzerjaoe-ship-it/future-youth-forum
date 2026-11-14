@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'multiplayer_arcade.dart';
 import 'football_quiz.dart';
+import 'arcade_minigames.dart';
 
 
 class ArcadeHubPage extends StatefulWidget {
@@ -126,6 +127,16 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
           subtitle: const Text('450 صيغة سؤال • بطولات • أندية • تاريخ كروي'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootballQuizPage())),
+        ),
+      ),
+      const SizedBox(height: 10),
+      Card(
+        child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.extension_rounded)),
+          title: const Text('ألعاب الذكاء والتحدي', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('ذاكرة الرموز • فك الكلمة • خمن الرقم'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArcadeMiniGamesPage())),
         ),
       ),
       const SizedBox(height: 10),
