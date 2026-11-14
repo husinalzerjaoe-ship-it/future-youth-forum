@@ -282,22 +282,24 @@ class ArcadeAchievementsPage extends StatelessWidget {
 class ArcadeStorePage extends StatelessWidget {
   const ArcadeStorePage({super.key});
   static const _items=[
-    ('bronze_star','نجمة برونزية','⭐',20),('flame','وسام اللهب','🔥',45),('crown','التاج الذهبي','👑',80),('rocket','وسام الصاروخ','🚀',65)
+    ('bronze_star','نجمة برونزية','⭐',20,'badge'),('flame','وسام اللهب','🔥',45,'badge'),('crown','التاج الذهبي','👑',80,'badge'),('rocket','وسام الصاروخ','🚀',65,'badge'),
+    ('frame_neon','إطار نيون','🟣',90,'frame'),('frame_gold','إطار ذهبي','🌟',120,'frame'),('frame_ocean','إطار المحيط','🌊',75,'frame')
   ];
   @override Widget build(BuildContext context){
     final uid=FirebaseAuth.instance.currentUser!.uid;
     final ref=FirebaseFirestore.instance.collection('arcadeProfiles').doc(uid);
-    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('متجر الأوسمة')),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:ref.snapshots(),builder:(c,s){
+    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('متجر النقاط والإطارات')),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:ref.snapshots(),builder:(c,s){
       final p=s.data?.data()??{};final coins=p['coins']??0;final inventory=List<String>.from(p['inventory']??[]);
       return ListView(padding:const EdgeInsets.all(14),children:[
         Card(child:ListTile(leading:const Icon(Icons.monetization_on_rounded,color:Colors.amber),title:const Text('رصيدك'),trailing:Text(coins.toString()+' عملة',style:const TextStyle(fontWeight:FontWeight.w900)))),
-        ..._items.map((item){final owned=inventory.contains(item.$1);return Card(child:ListTile(leading:Text(item.$3,style:const TextStyle(fontSize:30)),title:Text(item.$2),subtitle:Text(item.$4.toString()+' عملة'),trailing:owned?FilledButton.tonal(onPressed:()=>ref.update({'equippedBadge':item.$1}),child:Text(p['equippedBadge']==item.$1?'مفعّل':'استخدم')):FilledButton(onPressed:()=>_buy(context,item.$1),child:const Text('شراء'))));}),
+        const Padding(padding:EdgeInsets.symmetric(vertical:10),child:Text('الأوسمة والإطارات',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18))),
+        ..._items.map((item){final owned=inventory.contains(item.$1);final isFrame=item.$5=='frame';final field=isFrame?'equippedFrame':'equippedBadge';final equipped=p[field]==item.$1;return Card(child:ListTile(leading:Text(item.$3,style:const TextStyle(fontSize:30)),title:Text(item.$2),subtitle:Text(item.$4.toString()+' عملة • '+(isFrame?'إطار':'وسام')),trailing:owned?FilledButton.tonal(onPressed:()=>ref.update({field:item.$1}),child:Text(equipped?'مفعّل':'استخدم')):FilledButton(onPressed:()=>_buy(context,item.$1),child:const Text('شراء'))));}),
         if(!s.hasData||!s.data!.exists)const Padding(padding:EdgeInsets.all(12),child:Text('العب أولاً لتحصل على محفظة العملات.')),
       ]);
     })));
   }
-  Future<void> _buy(BuildContext context,String badge) async {
-    try{await FirebaseFunctions.instance.httpsCallable('purchaseArcadeBadge').call({'badgeId':badge});if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم شراء الوسام!')));}
+  Future<void> _buy(BuildContext context,String itemId) async {
+    try{await FirebaseFunctions.instance.httpsCallable('purchaseArcadeBadge').call({'badgeId':itemId});if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تمت الإضافة إلى مجموعتك!')));}
     catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الشراء: '+e.toString())));}
   }
 }
