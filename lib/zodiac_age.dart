@@ -195,6 +195,30 @@ class _ZodiacAgePageState extends State<ZodiacAgePage> {
             const SizedBox(height: 12),
             Card(
               child: ExpansionTile(
+                leading: const Icon(Icons.mosque, color: _violet),
+                title: const Text('دليل صلاة الاستخارة'),
+                subtitle: const Text('الدعاء والخطوات باختصار'),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: const [
+                  Text(
+                    'إذا هممت بأمر مباح وترددت فيه، صلِّ ركعتين من غير الفريضة، ثم ادعُ بدعاء الاستخارة، وامضِ فيما يتيسر لك بعد الاستشارة والتفكير.',
+                    style: TextStyle(height: 1.7),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'دعاء الاستخارة: «اللهم إني أستخيرك بعلمك، وأستقدرك بقدرتك، وأسألك من فضلك العظيم، فإنك تقدر ولا أقدر، وتعلم ولا أعلم، وأنت علام الغيوب. اللهم إن كنت تعلم أن هذا الأمر خير لي في ديني ومعاشي وعاقبة أمري، فاقدره لي ويسره لي ثم بارك لي فيه، وإن كنت تعلم أن هذا الأمر شر لي في ديني ومعاشي وعاقبة أمري، فاصرفه عني واصرفني عنه، واقدر لي الخير حيث كان ثم أرضني به».',
+                    style: TextStyle(height: 1.8),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'لا تعتمد على الأبراج أو الأحلام أو نتيجة عشوائية لاتخاذ القرار؛ الاستخارة دعاء وتفويض لله مع الأخذ بالأسباب.',
+                    style: TextStyle(color: Colors.grey, fontSize: 12, height: 1.6),
+                  ),
+                ],
+              ),
+            ),
+            Card(
+              child: ExpansionTile(
                 title: const Text('دليل الأبراج الاثني عشر'),
                 subtitle: const Text('الفترات والأسماء'),
                 children: _zodiacs.map((z) => ListTile(
