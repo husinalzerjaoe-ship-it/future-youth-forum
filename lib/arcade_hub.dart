@@ -3,7 +3,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-const _arcadePurple=Color(0xFF6D5CE7);
 
 class ArcadeHubPage extends StatefulWidget {
   const ArcadeHubPage({super.key});
