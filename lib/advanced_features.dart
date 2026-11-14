@@ -329,6 +329,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
       ])));
     if (choice == 'reply') {
       final d = doc.data();
+      if (d == null) return;
       final type = d['type'];
       final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
       if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
