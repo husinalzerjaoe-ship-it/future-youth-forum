@@ -6,15 +6,31 @@ text = text.replace(
     '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
     '<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">'
 )
-permissions = """
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-"""
-if "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" not in text:
-    text = text.replace("<application", permissions + "\n    <application", 1)
-text = text.replace('android:name=".MainActivity"', 'android:name="com.ryanheise.audioservice.AudioServiceActivity"')
+
+audio_permissions = [
+    '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
+    '<uses-permission android:name="android.permission.WAKE_LOCK" />',
+    '<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />',
+    '<uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />',
+]
+livekit_permissions = [
+    '<uses-permission android:name="android.permission.CAMERA" />',
+    '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
+    '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+    '<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />',
+    '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />',
+    '<uses-feature android:name="android.hardware.camera" android:required="false" />',
+    '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />',
+]
+for item in audio_permissions + livekit_permissions:
+    permission_name = item.split('android:name="', 1)[1].split('"', 1)[0]
+    if f'android:name="{permission_name}"' not in text:
+        text = text.replace("<application", f"    {item}\n    <application", 1)
+
+text = text.replace(
+    'android:name=".MainActivity"',
+    'android:name="com.ryanheise.audioservice.AudioServiceActivity"',
+)
 service = """
         <service
             android:name="com.ryanheise.audioservice.AudioService"
@@ -34,21 +50,6 @@ service = """
             </intent-filter>
         </receiver>
 """
-if "com.ryanheise.audioservice.AudioService\"" not in text:
+if 'android:name="com.ryanheise.audioservice.AudioService"' not in text:
     text = text.replace("</application>", service + "\n    </application>")
-
-    # LiveKit audio/video calling permissions (idempotent).
-    livekit_permissions = [
-        '<uses-permission android:name="android.permission.CAMERA" />',
-        '<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />',
-        '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
-        '<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />',
-        '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />',
-        '<uses-feature android:name="android.hardware.camera" android:required="false" />',
-        '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />',
-    ]
-    for permission in livekit_permissions:
-        if permission.split(' android:')[0] not in text:
-            text = text.replace("<application", f"    {permission}\\n    <application", 1)
-
 path.write_text(text, encoding="utf-8")
