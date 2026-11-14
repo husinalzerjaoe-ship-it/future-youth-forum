@@ -275,6 +275,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 class PostsPage extends StatelessWidget {
+  const PostsPage({super.key});
 
   Future<void> addPost(BuildContext context) async {
     final text = TextEditingController();
