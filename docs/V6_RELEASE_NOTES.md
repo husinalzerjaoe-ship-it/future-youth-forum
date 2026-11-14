@@ -16,3 +16,10 @@ Publish the updated `firestore.rules` in Firebase Console before testing club cr
 
 ## Validation
 The CI workflow runs Flutter dependency resolution, static analysis, syntax checks, and release APK compilation. A successful build verifies compilation, not live Firebase/LiveKit/Supabase behavior; test multi-account interactions on real devices.
+
+
+## V6.1 — Knowledge and chat polish
+- Adds a knowledge and entertainment corner with a daily fact, general knowledge, digital safety, study tips, language and literature, riddles, discussion prompts, and creative writing challenges.
+- Adds local bookmarks, copy actions, category filters, and a random discovery action; saved items remain on the device.
+- Improves public chat interaction with swipe-to-reply, double-tap heart reactions, a wider quick-reaction set, and a refreshed composer surface.
+- Adds the new section to the Community Hub and bumps the Android app version to 4.7.0+18.
