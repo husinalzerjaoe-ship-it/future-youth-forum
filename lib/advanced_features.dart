@@ -165,6 +165,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Map<String, dynamic>? replyTo;
   final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
+  String searchQuery = '';
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
     try {
@@ -397,12 +398,37 @@ class _DirectChatPageState extends State<DirectChatPage> {
           Positioned(top: 22, right: 18, child: Icon(Icons.auto_awesome, color: _brand.withValues(alpha: .10), size: 54)),
           Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
           Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+          child: TextField(
+            onChanged: (value) => setState(() => searchQuery = value.trim().toLowerCase()),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'ابحث في هذه المحادثة...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                onPressed: () => setState(() => searchQuery = ''),
+                icon: const Icon(Icons.close_rounded),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: .9),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt', descending: true).limit(300).snapshots(),
           builder: (context, s) {
             if (s.hasError) return const Center(child: Text('تعذر تحميل المحادثة'));
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
-            return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.reversed.map((doc) {
+            final visible = s.data!.docs.where((doc) {
+              if (searchQuery.isEmpty) return true;
+              final d = doc.data();
+              final haystack = '${d['text'] ?? ''} ${d['senderName'] ?? ''}'.toLowerCase();
+              return haystack.contains(searchQuery);
+            }).toList();
+            if (visible.isEmpty) return Center(child: Text(searchQuery.isEmpty ? 'ابدأ محادثتك الآن ✨' : 'ماكو رسائل تطابق البحث'));
+            return ListView(padding: const EdgeInsets.all(12), children: visible.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
               return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
