@@ -132,6 +132,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   @override
   void initState() {
     super.initState();
+    _joinRoom();
     _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
       if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
       final data = snap.data()!;
@@ -140,6 +141,22 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       if (changed) _setupPlayer(data);
       else if (!_isHost) _applyRemoteState(data);
     }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+  }
+
+  Future<void> _joinRoom() async {
+    try {
+      final profile = await _watchDb.collection('publicProfiles').doc(_uid).get();
+      final data = profile.data() ?? {};
+      await _watchDb.collection('watchRooms').doc(widget.roomId)
+          .collection('participants').doc(_uid).set({
+        'uid': _uid,
+        'name': data['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
+        'photoUrl': data['photoUrl'] ?? '',
+        'joinedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تسجيل حضورك في الغرفة. تحقق من قواعد Firestore.');
+    }
   }
 
   Future<void> _setupPlayer(Map<String, dynamic> data) async {
@@ -286,6 +303,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   void dispose() {
     _syncTimer?.cancel();
     _roomSub?.cancel();
+    _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').doc(_uid).delete().catchError((_) {});
     _ytSub?.cancel();
     _youtube?.close();
     _video?.dispose();
@@ -304,6 +322,28 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
           AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
         else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
         const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').snapshots(),
+          builder: (context, snapshot) {
+            final people = snapshot.data?.docs ?? [];
+            return Card(child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
+              const Icon(Icons.groups_rounded, color: _watchBrand),
+              const SizedBox(width: 8),
+              Text('المشاهدون (' + people.length.toString() + ')', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 10),
+              Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: people.map((person) {
+                final d = person.data();
+                final photo = d['photoUrl'] as String? ?? '';
+                final name = d['name'] as String? ?? 'عضو';
+                return Padding(padding: const EdgeInsetsDirectional.only(end: 7), child: Tooltip(message: name, child: CircleAvatar(
+                  radius: 19,
+                  backgroundImage: photo.startsWith('https://') ? NetworkImage(photo) : null,
+                  child: photo.startsWith('https://') ? null : Text(name.isEmpty ? '؟' : name.characters.first),
+                )));
+              }).toList()))),
+            ])));
+          },
+        ),
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
           Row(children: [
             Icon(_room['status'] == 'playing' ? Icons.play_circle : Icons.pause_circle, color: _watchBrand),
