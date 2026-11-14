@@ -335,11 +335,26 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
                 final d = person.data();
                 final photo = d['photoUrl'] as String? ?? '';
                 final name = d['name'] as String? ?? 'عضو';
-                return Padding(padding: const EdgeInsetsDirectional.only(end: 7), child: Tooltip(message: name, child: CircleAvatar(
-                  radius: 19,
-                  backgroundImage: photo.startsWith('https://') ? NetworkImage(photo) : null,
-                  child: photo.startsWith('https://') ? null : Text(name.isEmpty ? '؟' : name.characters.first),
-                )));
+                return Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 9),
+                  child: Tooltip(
+                    message: name,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      CircleAvatar(
+                        radius: 19,
+                        backgroundColor: _watchBrand.withValues(alpha: .12),
+                        backgroundImage: photo.startsWith('https://') ? NetworkImage(photo) : null,
+                        child: photo.startsWith('https://') ? null : Text(name.isEmpty ? '؟' : name.characters.first),
+                      ),
+                      const SizedBox(width: 5),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 88),
+                        child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      ),
+                    ]),
+                  ),
+                );
               }).toList()))),
             ])));
           },
