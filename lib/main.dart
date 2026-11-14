@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
@@ -67,7 +68,7 @@ class FutureYouthApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'ملتقى شباب المستقبل',
-    themeMode: ThemeMode.system,
+    themeMode: ThemeMode.dark,
     theme: ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
@@ -261,7 +262,7 @@ class _AuthPageState extends State<AuthPage> {
                   ])),
                 ),
                 const SizedBox(height: 18),
-                Text('الإصدار V2 • مجتمع يجمعنا', style: TextStyle(color: Colors.white.withOpacity(.55), fontSize: 11)),
+                Text('الإصدار V3 • مجتمع يجمعنا ونصنع المستقبل', style: TextStyle(color: Colors.white.withOpacity(.68), fontSize: 11, fontWeight: FontWeight.w600)),
               ]),
             ),
           ))),
@@ -366,7 +367,9 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: IndexedStack(index: selected, children: [const PostsPage(), const EnhancedPublicChatPage(), const CommunityHubPage(), MyProfilePage()]),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        const MiniNowPlayingBar(),
+        NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
         destinations: const [
@@ -376,8 +379,67 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'ملفي'),
         ],
       ),
+      ]),
     ));
   }
+}
+
+class MiniNowPlayingBar extends StatelessWidget {
+  const MiniNowPlayingBar({super.key});
+
+  String _clock(Duration value) {
+    final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '${value.inHours > 0 ? '${value.inHours}:' : ''}$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<MediaItem?>(
+    stream: appAudioHandler.mediaItem,
+    builder: (context, itemSnapshot) {
+      final item = itemSnapshot.data;
+      if (item == null) return const SizedBox.shrink();
+      final duration = item.duration ?? Duration.zero;
+      return StreamBuilder<PlaybackState>(
+        stream: appAudioHandler.playbackState,
+        builder: (context, stateSnapshot) {
+          final playing = stateSnapshot.data?.playing ?? false;
+          return Material(
+            color: const Color(0xFF211B45),
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 8, 5),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: const Color(0xFF9B8BFF).withOpacity(.35)))),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Row(children: [
+                  Container(width: 38, height: 38, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF806BEE), Color(0xFF3D8DBB)]), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.music_note_rounded, color: Colors.white)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(item.artist ?? item.album ?? 'ملتقى شباب المستقبل', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ])),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'السابق', onPressed: appAudioHandler.skipToPrevious, icon: const Icon(Icons.skip_previous_rounded, color: Colors.white)),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل', onPressed: playing ? appAudioHandler.pause : appAudioHandler.play, icon: Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: const Color(0xFFC5B9FF), size: 31)),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'التالي', onPressed: appAudioHandler.skipToNext, icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
+                ]),
+                StreamBuilder<Duration>(
+                  stream: AudioService.position,
+                  builder: (context, positionSnapshot) {
+                    final position = positionSnapshot.data ?? Duration.zero;
+                    final maxMs = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
+                    return Row(children: [
+                      Text(_clock(position), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                      Expanded(child: SliderTheme(data: SliderTheme.of(context).copyWith(trackHeight: 2, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5), overlayShape: SliderComponentShape.noOverlay), child: Slider(min: 0, max: maxMs, value: position.inMilliseconds.clamp(0, maxMs.toInt()).toDouble(), onChanged: duration == Duration.zero ? null : (v) => appAudioHandler.seek(Duration(milliseconds: v.round())), activeColor: const Color(0xFFB8A8FF), inactiveColor: Colors.white24))),
+                      Text(_clock(duration), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                    ]);
+                  },
+                ),
+              ]),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
 class PostsPage extends StatelessWidget {
