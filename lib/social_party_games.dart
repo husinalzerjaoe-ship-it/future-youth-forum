@@ -30,13 +30,13 @@ class _Setup extends StatefulWidget {
 }
 class _SetupState extends State<_Setup>{
   int count=4; final names=<TextEditingController>[];
-  void sync(){while(names.length<count)names.add(TextEditingController(text:'لاعب \${names.length+1}'));while(names.length>count)names.removeLast().dispose();}
+  void sync(){while(names.length<count)names.add(TextEditingController(text:'لاعب ${names.length+1}'));while(names.length>count)names.removeLast().dispose();}
   @override void initState(){super.initState();count=widget.min<4?4:widget.min;sync();}
   @override void dispose(){for(final n in names){n.dispose();}super.dispose();}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:Text(widget.title)),body:ListView(padding:const EdgeInsets.all(18),children:[
-    DropdownButton<int>(value:count,isExpanded:true,items:[for(int i=widget.min;i<=widget.max;i++)DropdownMenuItem(value:i,child:Text('\$i لاعبين'))],onChanged:(v){if(v!=null)setState((){count=v;sync();});}),
-    for(int i=0;i<count;i++)Padding(padding:const EdgeInsets.only(bottom:8),child:TextField(controller:names[i],decoration:InputDecoration(labelText:'اسم اللاعب \${i+1}',border:const OutlineInputBorder()))),
-    FilledButton(onPressed:()=>widget.onStart(names.asMap().entries.map((e)=>e.value.text.trim().isEmpty?'لاعب \${e.key+1}':e.value.text.trim()).toList()),child:const Text('ابدأ')),
+    DropdownButton<int>(value:count,isExpanded:true,items:[for(int i=widget.min;i<=widget.max;i++)DropdownMenuItem(value:i,child:Text('$i لاعبين'))],onChanged:(v){if(v!=null)setState((){count=v;sync();});}),
+    for(int i=0;i<count;i++)Padding(padding:const EdgeInsets.only(bottom:8),child:TextField(controller:names[i],decoration:InputDecoration(labelText:'اسم اللاعب ${i+1}',border:const OutlineInputBorder()))),
+    FilledButton(onPressed:()=>widget.onStart(names.asMap().entries.map((e)=>e.value.text.trim().isEmpty?'لاعب ${e.key+1}':e.value.text.trim()).toList()),child:const Text('ابدأ')),
   ]));
 }
 
@@ -46,9 +46,9 @@ class _SpyGamePageState extends State<SpyGamePage>{
   List<String>? players;int spy=0,index=0;String word='';bool reveal=false;
   void start(List<String> p){final r=Random();setState((){players=p;spy=r.nextInt(p.length);word=words[r.nextInt(words.length)];index=0;reveal=false;});}
   @override Widget build(BuildContext c)=>players==null?_Setup('منو الجاسوس؟',3,8,start):Scaffold(appBar:AppBar(title:const Text('منو الجاسوس؟')),body:Center(child:Padding(padding:const EdgeInsets.all(20),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-    Text(reveal?'دور \${players![index]}':'مرّر الهاتف إلى \${players![index]}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+    Text(reveal?'دور ${players![index]}':'مرّر الهاتف إلى ${players![index]}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
     const SizedBox(height:20),
-    if(reveal)Text(index==spy?'أنت الجاسوس 🕵️':'الكلمة: \$word',style:const TextStyle(fontSize:30,fontWeight:FontWeight.bold)),
+    if(reveal)Text(index==spy?'أنت الجاسوس 🕵️':'الكلمة: $word',style:const TextStyle(fontSize:30,fontWeight:FontWeight.bold)),
     FilledButton(onPressed:()=>setState(()=>reveal=!reveal),child:Text(reveal?'إخفاء الدور':'اكشف دوري')),
     if(reveal)FilledButton.tonal(onPressed:()=>setState((){if(index+1==players!.length){players=null;}else{index++;reveal=false;}}),child:Text(index+1==players!.length?'انتهى التوزيع':'اللاعب التالي')),
     const Text('بعد التوزيع: أعطوا تلميحات قصيرة، ناقشوا وصوّتوا على الجاسوس.',textAlign:TextAlign.center),
@@ -60,7 +60,7 @@ class _WerewolfGamePageState extends State<WerewolfGamePage>{
   List<String>? players;List<String> roles=[];int index=0;bool reveal=false;
   void start(List<String> p){final r=Random();final a=<String>['ذئب 🐺'];a.addAll(List.filled(p.length-1,'مواطن 🧑'));a.shuffle(r);setState((){players=p;roles=a;index=0;reveal=false;});}
   @override Widget build(BuildContext c)=>players==null?_Setup('الذئب والمواطنون',4,12,start):Scaffold(appBar:AppBar(title:const Text('الذئب والمواطنون')),body:Center(child:Padding(padding:const EdgeInsets.all(20),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-    Text(reveal?'دور \${players![index]}':'سلّم الهاتف إلى \${players![index]}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
+    Text(reveal?'دور ${players![index]}':'سلّم الهاتف إلى ${players![index]}',style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold)),
     if(reveal)Padding(padding:const EdgeInsets.all(20),child:Text(roles[index],style:const TextStyle(fontSize:34,fontWeight:FontWeight.bold))),
     FilledButton(onPressed:()=>setState(()=>reveal=!reveal),child:Text(reveal?'إخفاء الدور':'اكشف دوري')),
     if(reveal)FilledButton.tonal(onPressed:()=>setState((){if(index+1==players!.length){players=null;}else{index++;reveal=false;}}),child:Text(index+1==players!.length?'ابدأوا النقاش':'اللاعب التالي')),
@@ -74,7 +74,7 @@ class _DrawGuessPageState extends State<DrawGuessPage>{
   @override void initState(){super.initState();next();}
   void next(){setState((){word=words[rng.nextInt(words.length)];strokes.clear();shown=false;});}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('ارسم وخمّن')),body:Padding(padding:const EdgeInsets.all(14),child:Column(children:[
-    Text(shown?'الكلمة: \$word':'الرسام فقط يشوف الكلمة: \$word',style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
+    Text(shown?'الكلمة: $word':'الرسام فقط يشوف الكلمة: $word',style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
     const Text('ارسم بدون كتابة حروف، وخلي البقية يخمنون.'),
     Expanded(child:GestureDetector(onPanStart:(d)=>strokes.add([d.localPosition]),onPanUpdate:(d)=>setState(()=>strokes.last.add(d.localPosition)),child:Container(width:double.infinity,margin:const EdgeInsets.symmetric(vertical:12),decoration:BoxDecoration(color:Colors.white,border:Border.all(color:Colors.black26),borderRadius:BorderRadius.circular(12)),child:CustomPaint(painter:_DrawPainter(strokes))))),
     Row(children:[Expanded(child:OutlinedButton(onPressed:()=>setState(strokes.clear),child:const Text('مسح'))),Expanded(child:FilledButton(onPressed:()=>setState(()=>shown=true),child:const Text('كشف الكلمة'))),IconButton(onPressed:next,icon:const Icon(Icons.refresh))]),
@@ -94,7 +94,7 @@ class _FruitMergePageState extends State<FruitMergePage>{
   void tap(int i){if(cells[i]==0){setState(()=>cells[i]=1);return;}final ns=[i%4>0?i-1:-1,i%4<3?i+1:-1,i>=4?i-4:-1,i<12?i+4:-1];for(final n in ns){if(n>=0&&cells[n]==cells[i]&&cells[i]<6){setState((){cells[i]++;cells[n]=0;score+=cells[i]*10;spawn();});return;}}}
   @override void initState(){super.initState();spawn();spawn();}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('دمج الفواكه')),body:Padding(padding:const EdgeInsets.all(16),child:Column(children:[
-    Text('النقاط: \$score',style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
+    Text('النقاط: $score',style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
     const Text('اضغط فاكهتين متجاورتين من النوع نفسه لدمجهما.'),
     Expanded(child:Center(child:AspectRatio(aspectRatio:1,child:GridView.builder(itemCount:16,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:4,crossAxisSpacing:7,mainAxisSpacing:7),itemBuilder:(c,i)=>InkWell(onTap:()=>tap(i),child:Container(decoration:BoxDecoration(color:Theme.of(c).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(12)),child:Center(child:Text(fruit[cells[i]],style:const TextStyle(fontSize:30))))))))),
     FilledButton(onPressed:()=>setState((){cells=List.filled(16,0);score=0;spawn();spawn();}),child:const Text('إعادة')),
@@ -108,9 +108,9 @@ class _DiceRacePageState extends State<DiceRacePage>{
   void roll(){if(winner!=null)return;setState((){dice=rng.nextInt(6)+1;pos[turn]=min(30,pos[turn]+dice);if(pos[turn]>=30)winner=names[turn];else turn=(turn+1)%names.length;});}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('سباق النرد')),body:ListView(padding:const EdgeInsets.all(16),children:[
     Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>_Setup('إعداد السباق',2,4,setup))),icon:const Icon(Icons.group_add),label:const Text('إعداد اللاعبين'))),
-    Text('الدور: \${winner??names[turn]} • النرد: \$dice',style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
-    for(int i=0;i<names.length;i++)Card(child:ListTile(title:Text(names[i]),subtitle:LinearProgressIndicator(value:pos[i]/30),trailing:Text('\${pos[i]}/30'))),
-    FilledButton(onPressed:winner==null?roll:null,child:Text(winner==null?'ارمِ النرد 🎲':'الفائز: \$winner')),
+    Text('الدور: ${winner??names[turn]} • النرد: $dice',style:const TextStyle(fontSize:19,fontWeight:FontWeight.bold)),
+    for(int i=0;i<names.length;i++)Card(child:ListTile(title:Text(names[i]),subtitle:LinearProgressIndicator(value:pos[i]/30),trailing:Text('${pos[i]}/30'))),
+    FilledButton(onPressed:winner==null?roll:null,child:Text(winner==null?'ارمِ النرد 🎲':'الفائز: $winner')),
     TextButton(onPressed:()=>setState((){pos=List.filled(names.length,0);turn=0;winner=null;}),child:const Text('إعادة السباق')),
     const Text('سباق نرد خفيف على نفس الجهاز؛ اختاروا من 2 إلى 4 لاعبين من إعداد اللاعبين.'),
   ]));
