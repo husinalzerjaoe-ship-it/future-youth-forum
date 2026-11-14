@@ -89,7 +89,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         final current = _text.text;
         final at = current.lastIndexOf('@');
         final prefix = at >= 0 ? current.substring(0, at) : current;
-        final insertion = '@${selected['name']} ';
+        final mentionName = (selected['name'] ?? 'عضو').toString().replaceAll(RegExp(r'\\s+'), '_');
+        final insertion = '@$mentionName ';
         final next = prefix + insertion;
         _text.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length));
         await _chatDb.collection('chatTyping').doc(_uid).set({
