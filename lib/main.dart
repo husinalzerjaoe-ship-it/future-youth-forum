@@ -1089,6 +1089,60 @@ class MemberProfilePage extends StatelessWidget {
   }
 }
 
+
+class MemberActivityStats extends StatelessWidget {
+  final String uid;
+  final dynamic joinedAt;
+  const MemberActivityStats({super.key, required this.uid, this.joinedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    final joined = joinedAt is Timestamp ? (joinedAt as Timestamp).toDate() : null;
+    final days = joined == null ? null : DateTime.now().difference(joined).inDays.clamp(0, 999999);
+    final activity = Future.wait<int>([
+      db.collection('posts').where('authorId', isEqualTo: uid).count().get()
+          .then((value) => value.count ?? 0),
+      db.collection('messages').where('senderId', isEqualTo: uid).count().get()
+          .then((value) => value.count ?? 0),
+    ]);
+    return Card(
+      elevation: 0,
+      color: const Color(0xFF211D43),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: brand.withValues(alpha: .35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('إحصائيات العضو', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 12),
+          FutureBuilder<List<int>>(
+            future: activity,
+            builder: (context, snapshot) {
+              final values = snapshot.data ?? const <int>[0, 0];
+              return Row(children: [
+                Expanded(child: _activityMetric(Icons.calendar_month, days?.toString() ?? '—', 'يوم منذ الانضمام')),
+                Expanded(child: _activityMetric(Icons.article_outlined, snapshot.hasData ? values[0].toString() : '…', 'منشور')),
+                Expanded(child: _activityMetric(Icons.forum_outlined, snapshot.hasData ? values[1].toString() : '…', 'رسالة عامة')),
+              ]);
+            },
+          ),
+          const SizedBox(height: 8),
+          const Text('الإحصائيات تشمل المنشورات ورسائل المحادثة العامة فقط.', style: TextStyle(color: Colors.white60, fontSize: 11)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _activityMetric(IconData icon, String value, String label) => Column(children: [
+    Icon(icon, color: const Color(0xFFB9AEFF), size: 21),
+    const SizedBox(height: 5),
+    Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+    Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+  ]);
+}
+
 class StarRateControl extends StatelessWidget {
   final String uid;
   const StarRateControl({super.key, required this.uid});
