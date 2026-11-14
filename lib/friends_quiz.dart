@@ -62,21 +62,22 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
-  Future<void> _join(String? value) async {
+  Future<bool> _join(String? value) async {
     final code = (value ?? _code.text).trim();
     if (!RegExp(r'^\d{6}$').hasMatch(code) || _busy) {
       _toast('اكتب رمزاً صحيحاً من 6 أرقام');
-      return;
+      return false;
     }
     setState(() => _busy = true);
+    var joined = false;
     try {
       final ref = _db.collection('gameRooms').doc(code);
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
-        if (!snap.exists) throw Exception('الغرفة غير موجودة');
+        if (!snap.exists) throw Exception('الغرفة غير موجودة أو انتهت');
         final data = snap.data()!;
         final members = List<String>.from(data['members'] ?? []);
-        if (members.contains(_uid)) return;
+        if (members.contains(_uid)) { joined = true; return; }
         if (data['game'] != 'football_quiz' || data['status'] != 'waiting' || members.length >= 4) {
           throw Exception('المسابقة بدأت أو اكتمل عدد اللاعبين');
         }
@@ -88,12 +89,15 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
           'scores': scores,
           'updatedAt': FieldValue.serverTimestamp(),
         });
+        joined = true;
       });
-      if (!mounted) return;
+      if (!mounted) return joined;
       _code.clear();
-      Navigator.push(context, MaterialPageRoute(builder: (_) => FriendsQuizRoomPage(roomId: code)));
+      if (joined) Navigator.push(context, MaterialPageRoute(builder: (_) => FriendsQuizRoomPage(roomId: code)));
+      return joined;
     } catch (e) {
       _toast(e.toString().replaceFirst('Exception: ', ''));
+      return false;
     } finally { if (mounted) setState(() => _busy = false); }
   }
 
@@ -150,8 +154,8 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
               trailing: FilledButton(
                 onPressed: _busy ? null : () async {
                   final roomId = d.data()['roomId']?.toString() ?? '';
-                  await _join(roomId);
-                  if (mounted) await d.reference.update({'status': 'accepted'});
+                  final joined = await _join(roomId);
+                  if (joined && mounted) await d.reference.update({'status': 'accepted'});
                 },
                 child: const Text('انضم'),
               ),
