@@ -324,7 +324,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
    final dir=await getTemporaryDirectory();
    final path=dir.path+'/regional_voice_'+FirebaseAuth.instance.currentUser!.uid+'_'+DateTime.now().microsecondsSinceEpoch.toString()+'.m4a';
    await voiceRecorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:128000,sampleRate:44100),path:path);
-   if(mounted)setState(()=>{voicePath=path;recordingVoice=true;error=null});
+   if(mounted)setState(() { voicePath=path; recordingVoice=true; error=null; });
   }catch(e){if(mounted)setState(()=>error='تعذر بدء تسجيل الصوت: $e');}
  }
  Future<void> finishVoiceRecording() async {
@@ -344,7 +344,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
    final saved=path??voicePath;
    if(saved!=null){try{final file=File(saved);if(await file.exists())await file.delete();}catch(_){}}
    voicePath=null;
-   if(mounted)setState(()=>{recordingVoice=false;busy=false});
+   if(mounted)setState(() { recordingVoice=false; busy=false; });
   }
  }
  Future<void> sendImage() async {
