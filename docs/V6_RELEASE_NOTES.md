@@ -32,3 +32,5 @@ The CI workflow runs Flutter dependency resolution, static analysis, syntax chec
 - Extends Firestore room and invitation rules for the new treasure duel while retaining existing XO and football quiz room paths.
 - Android app version: 4.8.0+19.
 - The new online treasure duel requires publishing the updated `firestore.rules` before use.
+
+- Follow-up quality pass: removed an unused invitation helper; active invitations are sent from the waiting 2D room and are accepted only after a successful join.
