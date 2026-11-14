@@ -34,3 +34,10 @@ The CI workflow runs Flutter dependency resolution, static analysis, syntax chec
 - The new online treasure duel requires publishing the updated `firestore.rules` before use.
 
 - Follow-up quality pass: removed an unused invitation helper; active invitations are sent from the waiting 2D room and are accepted only after a successful join.
+
+
+## V6.3 — Arcade refresh
+- Redesigned the game center with a polished hero banner, responsive two-column game cards, search, and filters for online, 2D, quiz, and solo games.
+- Expanded the friends quiz arena from 12 to 18 categories, adding space and astronomy, animals, video games, food, Iraqi civilizations, and logic puzzles. Each new category includes five questions with explanations.
+- Promoted the online 2D treasure duel to the featured game entry, with direct room creation, six-digit join codes, and friend invitations.
+- Android app version: 4.9.0+20.
