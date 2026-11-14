@@ -580,7 +580,7 @@ class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
           final pos=s.data??Duration.zero;
           final total=_player.duration??Duration(seconds:widget.durationSeconds);
           return Column(children:[
-            Slider(value:pos.inMilliseconds.toDouble().clamp(0,total.inMilliseconds>0?total.inMilliseconds.toDouble():1),min:0,max:total.inMilliseconds>0?total.inMilliseconds.toDouble():1,onChanged:(v)=>_player.seek(Duration(milliseconds:v.toInt())),dense:true),
+            Slider(value:pos.inMilliseconds.toDouble().clamp(0,total.inMilliseconds>0?total.inMilliseconds.toDouble():1).toDouble(),min:0,max:total.inMilliseconds>0?total.inMilliseconds.toDouble():1,onChanged:(v)=>_player.seek(Duration(milliseconds:v.toInt())),dense:true),
             Row(mainAxisAlignment:MainAxisAlignment.spaceBetween,children:[Text(_time(pos),style:const TextStyle(fontSize:10)),Text(_time(total),style:const TextStyle(fontSize:10))]),
           ]);
         }),
