@@ -235,7 +235,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   Future<void> _copyRoomCode() async {
     final code = _room?.name ?? _roomController.text.trim();
     if (code.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: code));
+    await SystemChannels.platform.invokeMethod<void>('Clipboard.setData', <String, String>{'text': code});
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('تم نسخ رمز الغرفة، أرسله لأصدقائك')),
     );
