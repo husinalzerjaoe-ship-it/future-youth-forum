@@ -263,7 +263,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
           return;
         }
         final dir = await getTemporaryDirectory();
-        final path = '\${dir.path}/private_voice_\${DateTime.now().microsecondsSinceEpoch}.m4a';
+        final path = '${dir.path}/private_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
         await voiceRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: path);
         if (mounted) setState(() { recordingVoice = true; voiceStartedAt = DateTime.now(); });
       } catch (e) {
@@ -277,7 +277,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) setState(() { recordingVoice = false; voiceStartedAt = null; });
       if (path == null || started == null) return;
       final elapsed = DateTime.now().difference(started).inSeconds;
-      final seconds = elapsed.clamp(1, 180);
+      final seconds = elapsed.clamp(1, 180).toInt();
       if (elapsed > 180 && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديد الرسالة الصوتية بثلاث دقائق.')));
       }
@@ -813,7 +813,7 @@ class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
             Slider(value: maxMs <= 0 ? 0 : position.inMilliseconds.clamp(0, maxMs).toDouble(),
               max: maxMs <= 0 ? 1 : maxMs.toDouble(),
               onChanged: maxMs <= 0 ? null : (v) => player.seek(Duration(milliseconds: v.round()))),
-            Text('\${position.inSeconds}s / \${total.inSeconds}s', style: const TextStyle(fontSize: 10)),
+            Text('${position.inSeconds}s / ${total.inSeconds}s', style: const TextStyle(fontSize: 10)),
           ]);
         });
       })),
