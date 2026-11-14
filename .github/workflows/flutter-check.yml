@@ -1,12 +1,14 @@
 name: Flutter quality check and Android APK
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
-    branches: [main, fix/media-private-chat-reactions]
+    branches: [main, fix/media-private-chat-reactions, free-tier-private-rooms, comprehensive-community-upgrade]
 
 concurrency:
-  group: flutter-apk-${{ github.ref }}
-  cancel-in-progress: true
+  group: flutter-apk-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
 jobs:
   analyze-and-build:
     runs-on: ubuntu-latest
@@ -62,7 +64,9 @@ jobs:
       - name: Configure Android background audio
         run: python scripts/configure_android_audio.py
       - name: Set Android app display name
-        run: sed -i 's/android:label="forum"/android:label="ملتقى الأنمي"/' android/app/src/main/AndroidManifest.xml
+        run: sed -i 's/android:label="forum"/android:label="ملتقى شباب المستقبل"/' android/app/src/main/AndroidManifest.xml
+      - name: Configure Future Youth Forum launcher icon
+        run: python scripts/configure_android_branding.py
       - name: Build release APK
         run: flutter build apk --release
       - name: Upload release APK

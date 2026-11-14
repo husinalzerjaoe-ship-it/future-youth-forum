@@ -1,12 +1,12 @@
 # إعداد ربط Firebase Auth مع Supabase Storage
 
 ## لماذا هذا الربط مطلوب؟
-التطبيق يسجل دخول المستخدمين عبر Firebase Authentication، ويرفع صور الدردشة إلى Supabase Storage. لذلك يرسل التطبيق Firebase ID token إلى Supabase. سياسة التخزين تستخدم claim `sub` كنص لأن Firebase UID ليس مضموناً أن يكون UUID.
+التطبيق يسجل دخول المستخدمين عبر Firebase Authentication، ويرفع صور الدردشة إلى Supabase Storage. لذلك يرسل التطبيق Firebase ID token إلى Supabase. معرّف Firebase الصحيح في إعدادات التطبيق هو `futureyouth-69f8a`؛ يجب أن يطابق Issuer وAudience في SQL. سياسة التخزين تستخدم claim `sub` كنص لأن Firebase UID ليس مضموناً أن يكون UUID.
 
 ## إعداد Supabase مرة واحدة
 1. افتح مشروع Supabase: `xwfzdiftlzrjsprnbwpf`.
 2. اذهب إلى **Authentication → Sign In / Providers → Third-Party Auth**.
-3. أضف Firebase كمزود Third-party Auth، واستخدم Firebase Project ID: `futureyouth-69f8a`.
+3. أضف Firebase كمزود Third-party Auth، واستخدم Firebase Project ID المطابق لإعدادات التطبيق: `futureyouth-69f8a` (انتبه لحرف a الأخير).
 4. احفظ الإعداد.
 5. افتح **SQL Editor** وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً.
 

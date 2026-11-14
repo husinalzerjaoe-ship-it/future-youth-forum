@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -36,22 +35,29 @@ Future<String> uploadForumMedia(
       throw ArgumentError('مجلد رفع غير مسموح.');
   }
 
-  // Existing accounts may predate the onUserCreated trigger. This callable
-  // safely adds role=authenticated to the current user's custom claims.
-  await FirebaseFunctions.instance
-      .httpsCallable('ensureSupabaseAuthenticatedRole')
-      .call();
-
+  // Supabase trusts Firebase as a Third-Party Auth provider. Firebase ID
+  // tokens do not need a custom "role" claim: Supabase assigns the anon role
+  // when role is absent, and the bucket RLS policies below validate the signed
+  // Firebase issuer, audience, subject, and sign-in provider before allowing
+  // uploads into this user's own folder.
   final token = await user.getIdToken(true);
   if (token == null || token.split('.').length != 3) {
-    throw StateError('تعذر تحديث رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
+    throw StateError('تعذر قراءة رمز تسجيل الدخول. سجّل خروج وادخل من جديد.');
   }
   final payload = token.split('.')[1];
   final claims = jsonDecode(
     utf8.decode(base64Url.decode(base64Url.normalize(payload))),
   ) as Map<String, dynamic>;
-  if (claims['role'] != 'authenticated') {
-    throw StateError('صلاحية التخزين لم تتحدث بعد. أعد المحاولة بعد لحظات.');
+  final firebase = claims['firebase'];
+  if (claims['iss'] != 'https://securetoken.google.com/futureyouth-69f8a' ||
+      claims['aud'] != 'futureyouth-69f8a' ||
+      claims['sub'] != user.uid ||
+      firebase is! Map ||
+      firebase['sign_in_provider'] == null) {
+    throw StateError(
+      'تعذر التحقق من هوية Firebase. تأكد من ربط Firebase كمزوّد مصادقة '
+      'خارجي في إعدادات Supabase ثم سجّل الخروج والدخول.',
+    );
   }
 
   final name = file.name.toLowerCase();
