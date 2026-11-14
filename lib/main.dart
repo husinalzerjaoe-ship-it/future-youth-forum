@@ -1073,6 +1073,7 @@ class MemberProfilePage extends StatelessWidget {
                 },
                 icon: const Icon(Icons.message), label: const Text('مراسلة خاصة'),
               ),
+            MemberPointsCard(uid: uid),
             FollowControl(uid: uid),
             MemberSafetyActions(uid: uid, name: d['name'] as String? ?? fallbackName),
             StarRateControl(uid: uid),
@@ -1141,6 +1142,103 @@ class MemberActivityStats extends StatelessWidget {
     Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
     Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
   ]);
+}
+
+
+class MemberPointsCard extends StatelessWidget {
+  final String uid;
+  const MemberPointsCard({super.key, required this.uid});
+
+  static const String _founderEmail = 'husinalzerjaoe@gmail.com';
+
+  @override
+  Widget build(BuildContext context) {
+    final current = FirebaseAuth.instance.currentUser;
+    final isFounder = current?.email?.toLowerCase() == _founderEmail;
+    final isOwn = current?.uid == uid;
+    final balanceRef = db.collection('pointBalances').doc(uid);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: balanceRef.snapshots(),
+      builder: (context, snapshot) {
+        final points = (snapshot.data?.data()?['balance'] as num?)?.toInt() ?? 0;
+        return Card(
+          elevation: 0,
+          color: const Color(0xFF211D43),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: Colors.amber.withValues(alpha: .35)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              const Icon(Icons.workspace_premium, color: Colors.amber, size: 30),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('نقاط العضو', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(isFounder && isOwn ? 'رصيد المؤسس غير محدود' : '$points نقطة',
+                  style: const TextStyle(color: Colors.white70)),
+              ])),
+              if (isFounder && !isOwn)
+                FilledButton.tonalIcon(
+                  onPressed: () => _grant(context, uid),
+                  icon: const Icon(Icons.add),
+                  label: const Text('منح نقاط'),
+                ),
+              if (isFounder && isOwn)
+                const Chip(label: Text('مؤسس • غير محدود'), avatar: Icon(Icons.all_inclusive, size: 17)),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _grant(BuildContext context, String targetUid) async {
+    final controller = TextEditingController(text: '100');
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('منح نقاط للعضو'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'عدد النقاط', hintText: 'مثلاً 100'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          FilledButton(onPressed: () {
+            final value = int.tryParse(controller.text.trim());
+            if (value != null && value > 0 && value <= 1000000000) {
+              Navigator.pop(dialogContext, value);
+            }
+          }, child: const Text('منح')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (amount == null) return;
+    final actor = FirebaseAuth.instance.currentUser;
+    if (actor == null || actor.email?.toLowerCase() != _founderEmail) return;
+    final balance = db.collection('pointBalances').doc(targetUid);
+    final grant = db.collection('pointGrants').doc();
+    final batch = db.batch();
+    batch.set(balance, {
+      'uid': targetUid,
+      'balance': FieldValue.increment(amount),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': actor.uid,
+    }, SetOptions(merge: true));
+    batch.set(grant, {
+      'targetUid': targetUid,
+      'amount': amount,
+      'actorUid': actor.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم منح $amount نقطة للعضو')));
+    }
+  }
 }
 
 class StarRateControl extends StatelessWidget {
