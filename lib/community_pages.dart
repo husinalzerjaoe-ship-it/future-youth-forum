@@ -3,6 +3,7 @@ import 'package:gal/gal.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'youtube_video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -406,11 +407,7 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
  String category='أغاني';
  bool busy=false;
  static const categories=['أغاني','فيديوهات','أفلام ومقاطع رسمية','تعليم','متنوع'];
- bool validYoutube(String value) {
-  final uri=Uri.tryParse(value.trim());
-  if(uri==null||uri.scheme!='https') return false;
-  return ['youtube.com','www.youtube.com','m.youtube.com','youtu.be','www.youtu.be'].contains(uri.host.toLowerCase());
- }
+ bool validYoutube(String value) => isSupportedYoutubeUrl(value);
  Future<void> add() async {
   if(title.text.trim().isEmpty||!validYoutube(url.text)) {
    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اكتب عنواناً ورابط يوتيوب صحيحاً يبدأ بـ https')));
@@ -431,12 +428,9 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذرت الإضافة. تأكد من نشر قواعد Firestore')));
   } finally {if(mounted)setState(()=>busy=false);}
  }
- Future<void> openVideo(String value) async {
-  final uri=Uri.tryParse(value);
-  if(uri==null||!validYoutube(value)) return;
-  if(!await launchUrl(uri,mode:LaunchMode.externalApplication) && mounted) {
-   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر فتح يوتيوب')));
-  }
+ Future<void> openVideo(String value, String videoTitle) async {
+  if(!validYoutube(value) || !mounted) return;
+  Navigator.push(context,MaterialPageRoute(builder:(_)=>YouTubeWatchPage(url:value,title:videoTitle)));
  }
  @override void dispose(){title.dispose();url.dispose();super.dispose();}
  @override Widget build(BuildContext context)=>Directionality(
@@ -475,7 +469,7 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
        title:Text(d['title'] as String? ??'فيديو'),
        subtitle:Text('${d['category']??'متنوع'} • ${d['authorName']??'عضو'}'),
        trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'')),
-       onTap:()=>openVideo(d['url'] as String? ??''),
+       onTap:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو'),
       ));
      }).toList());
     },
