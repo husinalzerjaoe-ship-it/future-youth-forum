@@ -122,8 +122,8 @@ class _BluffPartyPageState extends State<BluffPartyPage>{
   @override void initState(){super.initState();cards=List.generate(4,(_)=>rng.nextInt(4));}
   @override Widget build(BuildContext c)=>Scaffold(appBar:AppBar(title:const Text('تحدي الخداع')),body:Padding(padding:const EdgeInsets.all(16),child:Column(children:[
     const Text('كل لاعب يشوف بطاقته سراً ويدّعي أنها تطابق رمز الجولة. اللاعب التالي يصدّق أو يتحدّى.'),
-    Text('الجولة \$round • الدور: \${names[turn]}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
-    const SizedBox(height:16),Text(revealed?'بطاقتك: \${['🍎','⭐','🎲','👑'][cards[turn]]}':'البطاقة مخفية',style:const TextStyle(fontSize:30)),
+    Text('الجولة $round • الدور: ${names[turn]}',style:const TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
+    const SizedBox(height:16),Text(revealed?'بطاقتك: ${['🍎','⭐','🎲','👑'][cards[turn]]}':'البطاقة مخفية',style:const TextStyle(fontSize:30)),
     FilledButton(onPressed:()=>setState(()=>revealed=!revealed),child:Text(revealed?'إخفاء البطاقة':'اكشف بطاقتي')),
     Row(children:[Expanded(child:OutlinedButton(onPressed:()=>setState(()=>result='تم كشف البطاقة. راجعوا هل كان الادعاء صحيحاً.'),child:const Text('أتحداك'))),Expanded(child:FilledButton(onPressed:()=>setState((){turn=(turn+1)%4;if(turn==0){round++;cards=List.generate(4,(_)=>rng.nextInt(4));}revealed=false;}),child:const Text('أصدّق وأمرّر')))]),
     Text(result),TextButton(onPressed:()=>setState((){turn=0;round=1;cards=List.generate(4,(_)=>rng.nextInt(4));revealed=false;result='';}),child:const Text('جولة جديدة')),
