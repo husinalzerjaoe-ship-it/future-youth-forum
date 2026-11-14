@@ -27,8 +27,8 @@ on storage.objects for insert
 to anon, authenticated
 with check (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
   and auth.jwt()->>'sub' is not null
   and (
     (
@@ -51,8 +51,8 @@ on storage.objects for update
 to anon, authenticated
 using (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
   and auth.jwt()->>'sub' is not null
   and (
     (
@@ -70,8 +70,8 @@ using (
 )
 with check (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
   and auth.jwt()->>'sub' is not null
   and (
     (
@@ -94,8 +94,8 @@ on storage.objects for delete
 to anon, authenticated
 using (
   bucket_id = 'forum-media'
-  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8'
-  and auth.jwt()->>'aud' = 'futureyouth-69f8'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
   and auth.jwt()->>'sub' is not null
   and (
     (
