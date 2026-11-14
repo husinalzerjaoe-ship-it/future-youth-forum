@@ -216,7 +216,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   Widget _wordSearch(){
     return _panel('🔎 شبكة الكلمات',[
       const Text('الكلمات المطلوبة: كتاب • مدرسة • قلم • بيت • شمس',style:TextStyle(fontWeight:FontWeight.w800)),
-      GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:25,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5),itemBuilder:(c,i)=>InkWell(onTap:(){setState((){_wordInput+=_wordGrid[i];_message='الحروف المختارة: '+_wordInput;});},child:Container(margin:const EdgeInsets.all(2),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(6)),child:Center(child:Text(_wordGrid[i],style:_big)))),
+      GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:25,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5),itemBuilder:(c,i)=>InkWell(onTap:(){setState((){_wordInput+=_wordGrid[i];_message='الحروف المختارة: '+_wordInput;});},child:Container(margin:const EdgeInsets.all(2),decoration:BoxDecoration(color:Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(6)),child:Center(child:Text(_wordGrid[i],style:_big))))) ,
       Text('اختيارك: '+_wordInput,style:_big),
       _button('تحقق من الكلمة',(){setState((){if(_words.contains(_wordInput)){_score+=5;_message='وجدت كلمة صحيحة!';_wordInput='';}else{_message='ليست كلمة من القائمة بعد.';}});}),
       _button('مسح الاختيار',(){setState(()=>_wordInput='');}),
