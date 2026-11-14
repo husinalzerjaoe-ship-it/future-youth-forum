@@ -536,7 +536,7 @@ class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
   @override void initState() {
     super.initState();
     _player = AudioPlayer();
-    _player.setUrl(widget.url).catchError((_) { if (mounted) setState(() => _failed = true); });
+    _player.setUrl(widget.url).catchError((_) { if (mounted) setState(() => _failed = true); return null; });
   }
   @override void dispose() { _player.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) => Container(
