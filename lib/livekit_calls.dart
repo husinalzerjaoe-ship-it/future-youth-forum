@@ -126,18 +126,14 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
       if (token.isEmpty || !serverUrl.startsWith('wss://')) {
         throw Exception('استجابة خادم المكالمات غير مكتملة.');
       }
-      final room = lk.Room();
+      final room = lk.Room(roomOptions: const lk.RoomOptions(adaptiveStream: true, dynacast: true));
       final listener = room.createListener();
       listener.on<lk.RoomDisconnectedEvent>((_) {
         if (mounted && identical(_room, room)) {
           setState(() => _error = 'انقطع الاتصال بالغرفة.');
         }
       });
-      await room.connect(
-        serverUrl,
-        token,
-        roomOptions: const lk.RoomOptions(adaptiveStream: true, dynacast: true),
-      );
+      await room.connect(serverUrl, token);
       await room.localParticipant?.setMicrophoneEnabled(true);
       if (_videoEnabled) {
         await room.localParticipant?.setCameraEnabled(true);
@@ -211,7 +207,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   Widget _participantTile(lk.Participant participant, {required bool local}) {
     Widget? video;
-    for (final publication in participant.videoTracks.values) {
+    for (final publication in participant.videoTrackPublications) {
       final track = publication.track;
       if (publication.subscribed && track is lk.VideoTrack && !publication.isScreenShare) {
         video = lk.VideoTrackRenderer(track);
