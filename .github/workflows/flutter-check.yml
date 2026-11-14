@@ -2,7 +2,7 @@ name: Flutter quality check and Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, release/combined-mainline, 'fix/**']
+    branches: [main, release/combined-mainline, 'fix/**', 'feature/**']
   pull_request:
     branches: [main]
 
@@ -19,6 +19,8 @@ jobs:
           node-version: 22
       - name: Check Firebase Functions syntax
         run: node --check functions/index.js
+      - name: Check LiveKit token worker syntax
+        run: node --check workers/livekit-token/src/index.js
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

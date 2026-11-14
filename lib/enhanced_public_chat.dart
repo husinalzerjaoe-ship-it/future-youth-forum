@@ -25,6 +25,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  bool _mentionPickerOpen = false;
   final AudioRecorder _voiceRecorder = AudioRecorder();
   bool _recordingVoice = false;
   DateTime? _voiceStartedAt;
@@ -32,6 +33,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   DateTime? _lastSuccessfulSend;
   String? _error;
   String? _pulseMessageId;
+  String _searchQuery = '';
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
     final normalized = value.toLowerCase().replaceAll(RegExp(r'[\sـ]+'), '');
@@ -56,6 +58,53 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
     return p.data()?['name'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
   }
+  Future<void> _showMentionPicker() async {
+    _mentionPickerOpen = true;
+    try {
+      final profiles = await _chatDb.collection('publicProfiles').limit(80).get();
+      if (!mounted) return;
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context, isScrollControlled: true, showDragHandle: true,
+        builder: (sheetContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(child: SizedBox(height: MediaQuery.of(sheetContext).size.height * .62,
+            child: Column(children: [
+              const Padding(padding: EdgeInsets.all(14), child: Text('اختَر عضواً للإشارة إليه', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(child: ListView(children: profiles.docs.where((p) => p.id != _uid).map((p) {
+                final d = p.data();
+                final name = (d['name'] ?? 'عضو').toString();
+                final photo = (d['photoUrl'] ?? '').toString();
+                return ListTile(
+                  leading: CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                    child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                  title: Text(name),
+                  subtitle: const Text('إضافة منشن إلى الرسالة'),
+                  onTap: () => Navigator.pop(sheetContext, {'uid': p.id, 'name': name}),
+                );
+              }).toList())),
+            ]),
+          )),
+        ),
+      );
+      if (selected != null && mounted) {
+        final current = _text.text;
+        final at = current.lastIndexOf('@');
+        final prefix = at >= 0 ? current.substring(0, at) : current;
+        final mentionName = (selected['name'] ?? 'عضو').toString().replaceAll(RegExp(r'\s+'), '_');
+        final insertion = '@$mentionName ';
+        final next = prefix + insertion;
+        _text.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length));
+        await _chatDb.collection('chatTyping').doc(_uid).set({
+          'uid': _uid, 'typing': true, 'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {
+      if (mounted) _snack('تعذر تحميل قائمة الأعضاء حالياً');
+    } finally {
+      _mentionPickerOpen = false;
+    }
+  }
+
   Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false,int? durationSeconds}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
     final now = DateTime.now();
@@ -87,7 +136,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final membership = (await _chatDb.collection('memberships').doc(_uid).get()).data() ?? {};
       final expiry = membership['expiresAt'];
       final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
-      await _chatDb.collection('messages').add({
+      final sentMessage = await _chatDb.collection('messages').add({
         'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
@@ -95,7 +144,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
       if (type == 'text') {
-        final tags = RegExp(r'@([^\s@]+)').allMatches(body).map((m)=>m.group(1)!).toSet().take(10).toList();
+        final tags = RegExp(r'@([^\s@]+)').allMatches(body).map((m)=>m.group(1)!.replaceAll('_', ' ')).toSet().take(10).toList();
         if (tags.isNotEmpty) {
           final matches = await _chatDb.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
           for (final profile in matches.docs) {
@@ -103,6 +152,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             await _chatDb.collection('notifications').add({
               'recipientId':profile.id,'actorId':_uid,'actorName':senderName,
               'type':'mention','text':'أشار إليك في الدردشة العامة','read':false,
+              'targetType':'publicMessage','targetId':sentMessage.id,'messageId':sentMessage.id,
               'createdAt':FieldValue.serverTimestamp(),
             });
           }
@@ -480,11 +530,50 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
       if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
     ])),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
+      child: TextField(
+        onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'ابحث في رسائل الساحة وأسماء الأعضاء...',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+            tooltip: 'مسح البحث', onPressed: () => setState(() => _searchQuery = ''),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: .92),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        ),
+      ),
+    ),
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
+      builder:(context,s){
+        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
+        final pinned=s.data!.docs;
+        return Container(margin:const EdgeInsets.fromLTRB(10,6,10,4),decoration:BoxDecoration(color:const Color(0xFFEDE8FF),borderRadius:BorderRadius.circular(13),border:Border.all(color:_chatBrand.withValues(alpha:.35))),child:ExpansionTile(
+          dense:true,leading:const Icon(Icons.push_pin_rounded,color:_chatBrand),title:Text('الرسائل المثبتة (${pinned.length})',style:const TextStyle(color:Color(0xFF34266F),fontWeight:FontWeight.w900)),
+          subtitle:const Text('اضغط لعرض الإعلانات والرسائل المهمة',style:TextStyle(fontSize:10,color:Color(0xFF6554A8))),
+          children:pinned.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.bookmark,color:_chatBrand,size:18),title:Text(d['senderName'] as String? ?? 'عضو',style:const TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF34266F))),subtitle:Text(d['text'] as String? ?? (d['type']=='image'?'📷 صورة':d['type']=='voice'?'🎙️ رسالة صوتية':'مرفق'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Color(0xFF34266F))),onTap:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('رسالة مثبتة'),content:Text(d['text'] as String? ?? 'رسالة مرفقة'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))])));}).toList(),
+        ));
+      },
+    ),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
-    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    Expanded(child:AnimatedContainer(
+      duration: const Duration(milliseconds: 850),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight, end: Alignment.bottomLeft,
+          colors: [Color(_background), Color(_background).withOpacity(.78), Color(_background).withOpacity(.92)],
+        ),
+      ),
+      child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
       stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
       builder:(context,blocks){
         if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
@@ -495,8 +584,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           builder:(c,s){
             if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
             if(!s.hasData)return const Center(child:CircularProgressIndicator());
-            final visible=s.data!.docs.where((d)=>!blockedIds.contains((d.data()['senderId']??'').toString())).toList();
-            if(visible.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
+            final visible=s.data!.docs.where((d) {
+              final data=d.data();
+              if(blockedIds.contains((data['senderId']??'').toString())) return false;
+              if(_searchQuery.isEmpty) return true;
+              final text = "${data['text'] ?? ''} ${data['senderName'] ?? ''}".toLowerCase();
+              return text.contains(_searchQuery);
+            }).toList();
+            if(visible.isEmpty)return Center(child:Text(_searchQuery.isEmpty?'ابدأ أول محادثة في الساحة ✨':'ما لقينا رسائل تطابق بحثك 🔎'));
             return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
           },
         );
@@ -513,7 +608,10 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
-        onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
+        onChanged:(v) {
+          _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
+          if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
+        },
         onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
       IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
     ]))),

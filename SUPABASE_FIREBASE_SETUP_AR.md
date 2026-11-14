@@ -8,13 +8,13 @@
 2. اذهب إلى **Authentication → Sign In / Providers → Third-Party Auth**.
 3. أضف Firebase كمزود Third-party Auth، واستخدم Firebase Project ID: `futureyouth-69f8a`.
 4. احفظ الإعداد، وتأكد أن Firebase Third-party Auth يظهر كمزوّد مفعّل للمشروع الصحيح.
-5. افتح **SQL Editor** وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً.
+5. افتح **SQL Editor** وشغّل محتوى الملف `supabase_public_chat_storage.sql` كاملاً (النسخة المحدّثة تقبل Firebase JWT الموثّق وتتحقق من المشروع وUID داخل سياسات التخزين، بدون اشتراط custom claim إضافي).
 6. تأكد أن إعداد Firebase في Supabase يستخدم Project ID `futureyouth-69f8a` نفسه، وليس اسم التطبيق أو رابط Firebase Console.
 
 الـbucket `forum-media` مضبوط كـPublic لأن الصور والستوريات والوسائط العامة تُعرض عبر public URL. لا ترفع إليه ملفات خاصة أو مستندات شخصية. حد الرفع 100MB، وتُقيد الأنواع المسموحة في SQL.
 
 ## تفعيل claim للمستخدمين
-Supabase يحتاج claim باسم `role: authenticated` داخل Firebase ID token حتى يعامل المستخدم كـauthenticated. أُضيفت Cloud Function في `functions/index.js` للحسابات الجديدة.
+لم نعد نعتمد على claim إضافي باسم `role: authenticated`. بعد تفعيل Firebase كمزوّد Third-party Auth وتشغيل SQL المحدّث، تتحقق سياسات التخزين من Firebase issuer وaudience وUID وتسمح لكل مستخدم بالكتابة داخل مجلده فقط.
 
 من مجلد المشروع، بعد تسجيل الدخول إلى Firebase CLI واختيار المشروع الصحيح:
 
@@ -28,7 +28,7 @@ firebase deploy --only functions,firestore:rules
 بعد إضافة دعم الرسائل الصوتية في الدردشة العامة والخاصة وغرف الدول والغرف الخاصة، تأكد أن نشر `firestore.rules` تم أيضاً؛ وإلا قد تظهر رسائل `permission-denied` عند إرسال الفويس أو الصور داخل بعض الغرف.
 
 ### الحسابات الموجودة مسبقاً
-نفّذ سكربت التحديث مرة واحدة من جهاز موثوق لديه Firebase Admin credentials:
+لا تحتاج الحسابات الحالية إلى سكربت إضافة role بعد تطبيق SQL المحدّث. سجّل الخروج ثم الدخول لتجديد Firebase ID token.
 
 ```bash
 cd functions
@@ -38,7 +38,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json node scripts/set_ex
 
 استبدل المسار بمكان ملف Service Account الذي نزلته من Firebase Console، ولا ترفعه إلى المستودع. السكربت يحافظ على custom claims الحالية ويضيف role فقط.
 
-بعد منح claim للحساب، افتح التطبيق وسجّل خروجاً ثم دخولاً. التطبيق يستدعي الوظيفة الموثوقة للحسابات القديمة ويجدد Firebase ID token قبل الرفع. إذا ظهر خطأ `third-party auth` فالمشكلة في إعداد مزود Firebase داخل Supabase أو في نشر Cloud Function، وليست في اختيار الصورة.
+بعد تطبيق SQL، افتح التطبيق وسجّل خروجاً ثم دخولاً. إذا ظهر خطأ `third-party auth` فتحقق من تفعيل Firebase كمزوّد داخل Supabase ومن تطابق Project ID.
 
 ## نظام نقاط التفاعل والترتيب الأسبوعي
 أُضيفت Cloud Functions لاحتساب النقاط من الخادم حتى لا يستطيع العضو منح نفسه نقاطاً من التطبيق:

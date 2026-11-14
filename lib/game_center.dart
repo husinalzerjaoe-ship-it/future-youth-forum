@@ -2,6 +2,12 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'multiplayer_arcade.dart';
+import 'social_party_games.dart';
+import 'board_games.dart';
+import 'arcade_minigames.dart';
+import 'arcade_penalty.dart';
+import 'friends_quiz.dart';
 
 const gameInk=Color(0xFF171936), gameViolet=Color(0xFF6554D9);
 final gameDb=FirebaseFirestore.instance;
@@ -12,12 +18,18 @@ class GameCenterPage extends StatelessWidget {
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
   appBar:AppBar(title:const Text('مركز الألعاب والتحديات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
+   _GameTile(icon:Icons.quiz_rounded,title:'مسابقة أسئلة مباشرة للأصدقاء',subtitle:'2–4 لاعبين • رمز غرفة • دعوات • ترتيب ونقاط مباشرة',page:const FriendsQuizPage()),
+   _GameTile(icon:Icons.public,title:'صالة اللعب أونلاين',subtitle:'إكس أو مباشر • رمز غرفة من 6 أرقام • دعوات الأصدقاء',page:const MultiplayerArcadePage()),
+   _GameTile(icon:Icons.groups_rounded,title:'ألعاب السهرة الجماعية',subtitle:'الجاسوس والذئب والرسم والخداع والنرد',page:const SocialPartyGamesPage()),
+   _GameTile(icon:Icons.grid_4x4,title:'ألعاب الطاولة',subtitle:'الدومينو والدامة لشخصين',page:const BoardGamesPage()),
+   _GameTile(icon:Icons.psychology_alt,title:'ألعاب الذكاء السريعة',subtitle:'الذاكرة وترتيب الحروف والتحديات',page:const ArcadeMiniGamesPage()),
+   _GameTile(icon:Icons.sports_soccer,title:'ضربات الجزاء',subtitle:'تحدي التسديد والحارس',page:const PenaltyShootoutPage()),
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(gradient:const LinearGradient(colors:[gameInk,gameViolet,Color(0xFF16A6A0)]),borderRadius:BorderRadius.circular(20)),child:const Text('تحدّى نفسك وأصدقاءك 🎮\nمعلومات عامة • كرة قدم • تخمين لاعبين',style:TextStyle(color:Colors.white,fontSize:21,fontWeight:FontWeight.bold))),
    const SizedBox(height:12),
    _GameTile(icon:Icons.quiz,title:'تحدي المعلومات',subtitle:'أسئلة متنوعة بمستويات مختلفة',page:const _QuizGame(category:'general')),
    _GameTile(icon:Icons.sports_soccer,title:'تحدي كرة القدم',subtitle:'أندية وبطولات ومنتخبات',page:const _QuizGame(category:'football')),
    _GameTile(icon:Icons.person_search,title:'من هو اللاعب؟',subtitle:'خمن اللاعب من التلميحات',page:const _QuizGame(category:'player')),
-   _GameTile(icon:Icons.people_alt,title:'دعوات وتحديات الأصدقاء',subtitle:'أرسل دعوة لعضو وتابع تحدياتك',page:const GameInvitesPage()),
+   _GameTile(icon:Icons.people_alt,title:'دعوات الأصدقاء والغرف',subtitle:'استقبل دعوة مباشرة أو انضم برمز الغرفة',page:const MultiplayerArcadePage()),
    _GameTile(icon:Icons.bolt,title:'تحدي السرعة',subtitle:'جاوب بأسرع ما يمكن',page:const _QuizGame(category:'speed')),
    _GameTile(icon:Icons.flag_outlined,title:'تحدي الأعلام',subtitle:'خمن الدولة من العلم',page:const _QuizGame(category:'flags')),
    _GameTile(icon:Icons.movie_outlined,title:'تحدي الأنمي',subtitle:'شخصيات وأحداث الأنمي',page:const _QuizGame(category:'anime')),

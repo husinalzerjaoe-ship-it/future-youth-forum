@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'watch_party.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
@@ -161,8 +162,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
   bool changingBackground = false;
   bool recordingVoice = false;
   DateTime? voiceStartedAt;
+  Map<String, dynamic>? replyTo;
   final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
+  String searchQuery = '';
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
     try {
@@ -236,10 +239,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
       batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
+      if (mounted) setState(() => replyTo = null);
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
@@ -321,10 +325,19 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Future<void> showMessageActions(DocumentSnapshot<Map<String,dynamic>> doc) async {
     final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
+        ListTile(leading: const Icon(Icons.reply, color: _brand), title: const Text('الرد على هذه الرسالة'), onTap: () => Navigator.pop(c, 'reply')),
         const ListTile(title: Text('تفاعل مع الرسالة')),
         ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
       ])));
-    if (choice != null) await reactToMessage(doc.id, choice);
+    if (choice == 'reply') {
+      final d = doc.data();
+      if (d == null) return;
+      final type = d['type'];
+      final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
+      if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
+    } else if (choice != null) {
+      await reactToMessage(doc.id, choice);
+    }
   }
   @override
   Widget build(BuildContext context) => Directionality(
@@ -385,12 +398,37 @@ class _DirectChatPageState extends State<DirectChatPage> {
           Positioned(top: 22, right: 18, child: Icon(Icons.auto_awesome, color: _brand.withValues(alpha: .10), size: 54)),
           Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
           Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+          child: TextField(
+            onChanged: (value) => setState(() => searchQuery = value.trim().toLowerCase()),
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'ابحث في هذه المحادثة...',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                onPressed: () => setState(() => searchQuery = ''),
+                icon: const Icon(Icons.close_rounded),
+              ),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: .9),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt', descending: true).limit(300).snapshots(),
           builder: (context, s) {
             if (s.hasError) return const Center(child: Text('تعذر تحميل المحادثة'));
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
-            return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.reversed.map((doc) {
+            final visible = s.data!.docs.where((doc) {
+              if (searchQuery.isEmpty) return true;
+              final d = doc.data();
+              final haystack = '${d['text'] ?? ''} ${d['senderName'] ?? ''}'.toLowerCase();
+              return haystack.contains(searchQuery);
+            }).toList();
+            if (visible.isEmpty) return Center(child: Text(searchQuery.isEmpty ? 'ابدأ محادثتك الآن ✨' : 'ماكو رسائل تطابق البحث'));
+            return ListView(padding: const EdgeInsets.all(12), children: visible.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
               return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
@@ -421,6 +459,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
+                  if (d['replyToMessageId'] is String)
+                    Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
                   if (d['type'] == 'voice' && d['audioUrl'] is String)
@@ -437,13 +477,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
             }).toList());
           },
         )),
-        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
+        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (replyTo != null) Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الرد على ${replyTo!['senderName']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)), Text(replyTo!['preview'] as String, maxLines: 1, overflow: TextOverflow.ellipsis)])), IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => replyTo = null), icon: const Icon(Icons.close, size: 18))])),
+          Row(children: [
           IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
-        ]))),
+        ])]))),
           ]),
         ]),
       ),
@@ -501,13 +543,87 @@ class NotificationsPage extends StatelessWidget {
               title: Text(d['text'] as String? ?? 'إشعار جديد'),
               subtitle: Text(d['actorName'] as String? ?? 'الملتقى'),
               trailing: d['read'] == true ? const Icon(Icons.done, color: Colors.green) : const Icon(Icons.circle, size: 9, color: _brand),
-              onTap: () => doc.reference.update({'read': true}),
+              onTap: () async {
+                await doc.reference.update({'read': true});
+                final targetType = (d['targetType'] ?? '').toString();
+                final targetId = (d['targetId'] ?? d['messageId'] ?? '').toString();
+                if (targetId.isNotEmpty && (targetType == 'publicMessage' || targetType == 'post' || targetType == 'watchRoom')) {
+                  if (!context.mounted) return;
+                  if (targetType == 'watchRoom') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: targetId)));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationTargetPage(
+                      targetId: targetId, isPost: targetType == 'post',
+                      title: targetType == 'post' ? 'المنشور الذي أشار إليك' : 'الرسالة التي أشار إليك بها',
+                    )));
+                  }
+                }
+              },
             );
           }).toList());
         },
       ),
     ),
   );
+}
+
+
+class NotificationTargetPage extends StatelessWidget {
+  final String targetId;
+  final bool isPost;
+  final String title;
+  const NotificationTargetPage({super.key, required this.targetId, required this.isPost, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final collection = isPost ? 'posts' : 'messages';
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _db.collection(collection).doc(targetId).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Center(child: Text('تعذر فتح المحتوى'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snapshot.data!.exists) return const Center(child: Text('هذا المحتوى لم يعد متاحاً أو تم حذفه'));
+            final data = snapshot.data!.data() ?? {};
+            final author = (data['authorName'] ?? data['senderName'] ?? 'عضو').toString();
+            final body = (data['text'] ?? data['caption'] ?? 'محتوى بدون نص').toString();
+            final photo = (data['authorPhoto'] ?? '').toString();
+            return ListView(padding: const EdgeInsets.all(18), children: [
+              Card(
+                elevation: 2,
+                child: Padding(padding: const EdgeInsets.all(18), child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                        child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(author, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      const Icon(Icons.alternate_email, color: _brand),
+                    ]),
+                    const SizedBox(height: 18),
+                    SelectableText(body, style: const TextStyle(fontSize: 17, height: 1.6)),
+                    if ((data['imageUrl'] ?? '').toString().startsWith('http')) ...[
+                      const SizedBox(height: 14),
+                      ClipRRect(borderRadius: BorderRadius.circular(14),
+                        child: Image.network(data['imageUrl'].toString(), fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(isPost ? 'المنشور المشار إليه' : 'الرسالة المشار إليها',
+                      style: const TextStyle(color: _brand, fontWeight: FontWeight.w700)),
+                  ],
+                )),
+              ),
+            ]);
+          },
+        ),
+      ),
+    );
+  }
 }
 
 

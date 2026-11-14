@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,10 +19,35 @@ import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
+import 'match_center.dart';
+import 'game_center.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
 final db = FirebaseFirestore.instance;
+
+Future<void> _notifyContentMentions({
+  required String text,
+  required String targetType,
+  required String targetId,
+  required String actorUid,
+  required String actorName,
+}) async {
+  final tags = RegExp(r'@([^\s@]+)').allMatches(text)
+      .map((m) => m.group(1)!.replaceAll('_', ' ')).toSet().take(10).toList();
+  if (tags.isEmpty) return;
+  final matches = await db.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
+  for (final profile in matches.docs) {
+    if (profile.id == actorUid) continue;
+    await db.collection('notifications').add({
+      'recipientId': profile.id, 'actorId': actorUid, 'actorName': actorName,
+      'type': 'mention', 'text': 'أشار إليك في منشور',
+      'read': false, 'targetType': targetType, 'targetId': targetId,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+}
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,7 +57,7 @@ Future<void> main() async {
     anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
     // Forward the signed-in Firebase ID token so Supabase Storage RLS can
     // identify the same user. Configure Firebase as a Supabase Third-party Auth
-    // provider and add role=authenticated to Firebase ID tokens.
+    // provider; the current storage policies validate Firebase issuer, audience and UID.
     accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
   await initializeLocalAudioService();
@@ -43,7 +70,7 @@ class FutureYouthApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
     title: 'ملتقى شباب المستقبل',
-    themeMode: ThemeMode.system,
+    themeMode: ThemeMode.dark,
     theme: ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
@@ -56,7 +83,86 @@ class FutureYouthApp extends StatelessWidget {
       textTheme: GoogleFonts.notoSansArabicTextTheme(ThemeData.dark().textTheme),
       scaffoldBackgroundColor: const Color(0xFF111321),
     ),
-    home: const AuthGate(),
+    home: const AnimatedIntroGate(),
+  );
+}
+
+
+class AnimatedIntroGate extends StatefulWidget {
+  const AnimatedIntroGate({super.key});
+  @override
+  State<AnimatedIntroGate> createState() => _AnimatedIntroGateState();
+}
+
+class _AnimatedIntroGateState extends State<AnimatedIntroGate> {
+  bool _showIntro = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+      if (mounted) setState(() => _showIntro = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 650),
+    switchInCurve: Curves.easeOutCubic,
+    switchOutCurve: Curves.easeInCubic,
+    transitionBuilder: (child, animation) => FadeTransition(
+      opacity: animation,
+      child: ScaleTransition(scale: Tween<double>(begin: .96, end: 1).animate(animation), child: child),
+    ),
+    child: _showIntro
+      ? const _AnimatedIntroScreen(key: ValueKey('future-youth-intro'))
+      : const AuthGate(key: ValueKey('future-youth-auth')),
+  );
+}
+
+class _AnimatedIntroScreen extends StatelessWidget {
+  const _AnimatedIntroScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF10152F), Color(0xFF29215D), Color(0xFF111321)],
+        ),
+      ),
+      child: Center(
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: .72, end: 1),
+          duration: const Duration(milliseconds: 1100),
+          curve: Curves.elasticOut,
+          builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 104, height: 104,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: const Color(0xFFB9AEFF).withValues(alpha: .65)),
+                boxShadow: [BoxShadow(color: brand.withValues(alpha: .35), blurRadius: 35, spreadRadius: 2)],
+              ),
+              child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFE4DEFF), size: 54),
+            ),
+            const SizedBox(height: 22),
+            const Text('ملتقى شباب المستقبل',
+              style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 8),
+            const Text('مساحة تجمع الأصدقاء والإبداع',
+              style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 26),
+            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(
+              strokeWidth: 2, color: Color(0xFFB9AEFF))),
+          ]),
+        ),
+      ),
+    ),
   );
 }
 
@@ -131,62 +237,144 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      backgroundColor: const Color(0xFFF5F6FC),
-      body: SafeArea(child: Center(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
-        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(color: Colors.white, child: Padding(padding: const EdgeInsets.all(22),
-            child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const Icon(Icons.groups_rounded, size: 58, color: brand),
-              const SizedBox(height: 12),
-              const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(registering ? 'أنشئ حسابك وابدأ المشاركة' : 'سجّل دخولك للمتابعة',
-                textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
-              const SizedBox(height: 24),
-              if (registering) ...[
-                TextFormField(controller: name, decoration: const InputDecoration(labelText: 'الاسم', border: OutlineInputBorder()),
-                  validator: (v) => registering && (v == null || v.trim().isEmpty) ? 'اكتب اسمك' : null),
-                const SizedBox(height: 14),
-              ],
-              TextFormField(controller: email, keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'البريد الإلكتروني', border: OutlineInputBorder()),
-                validator: (v) => v == null || !v.contains('@') ? 'اكتب بريد صحيح' : null),
-              const SizedBox(height: 14),
-              TextFormField(controller: password, obscureText: true,
-                decoration: const InputDecoration(labelText: 'كلمة المرور', border: OutlineInputBorder()),
-                validator: (v) => v == null || v.length < 6 ? 'اكتب 6 أحرف على الأقل' : null),
-              if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)],
-              const SizedBox(height: 18),
-              FilledButton(onPressed: busy ? null : submit,
-                style: FilledButton.styleFrom(backgroundColor: brand, padding: const EdgeInsets.all(15)),
-                child: busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(registering ? 'إنشاء حساب' : 'تسجيل الدخول')),
-              if (!registering) TextButton(
-                onPressed: busy ? null : () async {
-                  final address = email.text.trim();
-                  if (!address.contains('@')) {
-                    setState(() => error = 'اكتب بريدك الإلكتروني أولاً حتى نرسل رابط الاستعادة.');
-                    return;
-                  }
-                  try {
-                    await FirebaseAuth.instance.sendPasswordResetEmail(email: address);
-                    if (mounted) setState(() => error = 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك.');
-                  } on FirebaseAuthException catch (e) {
-                    if (mounted) setState(() => error = e.code == 'user-not-found' ? 'هذا البريد غير مسجل.' : 'تعذر إرسال رابط الاستعادة. حاول لاحقاً.');
-                  }
-                },
-                child: const Text('نسيت كلمة المرور؟'),
-              ),
-              TextButton(onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
-                child: Text(registering ? 'عندك حساب؟ سجّل دخولك' : 'ما عندك حساب؟ أنشئ حساب')),
-            ])),
-          )),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight, end: Alignment.bottomLeft,
+            colors: [Color(0xFF11152F), Color(0xFF29245B), Color(0xFF6554D9)],
+          ),
         ),
-      ))),
+        child: Stack(children: [
+          const Positioned.fill(child: _AuthStarfield()),
+          Positioned(top: -75, left: -55, child: _authGlow(210, const Color(0xFF8E7CFF).withOpacity(.20))),
+          Positioned(bottom: -90, right: -60, child: _authGlow(250, const Color(0xFF38C9D8).withOpacity(.14))),
+          SafeArea(child: Center(child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(children: [
+                Container(
+                  width: 92, height: 92,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    gradient: const LinearGradient(colors: [Color(0xFF8C7CF0), Color(0xFF4D43B6)]),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.25), blurRadius: 28, offset: const Offset(0, 12))],
+                    border: Border.all(color: Colors.white.withOpacity(.28), width: 1.5),
+                  ),
+                  child: const Icon(Icons.groups_rounded, color: Colors.white, size: 54),
+                ),
+                const SizedBox(height: 18),
+                const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: .2)),
+                const SizedBox(height: 7),
+                Text('مساحتك • أصدقاؤك • اهتماماتك', textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 13)),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171A38).withOpacity(.88),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white.withOpacity(.13)),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.24), blurRadius: 32, offset: const Offset(0, 16))],
+                  ),
+                  child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text(registering ? 'انضم إلى مجتمعنا' : 'أهلاً بعودتك',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 7),
+                    Text(registering ? 'أنشئ حسابك وابدأ رحلتك' : 'سجّل دخولك وتابع أصدقاءك',
+                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(.65))),
+                    const SizedBox(height: 24),
+                    if (registering) ...[
+                      _authField(name, 'الاسم الظاهر', Icons.person_outline,
+                        validator: (v) => registering && (v == null || v.trim().isEmpty) ? 'اكتب اسمك' : null),
+                      const SizedBox(height: 14),
+                    ],
+                    _authField(email, 'البريد الإلكتروني', Icons.alternate_email,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => v == null || !v.contains('@') ? 'اكتب بريد صحيح' : null),
+                    const SizedBox(height: 14),
+                    _authField(password, 'كلمة المرور', Icons.lock_outline,
+                      obscureText: true,
+                      validator: (v) => v == null || v.length < 6 ? 'اكتب 6 أحرف على الأقل' : null),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Container(padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(color: Colors.red.withOpacity(.12), borderRadius: BorderRadius.circular(12)),
+                        child: Text(error!, style: const TextStyle(color: Color(0xFFFF9C9C)), textAlign: TextAlign.center)),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(height: 54, child: FilledButton(
+                      onPressed: busy ? null : submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8878F2), foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: busy
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text(registering ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    )),
+                    if (!registering) TextButton(
+                      onPressed: busy ? null : () async {
+                        final address = email.text.trim();
+                        if (!address.contains('@')) {
+                          setState(() => error = 'اكتب بريدك الإلكتروني أولاً حتى نرسل رابط الاستعادة.');
+                          return;
+                        }
+                        try {
+                          await FirebaseAuth.instance.sendPasswordResetEmail(email: address);
+                          if (mounted) setState(() => error = 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك.');
+                        } on FirebaseAuthException catch (e) {
+                          if (mounted) setState(() => error = e.code == 'user-not-found' ? 'هذا البريد غير مسجل.' : 'تعذر إرسال رابط الاستعادة. حاول لاحقاً.');
+                        }
+                      },
+                      child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFFC9C2FF))),
+                    ),
+                    const SizedBox(height: 6),
+                    OutlinedButton(
+                      onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white, side: BorderSide(color: Colors.white.withOpacity(.28)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.all(14),
+                      ),
+                      child: Text(registering ? 'عندي حساب — تسجيل الدخول' : 'مستخدم جديد — إنشاء حساب'),
+                    ),
+                  ])),
+                ),
+                const SizedBox(height: 18),
+                Text('الإصدار V3 • مجتمع يجمعنا ونصنع المستقبل', style: TextStyle(color: Colors.white.withOpacity(.68), fontSize: 11, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ))),
+        ]),
+      ),
     ),
   );
+
+  Widget _authGlow(double size, Color color) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color,
+      boxShadow: [BoxShadow(color: color, blurRadius: 55, spreadRadius: 18)]),
+  );
+
+  Widget _authField(TextEditingController controller, String label, IconData icon, {
+    TextInputType? keyboardType, bool obscureText = false, String? Function(String?)? validator,
+  }) => TextFormField(
+    controller: controller, keyboardType: keyboardType, obscureText: obscureText, validator: validator,
+    style: const TextStyle(color: Colors.white),
+    decoration: InputDecoration(
+      labelText: label, prefixIcon: Icon(icon, color: const Color(0xFFB7AEFF)),
+      labelStyle: TextStyle(color: Colors.white.withOpacity(.66)),
+      filled: true, fillColor: Colors.white.withOpacity(.07),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 17),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF9B8FFF), width: 1.5)),
+    ),
+  );
+
 }
 
 class HomePage extends StatefulWidget {
@@ -218,6 +406,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'games':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage()));
+                  break;
                 case 'communityPlus':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage()));
                   break;
@@ -245,6 +436,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'games', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مركز الألعاب والتحديات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityPlus', child: ListTile(leading: Icon(Icons.forum_outlined), title: Text('مجتمع الأوتاكو والنقاشات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'saved', child: ListTile(leading: Icon(Icons.bookmarks_outlined), title: Text('المحفوظات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'inspiration', child: ListTile(leading: Icon(Icons.auto_awesome), title: Text('مكتبة العبارات والأدعية'), contentPadding: EdgeInsets.zero)),
@@ -261,7 +453,9 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: IndexedStack(index: selected, children: [const PostsPage(), const EnhancedPublicChatPage(), const CommunityHubPage(), MyProfilePage()]),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
+        const MiniNowPlayingBar(),
+        NavigationBar(
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
         destinations: const [
@@ -271,8 +465,67 @@ class _HomePageState extends State<HomePage> {
           NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'ملفي'),
         ],
       ),
+      ]),
     ));
   }
+}
+
+class MiniNowPlayingBar extends StatelessWidget {
+  const MiniNowPlayingBar({super.key});
+
+  String _clock(Duration value) {
+    final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '${value.inHours > 0 ? '${value.inHours}:' : ''}$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<MediaItem?>(
+    stream: appAudioHandler.mediaItem,
+    builder: (context, itemSnapshot) {
+      final item = itemSnapshot.data;
+      if (item == null) return const SizedBox.shrink();
+      final duration = item.duration ?? Duration.zero;
+      return StreamBuilder<PlaybackState>(
+        stream: appAudioHandler.playbackState,
+        builder: (context, stateSnapshot) {
+          final playing = stateSnapshot.data?.playing ?? false;
+          return Material(
+            color: const Color(0xFF211B45),
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 8, 5),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: const Color(0xFF9B8BFF).withOpacity(.35)))),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Row(children: [
+                  Container(width: 38, height: 38, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF806BEE), Color(0xFF3D8DBB)]), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.music_note_rounded, color: Colors.white)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text(item.artist ?? item.album ?? 'ملتقى شباب المستقبل', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                  ])),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'السابق', onPressed: appAudioHandler.skipToPrevious, icon: const Icon(Icons.skip_previous_rounded, color: Colors.white)),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل', onPressed: playing ? appAudioHandler.pause : appAudioHandler.play, icon: Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: const Color(0xFFC5B9FF), size: 31)),
+                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'التالي', onPressed: appAudioHandler.skipToNext, icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
+                ]),
+                StreamBuilder<Duration>(
+                  stream: AudioService.position,
+                  builder: (context, positionSnapshot) {
+                    final position = positionSnapshot.data ?? Duration.zero;
+                    final maxMs = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
+                    return Row(children: [
+                      Text(_clock(position), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                      Expanded(child: SliderTheme(data: SliderTheme.of(context).copyWith(trackHeight: 2, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5), overlayShape: SliderComponentShape.noOverlay), child: Slider(min: 0, max: maxMs, value: position.inMilliseconds.clamp(0, maxMs.toInt()).toDouble(), onChanged: duration == Duration.zero ? null : (v) => appAudioHandler.seek(Duration(milliseconds: v.round())), activeColor: const Color(0xFFB8A8FF), inactiveColor: Colors.white24))),
+                      Text(_clock(duration), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                    ]);
+                  },
+                ),
+              ]),
+            ),
+          );
+        },
+      );
+    },
+  );
 }
 
 class PostsPage extends StatelessWidget {
@@ -297,12 +550,17 @@ class PostsPage extends StatelessWidget {
       )));
     if (ok == true && (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
       final profile = await db.collection('publicProfiles').doc(user.uid).get();
-      await db.collection('posts').add({
+      final authorName = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
+      final post = await db.collection('posts').add({
         'text': text.text.trim(), 'videoUrl': video.text.trim(), 'authorId': user.uid,
-        'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
+        'authorName': authorName,
         'authorPhoto': profile.data()?['photoUrl'] ?? '',
         'createdAt': FieldValue.serverTimestamp(),
       });
+      await _notifyContentMentions(
+        text: text.text.trim(), targetType: 'post', targetId: post.id,
+        actorUid: user.uid, actorName: authorName,
+      );
     }
     text.dispose();
     video.dispose();
@@ -402,9 +660,18 @@ class PostsPage extends StatelessWidget {
             ),
             Card(
               child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFFEAF7EF), child: Icon(Icons.scoreboard_rounded, color: Color(0xFF16834A))),
+                title: const Text('مركز المباريات والنتائج', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('مواعيد ونتائج بطولات كرة القدم'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchCenterPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
                 leading: const CircleAvatar(backgroundColor: Color(0xFFEDE9FF), child: Icon(Icons.live_tv_rounded, color: Color(0xFF6554D9))),
                 title: const Text('غرف يوتيوب والمشاهدة الجماعية', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('شاهدوا الفيديو معاً وتحدثوا داخل الغرفة مباشرة'),
+                subtitle: const Text('يوتيوب وروابط فيديو وأفلام ومسلسلات متاحة للتضمين مع مزامنة ودردشة'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
               ),
@@ -885,17 +1152,171 @@ class MemberProfilePage extends StatelessWidget {
                 },
                 icon: const Icon(Icons.message), label: const Text('مراسلة خاصة'),
               ),
+            MemberPointsCard(uid: uid),
             FollowControl(uid: uid),
             MemberSafetyActions(uid: uid, name: d['name'] as String? ?? fallbackName),
             StarRateControl(uid: uid),
             Center(child: RatingSummary(uid: uid)),
             const Divider(height: 28),
+            MemberActivityStats(uid: uid, joinedAt: d['createdAt']),
+            const SizedBox(height: 12),
             const Text('منشوراته', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             MemberPosts(uid: uid),
           ]);
         },
       ),
     ));
+  }
+}
+
+
+class MemberActivityStats extends StatelessWidget {
+  final String uid;
+  final dynamic joinedAt;
+  const MemberActivityStats({super.key, required this.uid, this.joinedAt});
+
+  @override
+  Widget build(BuildContext context) {
+    final joined = joinedAt is Timestamp ? (joinedAt as Timestamp).toDate() : null;
+    final days = joined == null ? null : DateTime.now().difference(joined).inDays.clamp(0, 999999);
+    final activity = Future.wait<int>([
+      db.collection('posts').where('authorId', isEqualTo: uid).count().get()
+          .then((value) => value.count ?? 0),
+      db.collection('messages').where('senderId', isEqualTo: uid).count().get()
+          .then((value) => value.count ?? 0),
+    ]);
+    return Card(
+      elevation: 0,
+      color: const Color(0xFF211D43),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: brand.withValues(alpha: .35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('إحصائيات العضو', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 12),
+          FutureBuilder<List<int>>(
+            future: activity,
+            builder: (context, snapshot) {
+              final values = snapshot.data ?? const <int>[0, 0];
+              return Row(children: [
+                Expanded(child: _activityMetric(Icons.calendar_month, days?.toString() ?? '—', 'يوم منذ الانضمام')),
+                Expanded(child: _activityMetric(Icons.article_outlined, snapshot.hasData ? values[0].toString() : '…', 'منشور')),
+                Expanded(child: _activityMetric(Icons.forum_outlined, snapshot.hasData ? values[1].toString() : '…', 'رسالة عامة')),
+              ]);
+            },
+          ),
+          const SizedBox(height: 8),
+          const Text('الإحصائيات تشمل المنشورات ورسائل المحادثة العامة فقط.', style: TextStyle(color: Colors.white60, fontSize: 11)),
+        ]),
+      ),
+    );
+  }
+
+  Widget _activityMetric(IconData icon, String value, String label) => Column(children: [
+    Icon(icon, color: const Color(0xFFB9AEFF), size: 21),
+    const SizedBox(height: 5),
+    Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+    Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+  ]);
+}
+
+
+class MemberPointsCard extends StatelessWidget {
+  final String uid;
+  const MemberPointsCard({super.key, required this.uid});
+
+  static const String _founderEmail = 'husinalzerjaoe@gmail.com';
+
+  @override
+  Widget build(BuildContext context) {
+    final current = FirebaseAuth.instance.currentUser;
+    final isFounder = current?.email?.toLowerCase() == _founderEmail;
+    final isOwn = current?.uid == uid;
+    final balanceRef = db.collection('pointBalances').doc(uid);
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: balanceRef.snapshots(),
+      builder: (context, snapshot) {
+        final points = (snapshot.data?.data()?['balance'] as num?)?.toInt() ?? 0;
+        return Card(
+          elevation: 0,
+          color: const Color(0xFF211D43),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(color: Colors.amber.withValues(alpha: .35)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(children: [
+              const Icon(Icons.workspace_premium, color: Colors.amber, size: 30),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('نقاط العضو', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(isFounder && isOwn ? 'رصيد المؤسس غير محدود' : '$points نقطة',
+                  style: const TextStyle(color: Colors.white70)),
+              ])),
+              if (isFounder && !isOwn)
+                FilledButton.tonalIcon(
+                  onPressed: () => _grant(context, uid),
+                  icon: const Icon(Icons.add),
+                  label: const Text('منح نقاط'),
+                ),
+              if (isFounder && isOwn)
+                const Chip(label: Text('مؤسس • غير محدود'), avatar: Icon(Icons.all_inclusive, size: 17)),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _grant(BuildContext context, String targetUid) async {
+    final controller = TextEditingController(text: '100');
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('منح نقاط للعضو'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'عدد النقاط', hintText: 'مثلاً 100'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          FilledButton(onPressed: () {
+            final value = int.tryParse(controller.text.trim());
+            if (value != null && value > 0 && value <= 1000000000) {
+              Navigator.pop(dialogContext, value);
+            }
+          }, child: const Text('منح')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (amount == null) return;
+    final actor = FirebaseAuth.instance.currentUser;
+    if (actor == null || actor.email?.toLowerCase() != _founderEmail) return;
+    final balance = db.collection('pointBalances').doc(targetUid);
+    final grant = db.collection('pointGrants').doc();
+    final batch = db.batch();
+    batch.set(balance, {
+      'uid': targetUid,
+      'balance': FieldValue.increment(amount),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': actor.uid,
+    }, SetOptions(merge: true));
+    batch.set(grant, {
+      'targetUid': targetUid,
+      'amount': amount,
+      'actorUid': actor.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تم منح $amount نقطة للعضو')));
+    }
   }
 }
 
@@ -1144,4 +1565,88 @@ class _MemberSearchPageState extends State<MemberSearchPage> {
       ),
     );
   }
+}
+
+
+/// Lightweight animated anime-night atmosphere; uses no remote image or asset.
+class _AuthStarfield extends StatefulWidget {
+  const _AuthStarfield();
+
+  @override
+  State<_AuthStarfield> createState() => _AuthStarfieldState();
+}
+
+class _AuthStarfieldState extends State<_AuthStarfield>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 18),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => IgnorePointer(
+    child: AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => CustomPaint(
+        painter: _AnimeNightPainter(_controller.value),
+        child: const SizedBox.expand(),
+      ),
+    ),
+  );
+}
+
+class _AnimeNightPainter extends CustomPainter {
+  _AnimeNightPainter(this.phase);
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final random = math.Random(29);
+    for (var i = 0; i < 72; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = .45 + random.nextDouble() * 1.25;
+      final wave = (math.sin((phase * math.pi * 2) + i * .71) + 1) / 2;
+      final alpha = (.12 + wave * .48).clamp(0.0, .62).toDouble();
+      final paint = Paint()
+        ..color = Color.lerp(
+          const Color(0xFFB9C9FF),
+          const Color(0xFFE4C8FF),
+          (i % 4) / 3,
+        )!.withOpacity(alpha);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+
+    final cometPhase = (phase * 1.35) % 1;
+    final cometX = size.width * (1.15 - cometPhase * 1.45);
+    final cometY = size.height * (.18 + .24 * cometPhase);
+    final cometPaint = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          const Color(0x00B8C8FF),
+          const Color(0x88C6C8FF),
+          const Color(0x00FFFFFF),
+        ],
+      ).createShader(Rect.fromLTWH(cometX - 70, cometY - 2, 70, 4));
+    canvas.drawLine(
+      Offset(cometX - 70, cometY - 2),
+      Offset(cometX, cometY),
+      cometPaint..strokeWidth = 2,
+    );
+    canvas.drawCircle(
+      Offset(cometX, cometY),
+      2,
+      Paint()..color = const Color(0x99E5DCFF),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _AnimeNightPainter oldDelegate) =>
+      oldDelegate.phase != phase;
 }
