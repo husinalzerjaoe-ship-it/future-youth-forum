@@ -65,6 +65,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'تصويتات الملتقى',subtitle:'استفتاءات وآراء الأعضاء',category:'المجتمع',icon:Icons.poll,page:const CommunityPollsPage()),
   (title:'فعاليات الملتقى',subtitle:'مسابقات ولقاءات وتسجيل مشاركة',category:'المجتمع',icon:Icons.event_available,page:const CommunityEventsPage()),
   (title:'أندية الاهتمامات',subtitle:'أنشئ نادياً أو انضم لأصحاب اهتماماتك',category:'المجتمع',icon:Icons.diversity_3_rounded,page:const V6CommunitySuitePage()),
+  (title:'مساحتي الشخصية',subtitle:'مزاجك وأهدافك وعاداتك ودفتر يومياتك',category:'المعرفة',icon:Icons.auto_graph_rounded,page:const PersonalGrowthPage()),
   (title:'الغرف والملفات والموسيقى',subtitle:'غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',category:'الترفيه',icon:Icons.hub,page:const ExtraCommunityFeaturesPage()),
   (title:'أبراج وحساب العمر',subtitle:'أدوات خفيفة ومعلومات ترفيهية',category:'المعرفة',icon:Icons.cake_outlined,page:const LifeToolsPage()),
  ];
