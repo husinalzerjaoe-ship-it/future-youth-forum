@@ -23,3 +23,12 @@ The CI workflow runs Flutter dependency resolution, static analysis, syntax chec
 - Adds local bookmarks, copy actions, category filters, and a random discovery action; saved items remain on the device.
 - Improves public chat interaction with swipe-to-reply, double-tap heart reactions, a wider quick-reaction set, and a refreshed composer surface.
 - Adds the new section to the Community Hub and bumps the Android app version to 4.7.0+18.
+
+
+## V6.2 — Friends battle arena and 2D treasure duel
+- Adds 12 pass-and-play quiz arenas: general knowledge, science, geography and flags, history, football, anime, technology and safety, mathematics, language and literature, films and characters, riddles, and culture and arts.
+- Each arena rotates turns between two named players, tracks scores, explains answers, and shows the winner.
+- Adds a real-time online 2D treasure duel for two friends, with a 7×7 board, alternating moves, collectible gems, live scores, six-digit room codes, and direct friend invitations.
+- Extends Firestore room and invitation rules for the new treasure duel while retaining existing XO and football quiz room paths.
+- Android app version: 4.8.0+19.
+- The new online treasure duel requires publishing the updated `firestore.rules` before use.
