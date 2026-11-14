@@ -354,6 +354,7 @@ class _FocusRoomPageState extends State<FocusRoomPage> {
       if (!mounted) { timer.cancel(); return; }
       if (_minutes == 0 && _seconds == 0) {
         timer.cancel();
+        final wasFocus = !_breakMode;
         setState(() {
           _running = false;
           if (!_breakMode) { _sessions++; _breakMode = true; _minutes = 5; }
@@ -361,7 +362,7 @@ class _FocusRoomPageState extends State<FocusRoomPage> {
           _seconds = 0;
         });
         SharedPreferences.getInstance().then((p) => p.setInt('focus_sessions', _sessions));
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_breakMode ? 'انتهت الاستراحة، مستعد لجلسة جديدة؟' : 'أحسنت! اكتملت جلسة تركيز 🎉')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(wasFocus ? 'أحسنت! اكتملت جلسة تركيز 🎉' : 'انتهت الاستراحة، مستعد لجلسة جديدة؟')));
         return;
       }
       setState(() {
@@ -377,7 +378,7 @@ class _FocusRoomPageState extends State<FocusRoomPage> {
   }
 
   @override Widget build(BuildContext context) {
-    final progress = 1 - (_total / ((_breakMode ? 5 : 25) * 60)).clamp(0.0, 1.0);
+    final progress = (1 - (_total / ((_breakMode ? 5 : 25) * 60)).clamp(0.0, 1.0)).toDouble();
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('مساحة التركيز')),
       body: ListView(padding: const EdgeInsets.all(18), children: [
@@ -396,7 +397,7 @@ class _FocusRoomPageState extends State<FocusRoomPage> {
           ]),
         ),
         const SizedBox(height: 16),
-        TextField(controller: _taskController, maxLength: 100, decoration: const InputDecoration(labelText: 'شنو المهمة اللي تريد تركز عليها؟', prefixIcon: Icon(Icons.edit_note), border: OutlineInputBorder())),
+        TextField(controller: _taskController, onChanged: (_) => setState(() {}), maxLength: 100, decoration: const InputDecoration(labelText: 'شنو المهمة اللي تريد تركز عليها؟', prefixIcon: Icon(Icons.edit_note), border: OutlineInputBorder())),
         Row(children: [
           Expanded(child: FilledButton.icon(onPressed: _running ? _pause : _start, icon: Icon(_running ? Icons.pause : Icons.play_arrow), label: Text(_running ? 'إيقاف مؤقت' : 'ابدأ التركيز'))),
           const SizedBox(width: 8),
