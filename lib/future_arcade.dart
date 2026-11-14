@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 const _arcadeGames = <_ArcadeGame>[
   _ArcadeGame('ludo','لودو 2D','ارمِ النرد وحرّك أحجارك إلى خط النهاية',Icons.casino_rounded,'طاولة'),
@@ -87,7 +89,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   final _random=Random();
   int _score=0,_step=0,_turn=0,_lane=1,_position=0,_wave=1,_fish=0;
   int? _selected;
-  bool _revealed=false,_ended=false;
+  bool _revealed=false,_ended=false,_rewardClaimed=false;
   String _message='ابدأ التحدي!';
   final List<int> _snake=[27,28,29];
   final List<int> _bombs=[];
@@ -113,6 +115,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
           Text(_message,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w800,fontSize:16)),
         ])),
         const SizedBox(height:16),_buildGame(g.id),
+        if(_score>0&&!_rewardClaimed)Padding(padding:const EdgeInsets.only(bottom:8),child:FilledButton.icon(onPressed:_claimReward,icon:const Icon(Icons.card_giftcard_rounded),label:const Text('إنهاء الجولة واستلام النقاط والعملات'))),
         const SizedBox(height:18),OutlinedButton.icon(onPressed:_reset,icon:const Icon(Icons.refresh_rounded),label:const Text('إعادة اللعبة')),
         const SizedBox(height:8),const Text('نسخة لعب محلية أولية: اللعب على نفس الجهاز. الغرف المتزامنة والدردشة تُدار من صفحة الغرف.',textAlign:TextAlign.center,style:TextStyle(fontSize:11,color:Colors.grey)),
       ])),
@@ -226,7 +229,24 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
       _button('ضع قنبلة',(){if(_selected==null)return;setState((){_bombs.add(_selected!);_message='وضعت قنبلة.';});}),
     ]);
   }
-  void _reset(){setState((){_score=0;_step=0;_turn=0;_lane=1;_position=0;_wave=1;_fish=0;_selected=null;_revealed=false;_ended=false;_message='ابدأ التحدي!';_snake..clear()..addAll([27,28,29]);_bombs.clear();_sudoku..clear()..addAll([[1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]]);_wordInput='';});}
+  Future<void> _claimReward() async {
+    try {
+      final id=widget.game.id;
+      final result=await FirebaseFunctions.instance.httpsCallable('claimArcadeReward').call({
+        'gameId':'arcade_'+id,
+        'resultId':DateTime.now().microsecondsSinceEpoch.toString()+'_'+Random().nextInt(999999).toString(),
+        'score':_score,
+      });
+      final data=Map<String,dynamic>.from(result.data as Map);
+      if(!mounted)return;
+      setState(()=>_rewardClaimed=true);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('حصلت على '+(data['xp']??0).toString()+' XP و '+(data['coins']??0).toString()+' عملة!')));
+    } catch(e) {
+      if(!mounted)return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر استلام المكافأة. تأكد من نشر Cloud Function: '+e.toString())));
+    }
+  }
+  void _reset(){setState((){_score=0;_step=0;_turn=0;_lane=1;_position=0;_wave=1;_fish=0;_selected=null;_revealed=false;_ended=false;_rewardClaimed=false;_message='ابدأ التحدي!';_snake..clear()..addAll([27,28,29]);_bombs.clear();_sudoku..clear()..addAll([[1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]]);_wordInput='';});}
 }
 
 class ArcadeAchievementsPage extends StatelessWidget {
@@ -236,7 +256,48 @@ class ArcadeAchievementsPage extends StatelessWidget {
     Card(child:ListTile(leading:const Icon(Icons.military_tech_rounded,color:Colors.amber,size:34),title:const Text('بداية الأسطورة'),subtitle:const Text('أكمل أول لعبة'),trailing:const Text('مقفل'))),
     Card(child:ListTile(leading:const Icon(Icons.local_fire_department_rounded,color:Colors.deepOrange,size:34),title:const Text('سلسلة الفوز'),subtitle:const Text('حقق 3 انتصارات متتالية'),trailing:const Text('مقفل'))),
     const Padding(padding:EdgeInsets.all(12),child:Text('لوحة الإنجازات مع حفظ الحساب والمتجر والجوائز الموثقة تحتاج ربط خدمة المكافآت الموثوقة قبل إتاحة العملات القابلة للصرف.')),
+    OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeLeaderboardPage())),icon:const Icon(Icons.leaderboard_rounded),label:const Text('لوحة المتصدرين')),
+    OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeTournamentsPage())),icon:const Icon(Icons.emoji_events_rounded),label:const Text('البطولات')),
     OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeRoomsPage())),icon:const Icon(Icons.groups_rounded),label:const Text('الغرف الخاصة والدردشة')),
+  ])));
+}
+
+class ArcadeLeaderboardPage extends StatelessWidget {
+  const ArcadeLeaderboardPage({super.key});
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('متصدرون Future Arcade')),body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:FirebaseFirestore.instance.collection('arcadeProfiles').orderBy('xp',descending:true).limit(50).snapshots(),builder:(c,s){if(s.hasError)return const Center(child:Text('تعذر تحميل الترتيب.'));if(!s.hasData)return const Center(child:CircularProgressIndicator());if(s.data!.docs.isEmpty)return const Center(child:Text('لا توجد نتائج بعد. العب واحصل على أول نقاطك!'));return ListView.builder(itemCount:s.data!.docs.length,itemBuilder:(c,i){final x=s.data!.docs[i].data();return ListTile(leading:CircleAvatar(child:Text((i+1).toString())),title:Text(x['displayName']??'لاعب'),subtitle:Text('المستوى '+(x['level']??1).toString()),trailing:Text((x['xp']??0).toString()+' XP'));});})));
+}
+
+class ArcadeTournamentsPage extends StatefulWidget {
+  const ArcadeTournamentsPage({super.key});
+  @override State<ArcadeTournamentsPage> createState()=>_ArcadeTournamentsPageState();
+}
+class _ArcadeTournamentsPageState extends State<ArcadeTournamentsPage> {
+  final _db=FirebaseFirestore.instance;final _title=TextEditingController();String _game='arcade_ludo';bool _busy=false;
+  String get _uid=>FirebaseAuth.instance.currentUser!.uid;
+  static const _games={'arcade_ludo':'لودو 2D','arcade_jackaroo':'جاكارو','arcade_chess':'الشطرنج','arcade_mafia':'المافيا','arcade_racing':'سباق السيارات','arcade_snake':'الثعبان','arcade_space':'حرب الفضاء','arcade_platform':'مغامرة المنصات','arcade_tower':'الدفاع عن القلعة','arcade_fishing':'صيد السمك','arcade_millionaire':'من سيربح المليون؟','arcade_sudoku':'سودوكو','arcade_wordsearch':'البحث عن الكلمات','arcade_bomb':'ساحة القنابل'};
+  Future<void> _create() async {
+    if(_title.text.trim().length<3)return;
+    setState(()=>_busy=true);
+    try{await _db.collection('arcadeTournaments').add({'creatorId':_uid,'title':_title.text.trim(),'gameId':_game,'participants':[_uid],'status':'open','createdAt':FieldValue.serverTimestamp(),'updatedAt':FieldValue.serverTimestamp()});_title.clear();}
+    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إنشاء البطولة: '+e.toString())));}
+    finally{if(mounted)setState(()=>_busy=false);}
+  }
+  Future<void> _join(DocumentSnapshot<Map<String,dynamic>> doc) async {
+    final x=doc.data()??{};final p=List<String>.from(x['participants']??[]);
+    if(p.contains(_uid))return;
+    try{await doc.reference.update({'participants':[...p,_uid],'updatedAt':FieldValue.serverTimestamp()});}
+    catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الانضمام: '+e.toString())));}
+  }
+  @override void dispose(){_title.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('بطولات الألعاب')),body:ListView(padding:const EdgeInsets.all(14),children:[
+    Card(child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      const Text('أنشئ بطولة جديدة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:17)),
+      TextField(controller:_title,decoration:const InputDecoration(labelText:'اسم البطولة')),
+      const SizedBox(height:8),DropdownButtonFormField<String>(value:_game,items:_games.entries.map((e)=>DropdownMenuItem(value:e.key,child:Text(e.value))).toList(),onChanged:(v){if(v!=null)setState(()=>_game=v);},decoration:const InputDecoration(labelText:'اللعبة')),
+      const SizedBox(height:8),FilledButton(onPressed:_busy?_null:_create,child:const Text('إنشاء البطولة')),
+    ]))),
+    const SizedBox(height:12),const Text('البطولات المفتوحة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_db.collection('arcadeTournaments').where('status',isEqualTo:'open').snapshots(),builder:(c,s){if(s.hasError)return const Text('تعذر تحميل البطولات.');if(!s.hasData)return const Center(child:CircularProgressIndicator());return Column(children:s.data!.docs.map((d){final x=d.data();final joined=List<String>.from(x['participants']??[]).contains(_uid);return Card(child:ListTile(title:Text(x['title']??'بطولة'),subtitle:Text((_games[x['gameId']]??'لعبة')+' • '+List<String>.from(x['participants']??[]).length.toString()+' مشاركين'),trailing:joined?const Icon(Icons.check_circle,color:Colors.green):TextButton(onPressed:()=>_join(d),child:const Text('انضم'))));}).toList());}),
   ])));
 }
 
