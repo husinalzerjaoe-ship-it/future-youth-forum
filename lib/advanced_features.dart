@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -138,6 +142,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
   final controller = TextEditingController();
   bool busy = false;
   bool changingBackground = false;
+  bool recordingVoice = false;
+  DateTime? voiceStartedAt;
+  final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
@@ -187,10 +194,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تغيير الخلفية. تحقق من صلاحيات تخزين Supabase.')));
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
-  @override void dispose() { controller.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl}) async {
+  @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
+  Future<void> send({String? imageUrl, String? audioUrl, int? durationSeconds}) async {
     final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null) || busy) return;
+    if ((value.isEmpty && imageUrl == null && audioUrl == null) || busy) return;
     setState(() => busy = true);
     try {
       // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
@@ -212,14 +219,14 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': imageUrl == null ? 'text' : 'image', if (imageUrl != null) 'imageUrl': imageUrl, 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': imageUrl == null ? value : '📷 صورة', 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': imageUrl == null ? 'أرسل لك رسالة خاصة' : 'أرسل لك صورة',
+          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
@@ -247,6 +254,47 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) setState(() => busy = false);
     }
   }
+  Future<void> toggleVoiceRecording() async {
+    if (busy) return;
+    if (!recordingVoice) {
+      try {
+        if (!await voiceRecorder.hasPermission()) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('اسمح للتطبيق باستخدام المايكروفون أولاً.')));
+          return;
+        }
+        final dir = await getTemporaryDirectory();
+        final path = '\${dir.path}/private_voice_\${DateTime.now().microsecondsSinceEpoch}.m4a';
+        await voiceRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: path);
+        if (mounted) setState(() { recordingVoice = true; voiceStartedAt = DateTime.now(); });
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر بدء التسجيل: $e')));
+      }
+      return;
+    }
+    try {
+      final started = voiceStartedAt;
+      final path = await voiceRecorder.stop();
+      if (mounted) setState(() { recordingVoice = false; voiceStartedAt = null; });
+      if (path == null || started == null) return;
+      final elapsed = DateTime.now().difference(started).inSeconds;
+      final seconds = elapsed.clamp(1, 180);
+      if (elapsed > 180 && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديد الرسالة الصوتية بثلاث دقائق.')));
+      }
+      if (mounted) setState(() => busy = true);
+      final url = await uploadForumMedia(XFile(path), folder: 'private-chat');
+      if (mounted) setState(() => busy = false);
+      await send(audioUrl: url, durationSeconds: seconds);
+    } catch (e) {
+      if (mounted) {
+        setState(() { recordingVoice = false; voiceStartedAt = null; });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال التسجيل الصوتي: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> reactToMessage(String messageId, String emoji) async {
     final ref = _db.collection('conversations').doc(widget.conversationId).collection('messages').doc(messageId).collection('reactions').doc(_uid);
     final old = await ref.get();
@@ -358,6 +406,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     ),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
+                  if (d['type'] == 'voice' && d['audioUrl'] is String)
+                    _DirectVoicePlayer(url: d['audioUrl'] as String, durationSeconds: (d['durationSeconds'] as num?)?.toInt() ?? 0),
                   if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
                   StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream: doc.reference.collection('reactions').snapshots(), builder: (c, rs) {
                     final counts = <String,int>{};
@@ -372,6 +422,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
         )),
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
           IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
@@ -727,4 +778,45 @@ class SavePostControl extends StatelessWidget {
       },
     );
   }
+}
+
+
+class _DirectVoicePlayer extends StatefulWidget {
+  final String url;
+  final int durationSeconds;
+  const _DirectVoicePlayer({required this.url, required this.durationSeconds});
+  @override State<_DirectVoicePlayer> createState() => _DirectVoicePlayerState();
+}
+class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
+  late final AudioPlayer player;
+  @override void initState() {
+    super.initState();
+    player = AudioPlayer();
+    player.setUrl(widget.url).catchError((Object _) {});
+  }
+  @override void dispose() { player.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => Container(
+    width: 230, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(color: _brand.withValues(alpha: .08), borderRadius: BorderRadius.circular(12)),
+    child: Row(children: [
+      StreamBuilder<PlayerState>(stream: player.playerStateStream, builder: (context, snapshot) {
+        final playing = snapshot.data?.playing ?? false;
+        return IconButton(onPressed: () async { if (playing) { await player.pause(); } else { await player.play(); } },
+          icon: Icon(playing ? Icons.pause_circle_filled : Icons.play_circle_fill, color: _brand, size: 32));
+      }),
+      Expanded(child: StreamBuilder<Duration?>(stream: player.durationStream, builder: (context, durationSnap) {
+        final total = durationSnap.data ?? Duration(seconds: widget.durationSeconds);
+        return StreamBuilder<Duration>(stream: player.positionStream, builder: (context, positionSnap) {
+          final position = positionSnap.data ?? Duration.zero;
+          final maxMs = total.inMilliseconds;
+          return Column(mainAxisSize: MainAxisSize.min, children: [
+            Slider(value: maxMs <= 0 ? 0 : position.inMilliseconds.clamp(0, maxMs).toDouble(),
+              max: maxMs <= 0 ? 1 : maxMs.toDouble(),
+              onChanged: maxMs <= 0 ? null : (v) => player.seek(Duration(milliseconds: v.round()))),
+            Text('\${position.inSeconds}s / \${total.inSeconds}s', style: const TextStyle(fontSize: 10)),
+          ]);
+        });
+      })),
+    ]),
+  );
 }
