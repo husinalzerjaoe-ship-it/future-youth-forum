@@ -34,6 +34,7 @@ class _ArcadeLiveGamePageState extends State<ArcadeLiveGamePage> {
         final room = snap.data()!;
         final members = List<String>.from(room['members'] ?? const []);
         if (!members.contains(_uid)) throw StateError('أنت لست عضواً في هذه الغرفة.');
+        if (members.length > 1 && room['status'] != 'playing') throw StateError('المضيف لم يبدأ المباراة بعد.');
         final state = Map<String, dynamic>.from(room['state'] ?? const {});
         final turn = (state['turnIndex'] as num?)?.toInt() ?? 0;
         final current = members.isEmpty ? '' : members[turn % members.length];
