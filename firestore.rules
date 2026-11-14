@@ -1104,7 +1104,7 @@ service cloud.firestore {
           && request.resource.data.winner is string
           && request.resource.data.turn is string)
         ||
-        // Turn-based 2D treasure duel: only the active player may move.
+        // Secure turn-based 2D treasure duel.
         (resource.data.game == 'treasure_duel'
           && request.auth.uid in resource.data.members
           && resource.data.status == 'playing'
@@ -1114,14 +1114,62 @@ service cloud.firestore {
             .hasOnly(['positions', 'treasures', 'scores', 'moves', 'turn', 'winner', 'status', 'updatedAt'])
           && request.resource.data.positions is list
           && request.resource.data.positions.size() == 2
+          && request.resource.data.positions[0] is int
+          && request.resource.data.positions[1] is int
+          && request.resource.data.positions[0] >= 0
+          && request.resource.data.positions[0] < 49
+          && request.resource.data.positions[1] >= 0
+          && request.resource.data.positions[1] < 49
+          && request.resource.data.positions[0] != request.resource.data.positions[1]
           && request.resource.data.treasures is list
-          && request.resource.data.treasures.size() <= 6
+          && request.resource.data.treasures.size() <= resource.data.treasures.size()
+          && resource.data.treasures.hasAll(request.resource.data.treasures)
           && request.resource.data.scores is map
-          && request.resource.data.moves is int
+          && request.resource.data.moves == resource.data.moves + 1
           && request.resource.data.turn is string
           && request.resource.data.winner is string
           && request.resource.data.status in ['playing', 'finished']
-          && (request.resource.data.status == 'finished' || request.resource.data.turn != request.auth.uid))
+          && (
+            (resource.data.members[0] == request.auth.uid
+              && request.resource.data.positions[1] == resource.data.positions[1]
+              && (
+                request.resource.data.positions[0] == resource.data.positions[0] + 7
+                || request.resource.data.positions[0] == resource.data.positions[0] - 7
+                || (request.resource.data.positions[0] == resource.data.positions[0] + 1 && resource.data.positions[0] % 7 != 6)
+                || (request.resource.data.positions[0] == resource.data.positions[0] - 1 && resource.data.positions[0] % 7 != 0)
+              )
+              && request.resource.data.scores[request.auth.uid] ==
+                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[0]]) ? 1 : 0))
+            ||
+            (resource.data.members[1] == request.auth.uid
+              && request.resource.data.positions[0] == resource.data.positions[0]
+              && (
+                request.resource.data.positions[1] == resource.data.positions[1] + 7
+                || request.resource.data.positions[1] == resource.data.positions[1] - 7
+                || (request.resource.data.positions[1] == resource.data.positions[1] + 1 && resource.data.positions[1] % 7 != 6)
+                || (request.resource.data.positions[1] == resource.data.positions[1] - 1 && resource.data.positions[1] % 7 != 0)
+              )
+              && request.resource.data.scores[request.auth.uid] ==
+                resource.data.scores[request.auth.uid] + (resource.data.treasures.hasAny([request.resource.data.positions[1]]) ? 1 : 0))
+          )
+          && (
+            (resource.data.treasures.hasAny([request.resource.data.positions[resource.data.members[0] == request.auth.uid ? 0 : 1]])
+              && request.resource.data.treasures.size() == resource.data.treasures.size() - 1)
+            ||
+            (!resource.data.treasures.hasAny([request.resource.data.positions[resource.data.members[0] == request.auth.uid ? 0 : 1]])
+              && request.resource.data.treasures == resource.data.treasures)
+          )
+          && (
+            (request.resource.data.status == 'playing'
+              && request.resource.data.turn == (resource.data.members[0] == request.auth.uid ? resource.data.members[1] : resource.data.members[0])
+              && request.resource.data.treasures.size() > 0
+              && request.resource.data.moves < 36)
+            ||
+            (request.resource.data.status == 'finished'
+              && request.resource.data.turn == ''
+              && (request.resource.data.treasures.size() == 0 || request.resource.data.moves >= 36)
+              && request.resource.data.winner in resource.data.members)
+          ))
         ||
         // Football quiz players submit answers and host advances rounds.
         (resource.data.game == 'football_quiz'
