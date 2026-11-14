@@ -199,7 +199,7 @@ exports.claimArcadeReward = onCall(async (request) => {
 exports.purchaseArcadeBadge = onCall(async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
   const badgeId = request.data?.badgeId;
-  const prices = { bronze_star: 20, flame: 45, crown: 80, rocket: 65 };
+  const prices = { bronze_star: 20, flame: 45, crown: 80, rocket: 65, frame_neon: 90, frame_gold: 120, frame_ocean: 75 };
   if (!Object.prototype.hasOwnProperty.call(prices, badgeId)) {
     throw new HttpsError("invalid-argument", "Unknown badge.");
   }
