@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'watch_party.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
@@ -520,12 +521,16 @@ class NotificationsPage extends StatelessWidget {
                 await doc.reference.update({'read': true});
                 final targetType = (d['targetType'] ?? '').toString();
                 final targetId = (d['targetId'] ?? d['messageId'] ?? '').toString();
-                if (targetId.isNotEmpty && (targetType == 'publicMessage' || targetType == 'post')) {
+                if (targetId.isNotEmpty && (targetType == 'publicMessage' || targetType == 'post' || targetType == 'watchRoom')) {
                   if (!context.mounted) return;
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationTargetPage(
-                    targetId: targetId, isPost: targetType == 'post',
-                    title: targetType == 'post' ? 'المنشور الذي أشار إليك' : 'الرسالة التي أشار إليك بها',
-                  )));
+                  if (targetType == 'watchRoom') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: targetId)));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationTargetPage(
+                      targetId: targetId, isPost: targetType == 'post',
+                      title: targetType == 'post' ? 'المنشور الذي أشار إليك' : 'الرسالة التي أشار إليك بها',
+                    )));
+                  }
                 }
               },
             );
