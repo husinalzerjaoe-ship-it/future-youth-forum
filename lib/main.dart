@@ -690,7 +690,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
       const SizedBox(height: 12),
       TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
       const SizedBox(height: 12),
-      TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
+      Center(child: CircleAvatar(radius: 42, backgroundImage: photo.text.startsWith('https://') ? NetworkImage(photo.text) : null,
+        child: photo.text.startsWith('https://') ? null : const Icon(Icons.person, size: 42))),
+      const SizedBox(height: 8),
+      TextField(controller: photo, keyboardType: TextInputType.url, onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
       const SizedBox(height: 12),
       TextField(controller: cover, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط صورة الغلاف (اختياري)', border: OutlineInputBorder())),
       const SizedBox(height: 8),
@@ -747,6 +751,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
           final u = FirebaseAuth.instance.currentUser!;
           await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim(), 'coverUrl': cover.text.trim(), 'avatarFrame': avatarFrame}, SetOptions(merge: true));
           await u.updateDisplayName(name.text.trim());
+          if (photo.text.trim().startsWith('https://')) {
+            await u.updatePhotoURL(photo.text.trim());
+          }
           if (context.mounted) Navigator.pop(context);
         } catch (_) {
           if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر الحفظ. تحقق من قواعد Firestore.')));
