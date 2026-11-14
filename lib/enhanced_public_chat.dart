@@ -476,12 +476,24 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
-    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),builder:(c,s){
-      if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
-      if(!s.hasData)return const Center(child:CircularProgressIndicator());
-      if(s.data!.docs.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
-      return ListView(reverse:true,padding:const EdgeInsets.all(12),children:s.data!.docs.map(_bubble).toList());
-    }))),
+    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+      stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
+      builder:(context,blocks){
+        if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
+        if(!blocks.hasData)return const Center(child:CircularProgressIndicator());
+        final blockedIds=blocks.data!.docs.map((d)=>(d.data()['blockedId']??'').toString()).where((id)=>id.isNotEmpty).toSet();
+        return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+          stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),
+          builder:(c,s){
+            if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
+            if(!s.hasData)return const Center(child:CircularProgressIndicator());
+            final visible=s.data!.docs.where((d)=>!blockedIds.contains((d.data()['senderId']??'').toString())).toList();
+            if(visible.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
+            return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
+          },
+        );
+      },
+    ))),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatTyping').where('typing',isEqualTo:true).snapshots(),builder:(c,s){
       final n=(s.data?.docs??[]).where((d)=>d.id!=_uid).length;
       return n>0?const Padding(padding:EdgeInsets.all(3),child:Text('أحد الأعضاء يكتب الآن...',style:TextStyle(fontSize:11,color:_chatBrand))):const SizedBox.shrink();
