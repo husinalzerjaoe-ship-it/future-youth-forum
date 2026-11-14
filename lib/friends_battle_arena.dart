@@ -192,7 +192,7 @@ class _PassAndPlayQuizPage extends StatefulWidget {
   @override State<_PassAndPlayQuizPage> createState() => _PassAndPlayQuizPageState();
 }
 class _PassAndPlayQuizPageState extends State<_PassAndPlayQuizPage> {
-  final _names = [TextEditingController(text: 'اللاعب الأول'), TextEditingController(text: 'اللاعب الثاني')];
+  final _names = List.generate(4, (i) => TextEditingController(text: 'اللاعب ${i + 1}'));
   int _players = 2, _turn = 0, _round = 0;
   late List<int> _order;
   late List<int> _scores;
@@ -210,12 +210,19 @@ class _PassAndPlayQuizPageState extends State<_PassAndPlayQuizPage> {
       appBar: AppBar(title: Text('تحدي ${widget.category}')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         if (_round == 0) ...[
-          const Text('أسماء المتنافسين', style: TextStyle(fontWeight: FontWeight.bold)),
           Row(children: [
-            Expanded(child: TextField(controller: _names[0], decoration: const InputDecoration(labelText: 'اللاعب الأول'))),
-            const SizedBox(width: 8),
-            Expanded(child: TextField(controller: _names[1], decoration: const InputDecoration(labelText: 'اللاعب الثاني'))),
+            const Expanded(child: Text('عدد المتنافسين', style: TextStyle(fontWeight: FontWeight.bold))),
+            DropdownButton<int>(
+              value: _players,
+              items: [2, 3, 4].map((n) => DropdownMenuItem(value: n, child: Text('$n لاعبين'))).toList(),
+              onChanged: (n) { if (n != null) setState(() { _players = n; _reset(); }); },
+            ),
           ]),
+          const Text('أسماء المتنافسين', style: TextStyle(fontWeight: FontWeight.bold)),
+          Wrap(spacing: 10, runSpacing: 8, children: List.generate(_players, (i) => SizedBox(
+            width: MediaQuery.sizeOf(context).width / 2 - 28,
+            child: TextField(controller: _names[i], decoration: InputDecoration(labelText: 'اللاعب ' + (i + 1).toString())),
+          ))),
           const SizedBox(height: 10),
         ],
         Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(children: [
