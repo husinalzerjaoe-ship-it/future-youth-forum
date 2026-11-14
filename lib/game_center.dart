@@ -2,6 +2,11 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'multiplayer_arcade.dart';
+import 'social_party_games.dart';
+import 'board_games.dart';
+import 'arcade_minigames.dart';
+import 'arcade_penalty.dart';
 
 const gameInk=Color(0xFF171936), gameViolet=Color(0xFF6554D9);
 final gameDb=FirebaseFirestore.instance;
@@ -12,6 +17,11 @@ class GameCenterPage extends StatelessWidget {
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
   appBar:AppBar(title:const Text('مركز الألعاب والتحديات')),
   body:ListView(padding:const EdgeInsets.all(14),children:[
+   _GameTile(icon:Icons.public,title:'صالة اللعب أونلاين',subtitle:'إكس أو مباشر • رمز غرفة من 6 أرقام • دعوات الأصدقاء',page:const MultiplayerArcadePage()),
+   _GameTile(icon:Icons.groups_rounded,title:'ألعاب السهرة الجماعية',subtitle:'الجاسوس والذئب والرسم والخداع والنرد',page:const SocialPartyGamesPage()),
+   _GameTile(icon:Icons.grid_4x4,title:'ألعاب الطاولة',subtitle:'الدومينو والدامة لشخصين',page:const BoardGamesPage()),
+   _GameTile(icon:Icons.psychology_alt,title:'ألعاب الذكاء السريعة',subtitle:'الذاكرة وترتيب الحروف والتحديات',page:const ArcadeMiniGamesPage()),
+   _GameTile(icon:Icons.sports_soccer,title:'ضربات الجزاء',subtitle:'تحدي التسديد والحارس',page:const PenaltyShootoutPage()),
    Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(gradient:const LinearGradient(colors:[gameInk,gameViolet,Color(0xFF16A6A0)]),borderRadius:BorderRadius.circular(20)),child:const Text('تحدّى نفسك وأصدقاءك 🎮\nمعلومات عامة • كرة قدم • تخمين لاعبين',style:TextStyle(color:Colors.white,fontSize:21,fontWeight:FontWeight.bold))),
    const SizedBox(height:12),
    _GameTile(icon:Icons.quiz,title:'تحدي المعلومات',subtitle:'أسئلة متنوعة بمستويات مختلفة',page:const _QuizGame(category:'general')),
