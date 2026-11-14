@@ -194,3 +194,31 @@ exports.claimArcadeReward = onCall(async (request) => {
     return { alreadyClaimed: false, xp, coins, totalXp, totalCoins, level: Math.floor(totalXp / 100) + 1 };
   });
 });
+
+
+exports.purchaseArcadeBadge = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in is required.");
+  const badgeId = request.data?.badgeId;
+  const prices = { bronze_star: 20, flame: 45, crown: 80, rocket: 65 };
+  if (!Object.prototype.hasOwnProperty.call(prices, badgeId)) {
+    throw new HttpsError("invalid-argument", "Unknown badge.");
+  }
+  const uid = request.auth.uid;
+  const profileRef = adminDb.collection("arcadeProfiles").doc(uid);
+  return adminDb.runTransaction(async (tx) => {
+    const snap = await tx.get(profileRef);
+    if (!snap.exists) throw new HttpsError("failed-precondition", "Play a game to create your arcade wallet first.");
+    const profile = snap.data();
+    const inventory = Array.isArray(profile.inventory) ? profile.inventory : [];
+    if (inventory.includes(badgeId)) return { alreadyOwned: true, coins: Number(profile.coins || 0) };
+    const price = prices[badgeId];
+    const coins = Number(profile.coins || 0);
+    if (coins < price) throw new HttpsError("failed-precondition", "Not enough coins.");
+    tx.update(profileRef, {
+      coins: coins - price,
+      inventory: [...inventory, badgeId],
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    return { alreadyOwned: false, coins: coins - price };
+  });
+});
