@@ -132,62 +132,143 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      backgroundColor: const Color(0xFFF5F6FC),
-      body: SafeArea(child: Center(child: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
-        child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(color: Colors.white, child: Padding(padding: const EdgeInsets.all(22),
-            child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const Icon(Icons.groups_rounded, size: 58, color: brand),
-              const SizedBox(height: 12),
-              const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 23, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(registering ? 'أنشئ حسابك وابدأ المشاركة' : 'سجّل دخولك للمتابعة',
-                textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
-              const SizedBox(height: 24),
-              if (registering) ...[
-                TextFormField(controller: name, decoration: const InputDecoration(labelText: 'الاسم', border: OutlineInputBorder()),
-                  validator: (v) => registering && (v == null || v.trim().isEmpty) ? 'اكتب اسمك' : null),
-                const SizedBox(height: 14),
-              ],
-              TextFormField(controller: email, keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(labelText: 'البريد الإلكتروني', border: OutlineInputBorder()),
-                validator: (v) => v == null || !v.contains('@') ? 'اكتب بريد صحيح' : null),
-              const SizedBox(height: 14),
-              TextFormField(controller: password, obscureText: true,
-                decoration: const InputDecoration(labelText: 'كلمة المرور', border: OutlineInputBorder()),
-                validator: (v) => v == null || v.length < 6 ? 'اكتب 6 أحرف على الأقل' : null),
-              if (error != null) ...[const SizedBox(height: 12), Text(error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center)],
-              const SizedBox(height: 18),
-              FilledButton(onPressed: busy ? null : submit,
-                style: FilledButton.styleFrom(backgroundColor: brand, padding: const EdgeInsets.all(15)),
-                child: busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(registering ? 'إنشاء حساب' : 'تسجيل الدخول')),
-              if (!registering) TextButton(
-                onPressed: busy ? null : () async {
-                  final address = email.text.trim();
-                  if (!address.contains('@')) {
-                    setState(() => error = 'اكتب بريدك الإلكتروني أولاً حتى نرسل رابط الاستعادة.');
-                    return;
-                  }
-                  try {
-                    await FirebaseAuth.instance.sendPasswordResetEmail(email: address);
-                    if (mounted) setState(() => error = 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك.');
-                  } on FirebaseAuthException catch (e) {
-                    if (mounted) setState(() => error = e.code == 'user-not-found' ? 'هذا البريد غير مسجل.' : 'تعذر إرسال رابط الاستعادة. حاول لاحقاً.');
-                  }
-                },
-                child: const Text('نسيت كلمة المرور؟'),
-              ),
-              TextButton(onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
-                child: Text(registering ? 'عندك حساب؟ سجّل دخولك' : 'ما عندك حساب؟ أنشئ حساب')),
-            ])),
-          )),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight, end: Alignment.bottomLeft,
+            colors: [Color(0xFF11152F), Color(0xFF29245B), Color(0xFF6554D9)],
+          ),
         ),
-      ))),
+        child: Stack(children: [
+          Positioned(top: -75, left: -55, child: _authGlow(210, const Color(0xFF8E7CFF).withOpacity(.20))),
+          Positioned(bottom: -90, right: -60, child: _authGlow(250, const Color(0xFF38C9D8).withOpacity(.14))),
+          SafeArea(child: Center(child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(children: [
+                Container(
+                  width: 92, height: 92,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    gradient: const LinearGradient(colors: [Color(0xFF8C7CF0), Color(0xFF4D43B6)]),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.25), blurRadius: 28, offset: const Offset(0, 12))],
+                    border: Border.all(color: Colors.white.withOpacity(.28), width: 1.5),
+                  ),
+                  child: const Icon(Icons.groups_rounded, color: Colors.white, size: 54),
+                ),
+                const SizedBox(height: 18),
+                const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: .2)),
+                const SizedBox(height: 7),
+                Text('مساحتك • أصدقاؤك • اهتماماتك', textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 13)),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171A38).withOpacity(.88),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: Colors.white.withOpacity(.13)),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.24), blurRadius: 32, offset: const Offset(0, 16))],
+                  ),
+                  child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text(registering ? 'انضم إلى مجتمعنا' : 'أهلاً بعودتك',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 7),
+                    Text(registering ? 'أنشئ حسابك وابدأ رحلتك' : 'سجّل دخولك وتابع أصدقاءك',
+                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(.65))),
+                    const SizedBox(height: 24),
+                    if (registering) ...[
+                      _authField(name, 'الاسم الظاهر', Icons.person_outline,
+                        validator: (v) => registering && (v == null || v.trim().isEmpty) ? 'اكتب اسمك' : null),
+                      const SizedBox(height: 14),
+                    ],
+                    _authField(email, 'البريد الإلكتروني', Icons.alternate_email,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) => v == null || !v.contains('@') ? 'اكتب بريد صحيح' : null),
+                    const SizedBox(height: 14),
+                    _authField(password, 'كلمة المرور', Icons.lock_outline,
+                      obscureText: true,
+                      validator: (v) => v == null || v.length < 6 ? 'اكتب 6 أحرف على الأقل' : null),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Container(padding: const EdgeInsets.all(11),
+                        decoration: BoxDecoration(color: Colors.red.withOpacity(.12), borderRadius: BorderRadius.circular(12)),
+                        child: Text(error!, style: const TextStyle(color: Color(0xFFFF9C9C)), textAlign: TextAlign.center)),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(height: 54, child: FilledButton(
+                      onPressed: busy ? null : submit,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF8878F2), foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: busy
+                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text(registering ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    )),
+                    if (!registering) TextButton(
+                      onPressed: busy ? null : () async {
+                        final address = email.text.trim();
+                        if (!address.contains('@')) {
+                          setState(() => error = 'اكتب بريدك الإلكتروني أولاً حتى نرسل رابط الاستعادة.');
+                          return;
+                        }
+                        try {
+                          await FirebaseAuth.instance.sendPasswordResetEmail(email: address);
+                          if (mounted) setState(() => error = 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك.');
+                        } on FirebaseAuthException catch (e) {
+                          if (mounted) setState(() => error = e.code == 'user-not-found' ? 'هذا البريد غير مسجل.' : 'تعذر إرسال رابط الاستعادة. حاول لاحقاً.');
+                        }
+                      },
+                      child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFFC9C2FF))),
+                    ),
+                    const SizedBox(height: 6),
+                    OutlinedButton(
+                      onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white, side: BorderSide(color: Colors.white.withOpacity(.28)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.all(14),
+                      ),
+                      child: Text(registering ? 'عندي حساب — تسجيل الدخول' : 'مستخدم جديد — إنشاء حساب'),
+                    ),
+                  ])),
+                ),
+                const SizedBox(height: 18),
+                Text('الإصدار V2 • مجتمع يجمعنا', style: TextStyle(color: Colors.white.withOpacity(.55), fontSize: 11)),
+              ]),
+            ),
+          ))),
+        ]),
+      ),
     ),
   );
+
+  Widget _authGlow(double size, Color color) => Container(
+    width: size, height: size,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color,
+      boxShadow: [BoxShadow(color: color, blurRadius: 55, spreadRadius: 18)]),
+  );
+
+  Widget _authField(TextEditingController controller, String label, IconData icon, {
+    TextInputType? keyboardType, bool obscureText = false, String? Function(String?)? validator,
+  }) => TextFormField(
+    controller: controller, keyboardType: keyboardType, obscureText: obscureText, validator: validator,
+    style: const TextStyle(color: Colors.white),
+    decoration: InputDecoration(
+      labelText: label, prefixIcon: Icon(icon, color: const Color(0xFFB7AEFF)),
+      labelStyle: TextStyle(color: Colors.white.withOpacity(.66)),
+      filled: true, fillColor: Colors.white.withOpacity(.07),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 17),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF9B8FFF), width: 1.5)),
+    ),
+  );
+
 }
 
 class HomePage extends StatefulWidget {
