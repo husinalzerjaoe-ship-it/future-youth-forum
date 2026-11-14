@@ -187,6 +187,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   String? _error;
   bool _applyingRemote = false;
   bool _busy = false;
+  bool _viewerPlaybackUnlocked = false;
   Map<String, dynamic> _room = {};
   final _chatText = TextEditingController();
   bool _sendingChat = false;
@@ -329,6 +330,25 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     } catch (_) {} finally { _busy = false; }
   }
 
+  // Embedded players on Android/WebView may block remote autoplay until the
+  // viewer performs one local gesture. Unlock once, then remote room sync works.
+  Future<void> _enableViewerPlayback() async {
+    try {
+      if (_isYoutube && _youtube != null) {
+        await _youtube!.playVideo();
+        await _youtube!.pauseVideo();
+      } else if (_video?.value.isInitialized == true) {
+        await _video!.play();
+        await _video!.pause();
+      }
+      if (!mounted) return;
+      setState(() => _viewerPlaybackUnlocked = true);
+      await _applyRemoteState(_room);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تفعيل تشغيل الفيديو على جهازك. جرّب فتح المقطع في YouTube.');
+    }
+  }
+
   Future<void> _togglePlayback() async {
     if (!_isHost) return;
     if (_isYoutube && _youtube != null) {
@@ -406,10 +426,21 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة')),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(color: Theme.of(context).colorScheme.errorContainer, child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!))),
-        if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
-        else if (_video?.value.isInitialized == true)
-          AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
-        else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+        Stack(children: [
+          if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
+          else if (_video?.value.isInitialized == true)
+            AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
+          else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+          if (!_isHost && !_viewerPlaybackUnlocked && (_youtube != null || _video?.value.isInitialized == true))
+            Positioned.fill(child: Material(
+              color: Colors.black54,
+              child: Center(child: FilledButton.icon(
+                onPressed: _enableViewerPlayback,
+                icon: const Icon(Icons.touch_app_rounded),
+                label: const Text('اضغط لتفعيل المشاهدة المتزامنة'),
+              )),
+            )),
+        ]),
         const SizedBox(height: 12),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').snapshots(),
