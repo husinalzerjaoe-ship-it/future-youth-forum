@@ -431,20 +431,31 @@ class _DirectChatPageState extends State<DirectChatPage> {
           Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
           Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-          child: TextField(
-            onChanged: (value) => setState(() => searchQuery = value.trim().toLowerCase()),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'ابحث في هذه المحادثة...',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: searchQuery.isEmpty ? null : IconButton(
-                onPressed: () => setState(() => searchQuery = ''),
-                icon: const Icon(Icons.close_rounded),
+          padding: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+          child: SizedBox(
+            height: 40,
+            child: TextField(
+              onChanged: (value) => setState(() => searchQuery = value.trim().toLowerCase()),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'ابحث في هذه المحادثة...',
+                hintStyle: const TextStyle(fontSize: 12),
+                prefixIcon: const Icon(Icons.search_rounded, size: 19),
+                prefixIconConstraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                  onPressed: () => setState(() => searchQuery = ''),
+                  icon: const Icon(Icons.close_rounded, size: 17),
+                ),
+                suffixIconConstraints: const BoxConstraints.tightFor(width: 32, height: 34),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: .94),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: .9),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),
           ),
         ),
@@ -464,7 +475,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
               final d = doc.data(); final mine = d['senderId'] == _uid;
               return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .88),
                 decoration: BoxDecoration(color: mine ? const Color(0xFFE8E2FF) : Colors.white, border: Border.all(color: const Color(0xFFB9B9C8)), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 5, offset: Offset(0, 2))]),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if ((d['senderId'] as String? ?? '').isNotEmpty)
