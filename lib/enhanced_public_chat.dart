@@ -764,6 +764,15 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
                         onPressed: entry.connectionState == ConnectionState.waiting ? null : () => _join(contest.id),
                         child: const Text('اشترك', style: TextStyle(fontSize: 11)),
                       ),
+                      if (_isFounder)
+                        IconButton(
+                          tooltip: 'عرض المشاركين واختيار الفائز',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                          onPressed: () => _entries(contest.id),
+                          icon: const Icon(Icons.people_alt_rounded, size: 18, color: Color(0xFF795D22)),
+                        ),
                     ],
                   ),
                 );
