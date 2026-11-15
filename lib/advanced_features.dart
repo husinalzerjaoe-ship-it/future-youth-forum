@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -215,9 +216,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
   @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl, String? audioUrl, int? durationSeconds}) async {
+  Future<void> send({String? imageUrl, String? audioUrl, String? videoUrl, int? durationSeconds}) async {
     final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null && audioUrl == null) || busy) return;
+    if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null) || busy) return;
     setState(() => busy = true);
     try {
       // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
@@ -239,15 +240,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : videoUrl != null ? 'video' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (videoUrl != null) 'videoUrl': videoUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : videoUrl != null ? '🎬 فيديو' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       if (mounted) setState(() => replyTo = null);
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
+          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : videoUrl != null ? 'أرسل لك فيديو' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
@@ -275,6 +276,23 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) setState(() => busy = false);
     }
   }
+  Future<void> sendVideo() async {
+    if (busy) return;
+    final picked = await ImagePicker().pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3));
+    if (picked == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      final url = await uploadForumMedia(picked, folder: 'private-chat');
+      if (!mounted) return;
+      setState(() => busy = false);
+      await send(videoUrl: url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع الفيديو: $e')));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> toggleVoiceRecording() async {
     if (busy) return;
     if (!recordingVoice) {
@@ -326,6 +344,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
     final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
         ListTile(leading: const Icon(Icons.reply, color: _brand), title: const Text('الرد على هذه الرسالة'), onTap: () => Navigator.pop(c, 'reply')),
+        if (doc.data()?['senderId'] == _uid)
+          ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('حذف الرسالة'), onTap: () => Navigator.pop(c, 'delete')),
         const ListTile(title: Text('تفاعل مع الرسالة')),
         ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
       ])));
@@ -335,6 +355,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final type = d['type'];
       final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
       if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
+    } else if (choice == 'delete') {
+      final d = doc.data() ?? {};
+      final mediaUrl = (d['audioUrl'] ?? d['imageUrl'] ?? d['videoUrl']) as String?;
+      if (mediaUrl != null) { try { await deleteForumMedia(mediaUrl); } catch (_) {} }
+      await doc.reference.delete();
     } else if (choice != null) {
       await reactToMessage(doc.id, choice);
     }
@@ -463,6 +488,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
+                  if (d['type'] == 'video' && d['videoUrl'] is String)
+                    _DirectVideoMessage(url: d['videoUrl'] as String),
                   if (d['type'] == 'voice' && d['audioUrl'] is String)
                     _DirectVoicePlayer(url: d['audioUrl'] as String, durationSeconds: (d['durationSeconds'] as num?)?.toInt() ?? 0),
                   if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
@@ -480,7 +507,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
         SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Column(mainAxisSize: MainAxisSize.min, children: [
           if (replyTo != null) Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الرد على ${replyTo!['senderName']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)), Text(replyTo!['preview'] as String, maxLines: 1, overflow: TextOverflow.ellipsis)])), IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => replyTo = null), icon: const Icon(Icons.close, size: 18))])),
           Row(children: [
-          IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : sendImage, tooltip: 'إرسال صورة', icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : sendVideo, tooltip: 'إرسال فيديو', icon: const Icon(Icons.video_library_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
@@ -951,5 +979,25 @@ class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
         });
       })),
     ]),
+  );
+}
+
+class _DirectVideoMessage extends StatefulWidget {
+  final String url;
+  const _DirectVideoMessage({required this.url});
+  @override State<_DirectVideoMessage> createState() => _DirectVideoMessageState();
+}
+class _DirectVideoMessageState extends State<_DirectVideoMessage> {
+  late final VideoPlayerController _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  @override void initState() { super.initState(); _controller.initialize().then((_) { if (mounted) setState(() {}); }).catchError((_) { if (mounted) setState(() {}); }); }
+  @override void dispose() { _controller.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: SizedBox(width: 240, child: _controller.value.isInitialized
+      ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [
+          VideoPlayer(_controller),
+          IconButton.filledTonal(onPressed: () { setState(() { _controller.value.isPlaying ? _controller.pause() : _controller.play(); }); }, icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow)),
+        ]))
+      : const SizedBox(height: 140, child: Center(child: CircularProgressIndicator()))),
   );
 }
