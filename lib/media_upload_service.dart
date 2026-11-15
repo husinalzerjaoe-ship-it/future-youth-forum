@@ -27,6 +27,10 @@ Future<String> uploadForumMedia(
     case 'shared-files':
       prefix = '$folder/${user.uid}/';
       break;
+    case 'watch-rooms':
+      if (roomId == null || roomId.isEmpty) throw ArgumentError('معرّف غرفة المشاهدة مطلوب.');
+      prefix = 'watch-rooms/${user.uid}/$roomId/';
+      break;
     case 'regional-chat':
       if (roomId == null || roomId.isEmpty) {
         throw ArgumentError('معرّف غرفة الدردشة مطلوب.');
