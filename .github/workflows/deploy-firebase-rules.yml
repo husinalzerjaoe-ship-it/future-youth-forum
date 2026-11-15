@@ -28,5 +28,5 @@ jobs:
           test -f firestore.rules
           test -f storage.rules
 
-      - name: Deploy Firestore and Storage rules
-        run: firebase deploy --only firestore:rules,storage --project futureyouth-69f8a --non-interactive
+      - name: Deploy Firestore security rules
+        run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
