@@ -421,7 +421,7 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
-          IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
+          IconButton(tooltip: 'البحث عن الأعضاء', visualDensity: VisualDensity.compact, padding: EdgeInsets.zero, constraints: const BoxConstraints.tightFor(width: 38, height: 38), icon: const Icon(Icons.search, size: 21),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSearchPage()))),
           IconButton(tooltip: 'الرسائل الخاصة', icon: const Icon(Icons.mail_outline),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DirectMessagesPage()))),
