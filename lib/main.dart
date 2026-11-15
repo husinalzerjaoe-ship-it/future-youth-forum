@@ -415,7 +415,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
-      appBar: AppBar(
+      appBar: selected == 1 ? null : AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
         title: const Text('ملتقى شباب المستقبل'),
         actions: [
@@ -526,8 +526,9 @@ class _HomePageState extends State<HomePage> {
       ),
       body: IndexedStack(index: selected, children: [const PostsPage(), const EnhancedPublicChatPage(), const CommunityHubPage(), MyProfilePage()]),
       bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
-        const MiniNowPlayingBar(),
+        if (selected != 1) const MiniNowPlayingBar(),
         NavigationBar(
+          height: 64,
         selectedIndex: selected,
         onDestinationSelected: (index) => setState(() => selected = index),
         destinations: const [
