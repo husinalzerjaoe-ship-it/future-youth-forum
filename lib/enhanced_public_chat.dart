@@ -709,7 +709,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
             if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
           },
-          onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10)))),
+          onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10))))),
       IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white),icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded)),
     ]))),
   ]));
