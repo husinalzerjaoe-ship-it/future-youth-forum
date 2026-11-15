@@ -131,14 +131,18 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                   final myProfile = await _db.collection('publicProfiles').doc(_uid).get();
                   try {
                     final conversation = _db.collection('conversations').doc(id);
-                    final existing = await conversation.get();
-                    if (!existing.exists) {
-                      await conversation.set({
-                        'members': [_uid, d.id],
-                        'memberNames': {_uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو', d.id: name},
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                    }
+                    // Avoid reading a missing conversation: Firestore denies get()
+                    // on a non-existent private chat, preventing first-time DMs.
+                    // A stable participant order keeps the same two-member room ID.
+                    final members = <String>[_uid, d.id]..sort();
+                    await conversation.set({
+                      'members': members,
+                      'memberNames': {
+                        _uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو',
+                        d.id: name,
+                      },
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
                     if (!context.mounted) return;
                     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: d.id, otherName: name)));
                   } on FirebaseException catch (e) {
