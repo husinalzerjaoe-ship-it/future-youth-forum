@@ -700,13 +700,17 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
        IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
-      Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
-        onChanged:(v) {
-          _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
-          if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
-        },
-        onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
-      IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
+      Expanded(child:Container(
+        margin:const EdgeInsets.symmetric(vertical:4),
+        padding:const EdgeInsets.symmetric(horizontal:12,vertical:2),
+        decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(22),border:Border.all(color:_chatBrand.withValues(alpha:.20)),boxShadow:const [BoxShadow(color:Color(0x10000000),blurRadius:7,offset:Offset(0,2))]),
+        child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
+          onChanged:(v) {
+            _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
+            if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
+          },
+          onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10)))),
+      IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white),icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded)),
     ]))),
   ]));
 }
