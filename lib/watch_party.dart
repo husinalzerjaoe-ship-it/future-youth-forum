@@ -80,16 +80,13 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     final path = uri.path.toLowerCase();
     final isDirect = path.endsWith('.mp4') || path.endsWith('.m3u8') ||
         path.endsWith('.m4v') || path.endsWith('.mov') || path.endsWith('.webm');
-    if (videoId == null && !isDirect) {
-      setState(() => _error = 'الرابط لازم يكون يوتيوب أو رابط فيديو مباشر MP4 / M3U8 / MOV / WEBM.');
-      return;
-    }
+    final sourceType = videoId != null ? 'youtube' : isDirect ? 'direct' : 'web';
     setState(() { _creating = true; _error = null; });
     try {
       final ref = await _watchDb.collection('watchRooms').add({
         'name': _name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim(),
         'url': raw,
-        'sourceType': videoId == null ? 'direct' : 'youtube',
+        'sourceType': sourceType,
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
         'visibility': _privateRoom ? 'private' : 'public',
@@ -131,7 +128,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('أنشئ غرفة وشاهدوا معاً', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('يدعم روابط YouTube وروابط الفيديو المباشرة المصرّح بها مثل MP4 وM3U8.'),
+            const Text('يدعم YouTube وروابط MP4 / M3U8 والمواقع الخارجية. تشغيل المواقع الخارجية يكون بفتحها على كل جهاز وقد لا يتزامن الفيديو.'),
             const SizedBox(height: 12),
             TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم الغرفة', border: OutlineInputBorder())),
             const SizedBox(height: 10),
