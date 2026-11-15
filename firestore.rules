@@ -42,6 +42,11 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && request.resource.data.status in ['planned', 'watching', 'watched'];
       }
+
+      match /cinemaFavorites/{filmId} {
+        allow read, create, delete: if request.auth != null && request.auth.uid == userId;
+        allow update: if false;
+      }
     }
 
     match /animeWallpapers/{wallpaperId} {
