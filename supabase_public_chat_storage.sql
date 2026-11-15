@@ -32,7 +32,7 @@ with check (
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','posts','private-chat','voice-messages',
+        'public-chat','profiles','stories','posts','private-chat','voice-messages','watch-rooms',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -55,7 +55,7 @@ using (
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','posts','private-chat','voice-messages',
+        'public-chat','profiles','stories','posts','private-chat','voice-messages','watch-rooms',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -73,7 +73,7 @@ with check (
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','posts','private-chat','voice-messages',
+        'public-chat','profiles','stories','posts','private-chat','voice-messages','watch-rooms',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
@@ -96,7 +96,7 @@ using (
   and (
     (
       (storage.foldername(name))[1] in (
-        'public-chat','profiles','stories','posts','private-chat','voice-messages',
+        'public-chat','profiles','stories','posts','private-chat','voice-messages','watch-rooms',
         'chat-backgrounds','anime-wallpapers','shared-files'
       )
       and (storage.foldername(name))[2] = (auth.jwt()->>'sub')
