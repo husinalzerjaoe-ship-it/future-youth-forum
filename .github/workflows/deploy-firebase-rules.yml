@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - 'firestore.rules'
+      - 'storage.rules'
+      - 'firebase.json'
+      - '.github/workflows/deploy-firebase-rules.yml'
 
 permissions:
   contents: read
@@ -38,9 +41,9 @@ jobs:
           test -f firestore.rules
           test -f storage.rules
 
-      - name: Deploy Firestore security rules
+      - name: Deploy Firestore and Storage security rules
         run: |
-          firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive || {
-            echo "Deployment failed. Grant this service account the Firebase Rules Admin role (roles/firebaserules.admin) in Google Cloud IAM, then rerun this workflow."
+          firebase deploy --only firestore:rules,storage --project futureyouth-69f8a --non-interactive || {
+            echo "Deployment failed. Check that the service account has Firebase Rules Admin (roles/firebaserules.admin) and the required Cloud Storage/Firebase Storage permissions."
             exit 1
           }
