@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_player/video_player.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
 
@@ -137,7 +138,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final expiry = membership['expiresAt'];
       final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
       final sentMessage = await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
+        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
@@ -173,6 +174,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _sendVideo() async {
+    if (_sending) return;
+    try {
+      final file = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3));
+      if (file == null) return;
+      if (mounted) setState(() { _sending = true; _error = null; });
+      final url = await uploadForumMedia(file, folder: 'public-chat');
+      await _send(body: 'فيديو', mediaUrl: url, type: 'video', uploadInProgress: true);
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الفيديو: $e'); }
+    finally { if (mounted) setState(() => _sending = false); }
+  }
+
   Future<void> _toggleVoiceRecording() async {
     if (_sending) return;
     if (!_recordingVoice) {
@@ -268,7 +281,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       reason.dispose();
     }
     if(a=='pin'&&staff)await doc.reference.update({'isPinned':d['isPinned']!=true,'pinnedBy':_uid});
-    if(a=='delete'&&(mine||staff))await doc.reference.delete();
+    if(a=='delete'&&(mine||staff)){
+      final mediaUrl = (d['imageUrl'] ?? d['audioUrl'] ?? d['videoUrl'])?.toString();
+      if (mine && mediaUrl != null && mediaUrl.startsWith('https://')) { try { await deleteForumMedia(mediaUrl); } catch (_) {} }
+      await doc.reference.delete();
+    }
     if(a=='edit'&&mounted){
       final t=TextEditingController(text:d['text'] as String? ?? '');
       final v=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('تعديل الرسالة'),content:TextField(controller:t,maxLength:1000,maxLines:3),actions:[
@@ -508,6 +525,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
+        if(type=='video'&&d['videoUrl'] is String)_ChatVideoMessage(url:d['videoUrl'] as String),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -612,7 +630,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
     Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
-      IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
+      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:_chatBrand)),
+       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
       Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
@@ -712,5 +731,32 @@ class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
         }),
       ])),
     ]),
+  );
+}
+
+
+class _ChatVideoMessage extends StatefulWidget {
+  final String url;
+  const _ChatVideoMessage({required this.url});
+  @override State<_ChatVideoMessage> createState() => _ChatVideoMessageState();
+}
+class _ChatVideoMessageState extends State<_ChatVideoMessage> {
+  late final VideoPlayerController _controller;
+  @override void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { if (mounted) setState(() {}); });
+  }
+  @override void dispose() { _controller.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: Container(width: 250, color: Colors.black,
+      child: _controller.value.isInitialized
+        ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [
+            VideoPlayer(_controller),
+            IconButton(color: Colors.white, iconSize: 54, icon: Icon(_controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle),
+              onPressed: () => setState(() => _controller.value.isPlaying ? _controller.pause() : _controller.play())),
+          ]))
+        : const SizedBox(height: 150, child: Center(child: CircularProgressIndicator(color: Colors.white))),
+    ),
   );
 }
