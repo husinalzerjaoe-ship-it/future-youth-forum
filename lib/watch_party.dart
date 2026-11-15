@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'media_upload_service.dart';
 
 const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
@@ -191,6 +196,12 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   bool _viewerPlaybackUnlocked = false;
   Map<String, dynamic> _room = {};
   final _chatText = TextEditingController();
+  final _roomPicker = ImagePicker();
+  final _roomRecorder = AudioRecorder();
+  final _roomVoicePlayer = AudioPlayer();
+  bool _recordingRoomVoice = false;
+  DateTime? _roomVoiceStarted;
+  String? _roomVoicePath;
   bool _sendingChat = false;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool get _isHost => _room['hostUid'] == _uid;
@@ -385,9 +396,104 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
 
+
+  Future<bool> _roomChatIsMuted() async {
+    final mute = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('roomMutes').doc(_uid).get();
+    final d = mute.data() ?? {};
+    if (d['permanent'] == true) return true;
+    final until = d['until'];
+    return until is Timestamp && until.toDate().isAfter(DateTime.now());
+  }
+
+  Future<void> _sendRoomMedia(String type, String url, {int? durationSeconds}) async {
+    if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+    final p = await _watchDb.collection('publicProfiles').doc(_uid).get();
+    final name = (p.data()?['name'] as String?) ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
+    await _watchDb.collection('watchRooms').doc(widget.roomId).collection('messages').add({
+      'senderUid': _uid, 'senderName': name, 'text': type == 'image' ? 'صورة' : 'رسالة صوتية',
+      'type': type, 'mediaUrl': url, if (durationSeconds != null) 'durationSeconds': durationSeconds,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _sendRoomImage() async {
+    if (_sendingChat) return;
+    try {
+      if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+      final file = await _roomPicker.pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      if (mounted) setState(() { _sendingChat = true; _error = null; });
+      final url = await uploadForumMedia(file, folder: 'watch-rooms', roomId: widget.roomId);
+      await _sendRoomMedia('image', url);
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الصورة: $e'); }
+    finally { if (mounted) setState(() => _sendingChat = false); }
+  }
+
+  Future<void> _toggleRoomVoice() async {
+    if (_sendingChat) return;
+    if (!_recordingRoomVoice) {
+      try {
+        if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+        if (!await _roomRecorder.hasPermission()) { if (mounted) setState(() => _error = 'اسمح للتطبيق باستخدام المايك لتسجيل الفويس.'); return; }
+        final dir = await Directory.systemTemp.createTemp('watch_room_voice_');
+        final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _roomRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: path);
+        if (mounted) setState(() { _recordingRoomVoice = true; _roomVoiceStarted = DateTime.now(); _roomVoicePath = path; _error = null; });
+      } catch (e) { if (mounted) setState(() => _error = 'تعذر بدء تسجيل الفويس: $e'); }
+      return;
+    }
+    try {
+      final path = await _roomRecorder.stop();
+      final started = _roomVoiceStarted;
+      if (mounted) setState(() { _recordingRoomVoice = false; _roomVoiceStarted = null; });
+      final fp = path ?? _roomVoicePath;
+      if (fp == null || started == null) return;
+      final seconds = DateTime.now().difference(started).inSeconds;
+      if (seconds < 1 || seconds > 180) { if (mounted) setState(() => _error = 'مدة الفويس لازم تكون بين ثانية و3 دقائق.'); return; }
+      final file = File(fp);
+      if (!await file.exists() || await file.length() == 0) return;
+      if (mounted) setState(() => _sendingChat = true);
+      final url = await uploadForumMedia(XFile(fp, name: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a'), folder: 'watch-rooms', roomId: widget.roomId);
+      await _sendRoomMedia('voice', url, durationSeconds: seconds);
+      try { await file.delete(); } catch (_) {}
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الفويس: $e'); }
+    finally { if (mounted) setState(() { _sendingChat = false; _recordingRoomVoice = false; }); }
+  }
+
+  Future<void> _manageRoomMembers() async {
+    if (!_isHost && FirebaseAuth.instance.currentUser?.email?.toLowerCase() != 'husinalzerjaoe@gmail.com') return;
+    final people = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').get();
+    if (!mounted) return;
+    await showDialog<void>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+      title: const Text('إدارة أعضاء الغرفة'),
+      content: SizedBox(width: 360, child: ListView(shrinkWrap: true, children: people.docs.where((p) => p.id != _uid).map((p) => ListTile(
+        title: Text((p.data()['name'] ?? 'عضو').toString()), subtitle: const Text('كتم دردشة الغرفة فقط'),
+        trailing: PopupMenuButton<int>(onSelected: (mins) async {
+          final ref = _watchDb.collection('watchRooms').doc(widget.roomId).collection('roomMutes').doc(p.id);
+          if (mins == -1) { await ref.delete(); }
+          else { await ref.set({'uid': p.id, 'by': _uid, 'permanent': mins == 0, 'until': mins == 0 ? null : Timestamp.fromDate(DateTime.now().add(Duration(minutes: mins))), 'updatedAt': FieldValue.serverTimestamp()}); }
+          if (mounted) setState(() => _error = mins == -1 ? 'تم إلغاء الكتم.' : 'تم تطبيق الكتم داخل هذه الغرفة.');
+        }, itemBuilder: (_) => const [PopupMenuItem(value: 10, child: Text('10 دقائق')), PopupMenuItem(value: 60, child: Text('ساعة')), PopupMenuItem(value: 1440, child: Text('24 ساعة')), PopupMenuItem(value: 0, child: Text('دائم')), PopupMenuItem(value: -1, child: Text('إلغاء الكتم'))]),
+      )).toList())),
+      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('إغلاق'))],
+    )));
+  }
+
+  Future<void> _deleteRoom() async {
+    if (!_isHost && FirebaseAuth.instance.currentUser?.email?.toLowerCase() != 'husinalzerjaoe@gmail.com') return;
+    final yes = await showDialog<bool>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+      title: const Text('حذف غرفة المشاهدة؟'), content: const Text('ستختفي الغرفة من القائمة ولن يستطيع الأعضاء الدخول إليها.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف'))],
+    )));
+    if (yes != true) return;
+    await _watchDb.collection('watchRooms').doc(widget.roomId).update({'active': false, 'status': 'paused'});
+    if (mounted) Navigator.pop(context);
+  }
+
   Future<void> _sendRoomMessage() async {
     final text = _chatText.text.trim();
     if (text.isEmpty || _sendingChat) return;
+    if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
     setState(() => _sendingChat = true);
     try {
       final profile = await _watchDb.collection('publicProfiles').doc(_uid).get();
@@ -413,6 +519,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     _syncTimer?.cancel();
     _roomSub?.cancel();
     _chatText.dispose();
+    _roomRecorder.dispose();
+    _roomVoicePlayer.dispose();
     _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').doc(_uid).delete().catchError((_) {});
     _ytSub?.cancel();
     _youtube?.close();
@@ -424,7 +532,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة')),
+      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(
           color: Theme.of(context).colorScheme.errorContainer,
@@ -547,7 +655,9 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           if (!mine) Text(item['senderName'] as String? ?? 'عضو',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          Text(item['text'] as String? ?? ''),
+                          if (item['type'] == 'image' && (item['mediaUrl'] as String? ?? '').startsWith('https://')) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(item['mediaUrl'] as String, width: 210, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة')))
+                          else if (item['type'] == 'voice' && (item['mediaUrl'] as String? ?? '').startsWith('https://')) Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () async { try { await _roomVoicePlayer.setUrl(item['mediaUrl'] as String); await _roomVoicePlayer.play(); } catch (_) { if (mounted) setState(() => _error = 'تعذر تشغيل الفويس.'); } }, icon: const Icon(Icons.play_circle_fill)), Text('فويس • ${item['durationSeconds'] ?? 0} ث')])
+                          else Text(item['text'] as String? ?? ''),
                         ]),
                       ),
                     );
@@ -557,6 +667,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             )),
             const SizedBox(height: 8),
             Row(children: [
+              IconButton(tooltip: 'إرسال صورة', onPressed: _sendingChat ? null : _sendRoomImage, icon: const Icon(Icons.image_outlined)),
+              IconButton(tooltip: _recordingRoomVoice ? 'إيقاف وإرسال الفويس' : 'تسجيل فويس', onPressed: _sendingChat ? null : _toggleRoomVoice, color: _recordingRoomVoice ? Colors.red : null, icon: Icon(_recordingRoomVoice ? Icons.stop_circle : Icons.mic)),
               Expanded(child: TextField(
                 controller: _chatText,
                 minLines: 1,
