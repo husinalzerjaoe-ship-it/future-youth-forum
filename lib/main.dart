@@ -28,6 +28,8 @@ import 'friends_battle_arena.dart';
 import 'achievement_hub.dart';
 import 'engagement_features.dart';
 import 'future_studio.dart';
+import 'community_events.dart';
+import 'community_polls.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -434,6 +436,12 @@ class _HomePageState extends State<HomePage> {
                 case 'studio':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureStudioPage()));
                   break;
+                case 'events':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityEventsPage()));
+                  break;
+                case 'polls':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPollsPage()));
+                  break;
 
                 case 'games':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage()));
@@ -472,6 +480,8 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'engagement', child: ListTile(leading: Icon(Icons.emoji_events_rounded), title: Text('النشاط والنقاط ولوحة الصدارة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'expansion', child: ListTile(leading: Icon(Icons.event_available_rounded), title: Text('الفعاليات وغرف المشاهدة والمجتمعات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'studio', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('استوديو التصميم والبطاقات'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'events', child: ListTile(leading: Icon(Icons.event_available), title: Text('تقويم وفعاليات المجتمع'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'polls', child: ListTile(leading: Icon(Icons.poll), title: Text('تصويتات واستطلاعات المجتمع'), contentPadding: EdgeInsets.zero)),
 
               const PopupMenuItem(value: 'games', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مركز الألعاب والتحديات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityPlus', child: ListTile(leading: Icon(Icons.forum_outlined), title: Text('مجتمع الأوتاكو والنقاشات'), contentPadding: EdgeInsets.zero)),
