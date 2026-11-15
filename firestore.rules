@@ -206,14 +206,15 @@ service cloud.firestore {
         && (!('visibility' in request.resource.data) || request.resource.data.visibility in ['public', 'private'])
         && (!('invitedUids' in request.resource.data) || (request.resource.data.invitedUids is list && request.resource.data.invitedUids.size() <= 50))
         && (!('passwordProtected' in request.resource.data) || request.resource.data.passwordProtected is bool)
-        && (request.resource.data.passwordProtected != true || (request.resource.data.visibility == 'private'
-          && request.resource.data.passwordSalt is string && request.resource.data.passwordHash is string))
+        && (!('passwordProtected' in request.resource.data) || request.resource.data.passwordProtected != true
+          || (request.resource.data.visibility == 'private'
+            && request.resource.data.passwordSalt is string && request.resource.data.passwordHash is string))
         && (!('visibility' in request.resource.data) || request.resource.data.visibility != 'private'
           || (request.resource.data.invitedUids is list
             && (request.auth.uid in request.resource.data.invitedUids || request.resource.data.invitedUids.size() == 0)));
       // The host retains room-management control. Any authorized room participant
       // may send playback commands only; they cannot change the video, invitations,
-      // host, visibility, or room lifecycle.
+      // host, visibility, or room lifecycle (except host-managed invitations).
       allow update: if request.auth != null
         && request.resource.data.hostUid == resource.data.hostUid
         && (
