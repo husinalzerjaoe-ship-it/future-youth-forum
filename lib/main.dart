@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -21,7 +22,7 @@ import 'football_news.dart';
 import 'watch_party.dart';
 import 'match_center.dart';
 import 'game_center.dart';
-import 'community_expansion.dart';
+import 'community_expansion.dart' hide CommunityEventsPage;
 import 'v6_community_suite.dart';
 import 'arcade_hub.dart';
 import 'friends_battle_arena.dart';
@@ -279,15 +280,27 @@ class _AuthPageState extends State<AuthPage> {
                 Text('مساحتك • أصدقاؤك • اهتماماتك', textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white.withOpacity(.72), fontSize: 13)),
                 const SizedBox(height: 28),
-                Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF171A38).withOpacity(.88),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: Colors.white.withOpacity(.13)),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(.24), blurRadius: 32, offset: const Offset(0, 16))],
-                  ),
-                  child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      padding: const EdgeInsets.all(22),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF171A38).withOpacity(.58),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: Colors.white.withOpacity(.24)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [
+                            Colors.white.withOpacity(.13),
+                            const Color(0xFF171A38).withOpacity(.48),
+                          ],
+                        ),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(.24), blurRadius: 32, offset: const Offset(0, 16))],
+                      ),
+                      child: Form(key: form, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     Text(registering ? 'انضم إلى مجتمعنا' : 'أهلاً بعودتك',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
@@ -351,9 +364,11 @@ class _AuthPageState extends State<AuthPage> {
                       child: Text(registering ? 'عندي حساب — تسجيل الدخول' : 'مستخدم جديد — إنشاء حساب'),
                     ),
                   ])),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 18),
-                Text('الإصدار V3 • مجتمع يجمعنا ونصنع المستقبل', style: TextStyle(color: Colors.white.withOpacity(.68), fontSize: 11, fontWeight: FontWeight.w600)),
+                Text('مجتمع يجمعنا ونصنع المستقبل', style: TextStyle(color: Colors.white.withOpacity(.68), fontSize: 11, fontWeight: FontWeight.w600)),
               ]),
             ),
           ))),
