@@ -20,6 +20,7 @@ import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
+import 'cinema_hub.dart';
 import 'match_center.dart';
 import 'game_center.dart';
 import 'community_expansion.dart' hide CommunityEventsPage;
@@ -432,6 +433,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'cinema':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage()));
+                  break;
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
@@ -496,6 +500,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'cinema', child: ListTile(leading: Icon(Icons.movie_filter_rounded), title: Text('سينما الملتقى — أفلام ومسلسلات وغرف خاصة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'knowledge', child: ListTile(leading: Icon(Icons.lightbulb_outline_rounded), title: Text('ركن المعرفة والاكتشاف اليومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
@@ -747,6 +752,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('يوتيوب وروابط فيديو وأفلام ومسلسلات متاحة للتضمين مع مزامنة ودردشة'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF30204A), child: Icon(Icons.movie_filter_rounded, color: Color(0xFFD8B8FF))),
+                title: const Text('سينما الملتقى', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('مكتبة أفلام مفتوحة وغرف خاصة بدردشة ومشاهدة متزامنة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage())),
               ),
             ),
             Card(
