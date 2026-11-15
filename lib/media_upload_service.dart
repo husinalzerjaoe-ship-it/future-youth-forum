@@ -110,3 +110,19 @@ Future<String> uploadForumMedia(
   }
   return storage.getPublicUrl(path);
 }
+
+
+Future<void> deleteForumMedia(String publicUrl) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) throw StateError('سجّل الدخول أولاً.');
+  final uri = Uri.tryParse(publicUrl);
+  if (uri == null || uri.host.isEmpty) throw ArgumentError('رابط الملف غير صالح.');
+  final segments = uri.pathSegments;
+  final marker = segments.indexOf('forum-media');
+  if (marker < 0 || marker + 2 >= segments.length) throw ArgumentError('رابط الملف غير صالح.');
+  final objectPath = segments.skip(marker + 1).join('/');
+  final parts = objectPath.split('/');
+  final owner = parts.length >= 3 && parts.first == 'regional-chat' ? parts[2] : parts.length >= 2 ? parts[1] : '';
+  if (owner != user.uid) throw StateError('يمكنك حذف ملفاتك أنت فقط.');
+  await Supabase.instance.client.storage.from('forum-media').remove([objectPath]);
+}
