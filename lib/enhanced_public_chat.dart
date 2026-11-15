@@ -491,11 +491,6 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
   }
 
-  Widget _chatToolButton(IconData icon,String tooltip,VoidCallback? onTap,{Color color=_chatBrand})=>Padding(
-    padding:const EdgeInsets.symmetric(horizontal:2),
-    child:IconButton(tooltip:tooltip,onPressed:onTap,style:IconButton.styleFrom(backgroundColor:color.withValues(alpha:.09),foregroundColor:color,fixedSize:const Size(42,42),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(15))),icon:Icon(icon,size:21)),
-  );
-
   Widget _bubble(DocumentSnapshot<Map<String,dynamic>> doc){
     final d=doc.data()??{};final mine=d['senderId']==_uid;final sender=(d['senderId']??'').toString();
     final founder=d['senderRole']=='founder' || (d['senderEmail']??'').toString().toLowerCase()==_founderEmail;
@@ -505,8 +500,8 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
     return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onDoubleTap:()=>_react(doc.id,'❤️'),onHorizontalDragEnd:(details){if(details.primaryVelocity!=null&&details.primaryVelocity!.abs()>250){setState(()=>_reply=doc);}},onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
-      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.84),margin:const EdgeInsets.symmetric(vertical:5,horizontal:3),padding:const EdgeInsets.fromLTRB(12,10,12,7),
-      decoration:BoxDecoration(color:founder?const Color(0xFFFFF8E8):(tierColor!=null?tierColor.withValues(alpha:.12):(mine?const Color(0xFFEAE6FF):Colors.white)),borderRadius:BorderRadius.only(topLeft:const Radius.circular(20),topRight:const Radius.circular(20),bottomLeft:Radius.circular(mine?6:20),bottomRight:Radius.circular(mine?20:6)),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.32),width:founder?2.2:1),boxShadow:const [BoxShadow(color:Color(0x120D1230),blurRadius:12,offset:Offset(0,4))]),
+      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
+      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(tierColor!=null?tierColor.withValues(alpha:.13):(mine?const Color(0xFFE8E2FF):Colors.white)),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.7),width:founder?2.6:(tierColor!=null?2:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -554,12 +549,12 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
-     Container(padding:const EdgeInsets.fromLTRB(14,13,10,13),decoration:const BoxDecoration(gradient:LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF11162F),Color(0xFF30286F),Color(0xFF6554D9)]),borderRadius:BorderRadius.vertical(bottom:Radius.circular(22)),boxShadow:[BoxShadow(color:Color(0x260F1230),blurRadius:14,offset:Offset(0,5))]),child:Row(children:[
-       Container(width:44,height:44,decoration:BoxDecoration(color:Colors.white.withValues(alpha:.13),borderRadius:BorderRadius.circular(15),border:Border.all(color:Colors.white24)),child:const Icon(Icons.forum_rounded,color:Colors.white,size:24)),const SizedBox(width:11),
-       const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:17)),SizedBox(height:3),Text('مساحة الأصدقاء • دردشة مباشرة',style:TextStyle(color:Color(0xFFD9D4FF),fontSize:11))])),
-       StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Container(padding:const EdgeInsets.symmetric(horizontal:9,vertical:7),decoration:BoxDecoration(color:Colors.white.withValues(alpha:.12),borderRadius:BorderRadius.circular(20),border:Border.all(color:Colors.white24)),child:Row(mainAxisSize:MainAxisSize.min,children:[Container(width:7,height:7,decoration:const BoxDecoration(color:Color(0xFF63E6A5),shape:BoxShape.circle)),const SizedBox(width:5),Text('${s.data?.docs.length??0} متصل',style:const TextStyle(color:Colors.white,fontSize:11,fontWeight:FontWeight.bold))]))),
-       PopupMenuButton<String>(icon:const Icon(Icons.more_vert,color:Colors.white),onSelected:(v){if(v=='background')showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((color)=>ListTile(leading:CircleAvatar(backgroundColor:Color(color)),title:const Text('اختيار خلفية'),onTap:(){Navigator.pop(c);setState(()=>_background=color);_chatDb.collection('chatPreferences').doc(_uid).set({'background':color},SetOptions(merge:true));})).toList()));if(v=='admin')_founderTools();},itemBuilder:(c)=>[const PopupMenuItem(value:'background',child:Text('تغيير الخلفية')),if(_isFounder)const PopupMenuItem(value:'admin',child:Text('لوحة المؤسس'))]),
-     ])),
+    Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:const BoxDecoration(gradient:LinearGradient(colors:[Color(0xFF171936),Color(0xFF5144B8),Color(0xFF8C7CF0)])),child:Row(children:[
+      const Icon(Icons.forum,color:Colors.white,size:30),const SizedBox(width:9),
+      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('اسحب الرسالة للرد • اضغط مرتين للإعجاب',style:TextStyle(color:Colors.white70,fontSize:11))])),
+      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Text((s.data?.docs.length??0).toString()+' متصل',style:const TextStyle(color:Colors.white,fontSize:11))),
+      IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
+      if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
     ])),
     Padding(
       padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
@@ -634,15 +629,20 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }),
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
-     Container(padding:const EdgeInsets.fromLTRB(9,8,9,8),decoration:const BoxDecoration(color:Color(0xFFF8F7FF),border:Border(top:BorderSide(color:Color(0x1F6554D9)))),child:SafeArea(top:false,child:Column(mainAxisSize:MainAxisSize.min,children:[
-       if(_recordingVoice)Container(width:double.infinity,margin:const EdgeInsets.only(bottom:7),padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),decoration:BoxDecoration(color:const Color(0xFFFFE8EA),borderRadius:BorderRadius.circular(12)),child:const Row(children:[Icon(Icons.fiber_manual_record,color:Colors.red,size:13),SizedBox(width:7),Text('جاري تسجيل الرسالة الصوتية...',style:TextStyle(color:Color(0xFFB42335),fontWeight:FontWeight.bold,fontSize:12))])),
-       Row(crossAxisAlignment:CrossAxisAlignment.end,children:[
-         _chatToolButton(Icons.add_rounded,'المرفقات',_sending?null:()=>showModalBottomSheet<void>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:SafeArea(child:Wrap(children:[ListTile(leading:const Icon(Icons.photo,color:_chatBrand),title:const Text('إرسال صورة'),onTap:(){Navigator.pop(c);_sendImage();}),ListTile(leading:const Icon(Icons.video_library,color:Color(0xFF168A83)),title:const Text('إرسال فيديو'),onTap:(){Navigator.pop(c);_sendVideo();}),ListTile(leading:const Icon(Icons.emoji_emotions,color:Colors.orange),title:const Text('الملصقات'),onTap:(){Navigator.pop(c);_showStickers();})]))))),
-         Expanded(child:Container(padding:const EdgeInsets.symmetric(horizontal:13,vertical:3),decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(23),border:Border.all(color:const Color(0x226554D9)),boxShadow:const [BoxShadow(color:Color(0x0D171936),blurRadius:8,offset:Offset(0,2))]),child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,onChanged:(v){_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){});if(v.endsWith('@')&&!_mentionPickerOpen)_showMentionPicker();},onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالة...',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:9))))),
-         const SizedBox(width:7),GestureDetector(onTap:_sending?null:()=>_send(body:_text.text),child:Container(width:45,height:45,decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF6554D9),Color(0xFF40338F)]),borderRadius:BorderRadius.circular(16),boxShadow:const [BoxShadow(color:Color(0x336554D9),blurRadius:9,offset:Offset(0,3))]),child:Center(child:_sending?const SizedBox(width:19,height:19,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded,color:Colors.white,size:21)))),
-         const SizedBox(width:4),_chatToolButton(_recordingVoice?Icons.stop_circle_rounded:Icons.mic_none_rounded,_recordingVoice?'إيقاف التسجيل':'تسجيل فويس',_sending?null:_toggleVoiceRecording,color:_recordingVoice?Colors.red:_chatBrand),
-       ]),
-     ]))),
+    Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
+      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:_chatBrand)),
+       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
+      IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
+      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
+      Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
+        onChanged:(v) {
+          _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
+          if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
+        },
+        onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
+      IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
+    ]))),
+  ]));
 }
 
 
