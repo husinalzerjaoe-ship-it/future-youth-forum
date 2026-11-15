@@ -42,8 +42,10 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
     } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ المفضلة.'))); }
   }
 
-  Future<List<_Film>> _load() async {
-    const q = 'collection:opensource_movies AND mediatype:movies';
+  Future<List<_Film>> _load({bool series = false}) async {
+    final q = series
+        ? 'collection:opensource_movies AND mediatype:movies AND (title:episode OR title:serial OR title:season OR title:series)'
+        : 'collection:opensource_movies AND mediatype:movies';
     final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
     final response = await http.get(uri).timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) throw Exception('archive unavailable');
@@ -123,7 +125,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal,
                 itemCount: _categories.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) => ChoiceChip(label: Text(_categories[i]), selected: _category == _categories[i],
-                  onSelected: (_) => setState(() => _category = _categories[i]))))),
+                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'مسلسلات كلاسيكية'); }))))),
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                 child: Row(children: [const Icon(Icons.local_movies, color: _cinemaAccent), const SizedBox(width: 8),
                   const Expanded(child: Text('مكتبة الأعمال المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
@@ -204,8 +206,9 @@ class _FilmDetailsState extends State<_FilmDetails> {
   }
   void _start() {
     final url = _directUrl; if (url == null) return;
-    Navigator.pop(context);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    navigator.push(MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(
       initialUrl: url, initialName: widget.film.title, cinemaMode: true)));
   }
   @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl,
@@ -239,7 +242,7 @@ class CinemaRoomsPage extends StatelessWidget {
   @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl,
     child: Scaffold(appBar: AppBar(title: const Text('غرف سينما الملتقى')),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('watchRooms').where('roomType', isEqualTo: 'cinema').where('active', isEqualTo: true).limit(50).snapshots(),
+        stream: FirebaseFirestore.instance.collection('watchRooms').where('roomType', isEqualTo: 'cinema').where('active', isEqualTo: true).where('visibility', isEqualTo: 'public').limit(50).snapshots(),
         builder: (context, snap) {
           if (snap.hasError) return const Center(child: Text('تعذر تحميل غرف السينما.'));
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
