@@ -103,10 +103,19 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
     child: Scaffold(
       appBar: AppBar(title: const Text('اختيار عضو')),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.all(12), child: TextField(
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'ابحث عن عضو بالاسم', border: OutlineInputBorder()),
+        Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 3), child: SizedBox(height: 40, child: TextField(
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            isDense: true,
+            prefixIcon: const Icon(Icons.search, size: 19),
+            prefixIconConstraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            hintText: 'ابحث عن عضو بالاسم',
+            hintStyle: const TextStyle(fontSize: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
-        )),
+        ))),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('publicProfiles').orderBy('name').limit(200).snapshots(),
           builder: (context, s) {
