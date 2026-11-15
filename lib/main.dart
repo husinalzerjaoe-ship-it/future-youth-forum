@@ -1,4 +1,3 @@
-import 'direct_messages.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
