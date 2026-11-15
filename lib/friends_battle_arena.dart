@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'game_room_social.dart';
 
 const _arenaPurple = Color(0xFF6554D9);
 const _arenaInk = Color(0xFF171936);
@@ -470,6 +471,7 @@ class _TreasureRoomPageState extends State<TreasureRoomPage> {
           ],
           if (d['status'] == 'finished') FilledButton.icon(onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const TreasureLobbyPage())), icon: const Icon(Icons.replay_rounded), label: const Text('ابدأ مغامرة جديدة')),
           const SizedBox(height: 8),
+          GameRoomSocialPanel(roomId: widget.roomId),
           SelectableText('رمز الغرفة: ${widget.roomId}', textAlign: TextAlign.center),
           TextButton.icon(onPressed: () => Clipboard.setData(ClipboardData(text: widget.roomId)), icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
         ]);
