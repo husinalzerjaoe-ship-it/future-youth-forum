@@ -20,13 +20,16 @@ const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
 
 class WatchPartyLobbyPage extends StatefulWidget {
-  const WatchPartyLobbyPage({super.key});
+  final String? initialUrl;
+  final String? initialName;
+  final bool cinemaMode;
+  const WatchPartyLobbyPage({super.key, this.initialUrl, this.initialName, this.cinemaMode = false});
   @override State<WatchPartyLobbyPage> createState() => _WatchPartyLobbyPageState();
 }
 
 class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
-  final _url = TextEditingController();
-  final _name = TextEditingController(text: 'غرفة مشاهدة');
+  late final TextEditingController _url;
+  late final TextEditingController _name;
   final _roomPassword = TextEditingController();
   bool _creating = false;
   bool _privateRoom = false;
@@ -34,6 +37,14 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
   final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
+
+  @override
+  void initState() {
+    super.initState();
+    _url = TextEditingController(text: widget.initialUrl ?? '');
+    _name = TextEditingController(text: widget.initialName ?? 'غرفة مشاهدة');
+    _privateRoom = widget.cinemaMode;
+  }
 
   @override
   void dispose() { _url.dispose(); _name.dispose(); _roomPassword.dispose(); super.dispose(); }
@@ -100,6 +111,8 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     try {
       final ref = await _watchDb.collection('watchRooms').add({
         'name': _name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim(),
+        'roomType': widget.cinemaMode ? 'cinema' : 'watch',
+        if (widget.cinemaMode) 'contentTitle': _name.text.trim(),
         'url': raw,
         'sourceType': sourceType,
         if (videoId != null) 'videoId': videoId,
