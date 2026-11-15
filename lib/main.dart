@@ -21,6 +21,12 @@ import 'football_news.dart';
 import 'watch_party.dart';
 import 'match_center.dart';
 import 'game_center.dart';
+import 'community_expansion.dart';
+import 'v6_community_suite.dart';
+import 'arcade_hub.dart';
+import 'friends_battle_arena.dart';
+import 'achievement_hub.dart';
+import 'engagement_features.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -406,6 +412,25 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v6':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
+                  break;
+                case 'arcadeHub':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ArcadeHubPage()));
+                  break;
+                case 'friendsArena':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsBattleArenaPage()));
+                  break;
+                case 'achievements':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementHubPage()));
+                  break;
+                case 'engagement':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const EngagementHubPage()));
+                  break;
+                case 'expansion':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityExpansionPage()));
+                  break;
+
                 case 'games':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage()));
                   break;
@@ -436,6 +461,13 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'friendsArena', child: ListTile(leading: Icon(Icons.people_alt_rounded), title: Text('منافسات الأصدقاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('الإنجازات والأوسمة'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'engagement', child: ListTile(leading: Icon(Icons.emoji_events_rounded), title: Text('النشاط والنقاط ولوحة الصدارة'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'expansion', child: ListTile(leading: Icon(Icons.event_available_rounded), title: Text('الفعاليات وغرف المشاهدة والمجتمعات'), contentPadding: EdgeInsets.zero)),
+
               const PopupMenuItem(value: 'games', child: ListTile(leading: Icon(Icons.sports_esports), title: Text('مركز الألعاب والتحديات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'communityPlus', child: ListTile(leading: Icon(Icons.forum_outlined), title: Text('مجتمع الأوتاكو والنقاشات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'saved', child: ListTile(leading: Icon(Icons.bookmarks_outlined), title: Text('المحفوظات'), contentPadding: EdgeInsets.zero)),
