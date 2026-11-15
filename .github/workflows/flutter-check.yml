@@ -1,8 +1,7 @@
 name: Flutter quality check and Android APK
 on:
-  workflow_dispatch:
   push:
-    branches: [main, release/combined-mainline, 'fix/**', 'feature/**']
+    branches: ['release/**', 'fix/**', 'feature/**']
   pull_request:
     branches: [main]
 
