@@ -206,7 +206,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       final changed = data['url'] != _loadedUrl;
       if (mounted) setState(() => _room = data);
       if (changed) _setupPlayer(data);
-      else if (!_isHost) _applyRemoteState(data);
+      else _applyRemoteState(data);
     }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
   }
 
@@ -246,7 +246,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
-          if (!_isHost || _applyingRemote) return;
+          if (_applyingRemote) return;
           if (value.playerState == PlayerState.playing) _publish('playing');
           if (value.playerState == PlayerState.paused) _publish('paused');
         });
@@ -274,7 +274,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _applyRemoteState(Map<String, dynamic> data) async {
-    if (_isHost || _loadedUrl != data['url']) return;
+    if (data['controlUid'] == _uid || _loadedUrl != data['url']) return;
     _applyingRemote = true;
     try {
       final target = _targetPosition(data);
@@ -306,7 +306,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _publish(String status) async {
-    if (!_isHost || _applyingRemote || _busy) return;
+    if (_applyingRemote || _busy) return;
     _busy = true;
     try {
       final position = await _currentPosition();
@@ -314,6 +314,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         'status': status,
         'positionSeconds': position,
         'updatedAt': FieldValue.serverTimestamp(),
+        'controlUid': _uid,
       });
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذر مزامنة حالة المشاهدة.');
@@ -352,7 +353,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _togglePlayback() async {
-    if (!_isHost) return;
     if (_isYoutube && _youtube != null) {
       if (_youtube!.value.playerState == PlayerState.playing) {
         await _youtube!.pauseVideo();
@@ -374,7 +374,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _seekBy(int seconds) async {
-    if (!_isHost) return;
     final current = await _currentPosition();
     final next = (current + seconds).clamp(0, 864000).toDouble();
     if (_isYoutube && _youtube != null) {
@@ -504,11 +503,12 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             const SizedBox(width: 8),
             Expanded(child: Text(_isHost ? 'أنت مضيف الغرفة — تحكم بالتشغيل للجميع' : 'مشاهدة متزامنة مع المضيف', style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
-          if (_isHost) Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             IconButton(onPressed: () => _seekBy(-10), icon: const Icon(Icons.replay_10), tooltip: 'رجوع 10 ثوانٍ'),
             FilledButton.icon(onPressed: _togglePlayback, icon: Icon(_room['status'] == 'playing' ? Icons.pause : Icons.play_arrow), label: Text(_room['status'] == 'playing' ? 'إيقاف مؤقت' : 'تشغيل للجميع')),
             IconButton(onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10), tooltip: 'تقديم 10 ثوانٍ'),
-          ]) else const Padding(padding: EdgeInsets.only(top: 8), child: Text('المضيف وحده يتحكم بالتشغيل والتقديم حتى تبقون على نفس المقطع.')),
+           ]),
+          const Padding(padding: EdgeInsets.only(top: 4), child: Text('التحكم بالتشغيل والتقديم متاح لكل أعضاء الغرفة.', style: TextStyle(fontSize: 11))),
         ]))),
         const SizedBox(height: 8),
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
