@@ -19,6 +19,12 @@ jobs:
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
 
+      - name: Show deployment service account
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          echo "Firebase deploy service account: $(printf '%s' "$FIREBASE_SA_JSON" | jq -r '.client_email')"
+
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
@@ -29,4 +35,8 @@ jobs:
           test -f storage.rules
 
       - name: Deploy Firestore security rules
-        run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
+        run: |
+          firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive || {
+            echo "Deployment failed. Grant this service account the Firebase Rules Admin role (roles/firebaserules.admin) in Google Cloud IAM, then rerun this workflow."
+            exit 1
+          }
