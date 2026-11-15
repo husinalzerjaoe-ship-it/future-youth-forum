@@ -216,7 +216,10 @@ class _FriendsQuizRoomPageState extends State<FriendsQuizRoomPage> {
         final members = List<String>.from(data['members'] ?? []);
         final round = (data['round'] as num?)?.toInt() ?? 0;
         final answers = Map<String, dynamic>.from(data['answers'] ?? {});
-        if (members.length < 2) throw Exception('بانتظار لاعب آخر');
+        final requiredPlayers = data['mode'] == '2v2' ? 4 : 2;
+        if (members.length < requiredPlayers) {
+          throw Exception(data['mode'] == '2v2' ? 'تحتاج المسابقة إلى 4 لاعبين لبدء تحدي 2 ضد 2' : 'بانتظار لاعب آخر');
+        }
         if (!members.contains(_uid) || round >= _friendsQuizQuestions.length || answers.containsKey(_uid)) {
           throw Exception('إجابتك مسجلة أو انتهت المسابقة');
         }
@@ -283,7 +286,8 @@ class _FriendsQuizRoomPageState extends State<FriendsQuizRoomPage> {
           final scores = Map<String, dynamic>.from(data['scores'] ?? {});
           final answers = Map<String, dynamic>.from(data['answers'] ?? {});
           final round = (data['round'] as num?)?.toInt() ?? 0;
-          final waiting = members.length < 2;
+          final requiredPlayers = data['mode'] == '2v2' ? 4 : 2;
+          final waiting = members.length < requiredPlayers;
           final done = data['status'] == 'finished' || round >= _friendsQuizQuestions.length;
           final answered = answers.containsKey(_uid);
           return ListView(padding: const EdgeInsets.all(16), children: [
@@ -296,7 +300,7 @@ class _FriendsQuizRoomPageState extends State<FriendsQuizRoomPage> {
               }, icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
               if (data['hostId'] == _uid) TextButton.icon(onPressed: () => _invite(context, data), icon: const Icon(Icons.person_add_alt_1), label: const Text('دعوة صديق')),
             ]))),
-            if (data['mode'] == '2v2' && members.length >= 2) ...[
+            if (data['mode'] == '2v2' && members.length == 4) ...[
               Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
                 const Text('نتيجة الفرق', style: TextStyle(fontWeight: FontWeight.bold)),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
