@@ -214,7 +214,7 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.resource.data.hostUid == resource.data.hostUid
         && (
-          (isFounder() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']) && request.resource.data.active == false)
+          (isFounder() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'status']) && request.resource.data.active == false && request.resource.data.status == 'paused')
           ||
           (resource.data.hostUid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys()
