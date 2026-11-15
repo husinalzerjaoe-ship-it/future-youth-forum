@@ -623,7 +623,8 @@ service cloud.firestore {
           )
           && usersNotBlocked(members()[0], members()[1]);
         allow update: if false;
-        allow delete: if false;
+        allow delete: if request.auth != null && isMember()
+          && resource.data.senderId == request.auth.uid;
 
         match /reactions/{userId} {
           allow read: if request.auth != null && request.auth.uid in members();
@@ -1228,6 +1229,23 @@ service cloud.firestore {
           && request.resource.data.status in ['waiting', 'playing', 'finished'])
       );
       allow delete: if request.auth != null && request.auth.uid == resource.data.hostId;
+      match /chat/{messageId} {
+        function isGameMember() {
+          let room = get(/databases/$(database)/documents/gameRooms/$(roomId));
+          return request.auth != null && room.data.members is list
+            && request.auth.uid in room.data.members;
+        }
+        allow read: if isGameMember();
+        allow create: if isGameMember() && accountNotBanned() && chatNotMuted()
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 60
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500;
+        allow update: if false;
+        allow delete: if isGameMember() && resource.data.uid == request.auth.uid;
+      }
     }
 
 
