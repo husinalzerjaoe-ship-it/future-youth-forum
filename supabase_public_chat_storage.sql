@@ -24,9 +24,11 @@ using (bucket_id = 'forum-media');
 drop policy if exists "Forum members upload own media" on storage.objects;
 create policy "Forum members upload own media"
 on storage.objects for insert
-to authenticated
+to anon, authenticated
 with check (
   bucket_id = 'forum-media'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
   and (
     (
       (storage.foldername(name))[1] in (
@@ -45,9 +47,11 @@ with check (
 drop policy if exists "Forum members update own media" on storage.objects;
 create policy "Forum members update own media"
 on storage.objects for update
-to authenticated
+to anon, authenticated
 using (
   bucket_id = 'forum-media'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
   and (
     (
       (storage.foldername(name))[1] in (
@@ -64,6 +68,8 @@ using (
 )
 with check (
   bucket_id = 'forum-media'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
   and (
     (
       (storage.foldername(name))[1] in (
@@ -82,9 +88,11 @@ with check (
 drop policy if exists "Forum members delete own media" on storage.objects;
 create policy "Forum members delete own media"
 on storage.objects for delete
-to authenticated
+to anon, authenticated
 using (
   bucket_id = 'forum-media'
+  and auth.jwt()->>'aud' = 'futureyouth-69f8a'
+  and auth.jwt()->>'iss' = 'https://securetoken.google.com/futureyouth-69f8a'
   and (
     (
       (storage.foldername(name))[1] in (

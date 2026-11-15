@@ -37,6 +37,26 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
     {'q':'أي شخصية تقول غالباً: أنا ملك القراصنة؟','a':['لوفي','غوكو','إيتاتشي','تانجيرو'],'c':0,'why':'حلم لوفي أن يصبح ملك القراصنة.'},
     {'q':'ما اسم بطل Demon Slayer؟','a':['إينوسكي','زينيتسو','تانجيرو','غيو'],'c':2,'why':'تانجيرو كامادو هو بطل القصة.'},
     {'q':'في Dragon Ball، ما اسم التحول الذهبي الشهير؟','a':['نينجا مود','سوبر سايان','Bankai','Gear 5'],'c':1,'why':'التحول هو سوبر سايان.'},
+    {'q':"ما عاصمة اليابان؟",'a':["كيوتو","طوكيو","أوساكا","هيروشيما"],'c':1,'why':"طوكيو هي عاصمة اليابان."},
+    {'q':"كم عدد لاعبي فريق كرة القدم داخل الملعب؟",'a':["9","10","11","12"],'c':2,'why':"الفريق يبدأ المباراة بأحد عشر لاعباً."},
+    {'q':"ما أكبر كوكب في المجموعة الشمسية؟",'a':["الأرض","المشتري","المريخ","زحل"],'c':1,'why':"المشتري هو الأكبر حجماً."},
+    {'q':"ما الحيوان المعروف بسفينة الصحراء؟",'a':["الحصان","الجمل","الغزال","الفيل"],'c':1,'why':"الجمل مشهور بتحمل ظروف الصحراء."},
+    {'q':"كم ضلعاً للمثلث؟",'a':["ثلاثة","أربعة","خمسة","ستة"],'c':0,'why':"للمثلث ثلاثة أضلاع."},
+    {'q':"ما اللغة الرسمية في البرازيل؟",'a':["الإسبانية","البرتغالية","الإنجليزية","الفرنسية"],'c':1,'why':"البرتغالية هي اللغة الرسمية."},
+    {'q':"أي محيط هو الأكبر؟",'a':["الأطلسي","الهندي","الهادئ","المتجمد"],'c':2,'why':"المحيط الهادئ هو الأكبر."},
+    {'q':"من رسم لوحة الموناليزا؟",'a':["فان غوخ","بيكاسو","ليوناردو دا فنشي","مونيه"],'c':2,'why':"رسمها ليوناردو دا فنشي."},
+    {'q':"كم دقيقة في ساعتين؟",'a':["60","90","100","120"],'c':3,'why':"الساعتان تساويان 120 دقيقة."},
+    {'q':"ما عاصمة العراق؟",'a':["البصرة","الموصل","بغداد","أربيل"],'c':2,'why':"بغداد عاصمة العراق."},
+    {'q':"أي غاز تمتصه النباتات في البناء الضوئي؟",'a':["الأكسجين","ثاني أكسيد الكربون","النيتروجين","الهيدروجين"],'c':1,'why':"تمتص النباتات ثاني أكسيد الكربون."},
+    {'q':"ما أسرع حيوان بري؟",'a':["الأسد","الفهد","الحصان","النمر"],'c':1,'why':"الفهد أسرع الحيوانات البرية."},
+    {'q':"كم عدد ألوان قوس قزح التقليدية؟",'a':["خمسة","ستة","سبعة","ثمانية"],'c':2,'why':"الألوان التقليدية سبعة."},
+    {'q':"في أي قارة تقع مصر؟",'a':["آسيا فقط","أفريقيا","أوروبا","أمريكا"],'c':1,'why':"تقع مصر في شمال أفريقيا."},
+    {'q':"ما ناتج 12 × 8؟",'a':["86","92","96","108"],'c':2,'why':"12 مضروبة في 8 تساوي 96."},
+    {'q':"ما اسم الكوكب الأحمر؟",'a':["الزهرة","المريخ","عطارد","نبتون"],'c':1,'why':"المريخ يعرف بالكوكب الأحمر."},
+    {'q':"أي آلة موسيقية لها مفاتيح سوداء وبيضاء؟",'a':["العود","الناي","البيانو","الطبلة"],'c':2,'why':"البيانو يحتوي مفاتيح بيضاء وسوداء."},
+    {'q':"كم يوماً في السنة الكبيسة؟",'a':["364","365","366","367"],'c':2,'why':"السنة الكبيسة 366 يوماً."},
+    {'q':"ما عاصمة فرنسا؟",'a':["روما","مدريد","باريس","برلين"],'c':2,'why':"باريس عاصمة فرنسا."},
+    {'q':"أي معدن رمزه الكيميائي Au؟",'a':["الفضة","الذهب","الحديد","النحاس"],'c':1,'why':"Au هو رمز الذهب."},
   ];
 
   static const _riddles=[
@@ -45,6 +65,21 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
     ['يمشي بلا قدمين ويبكي بلا عينين، ما هو؟','السحاب'],
     ['ما الشيء الذي يكتب ولا يقرأ؟','القلم'],
     ['بيت بلا أبواب ولا نوافذ، ما هو؟','البيضة'],
+    ["شيء له رقبة وليس له رأس؟","الزجاجة"],
+    ["ما الذي يسمع بلا أذن ويتكلم بلا لسان؟","الصدى"],
+    ["كلما زاد نقص، ما هو؟","العمر"],
+    ["شيء تراه في الليل ثلاث مرات وفي النهار مرة؟","حرف اللام"],
+    ["ما الذي يملأ الغرفة ولا يشغل حيزاً؟","الضوء"],
+    ["له أوراق وليس نباتاً وله جلد وليس حيواناً؟","الكتاب"],
+    ["ما الشيء الذي إذا وضعته في الماء لا يبتل؟","الظل"],
+    ["يمر من الزجاج ولا يكسره؟","الضوء"],
+    ["شيء كلما مشى فقد جزءاً من ذيله؟","إبرة الخياطة والخيط"],
+    ["ما الباب الذي لا يمكن فتحه؟","الباب المفتوح"],
+    ["شيء له عين واحدة ولا يرى؟","الإبرة"],
+    ["ما الشيء الذي يكتب به ولا يمكنه القراءة؟","القلم"],
+    ["ما الشيء الذي يوجد في وسط مكة؟","حرف الكاف"],
+    ["شيء إذا لمسته صاح؟","الجرس"],
+    ["ما الذي يصعد ولا ينزل؟","العمر"],
   ];
 
   @override void initState(){super.initState();_nextRiddle();_loadDaily();}
@@ -184,10 +219,11 @@ class _ArcadeHubPageState extends State<ArcadeHubPage> {
         ),
       ),
       const SizedBox(height: 10),
-      _section('اختبر معلوماتك بالأنمي','جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
+      _section('اختبر معلوماتك','أنمي ومعلومات عامة • جاوب صح واجمع 5 نقاط لكل سؤال',Icons.quiz_outlined,Colors.deepPurple, _quizCard()),
       _section('حجر ورقة مقص','تحدّى الكمبيوتر واربح 3 نقاط',Icons.sports_esports,Colors.orange,_rpsCard()),
       _section('لغز اليوم','فكّر قبل ما تشوف الحل',Icons.lightbulb_outline,Colors.teal,_riddleCard()),
       _section('تحدي السرعة','اضغط الزر 10 مرات بأسرع وقت',Icons.bolt,Colors.pink,_speedCard()),
+      _section('رتّب الحروف','كوّن الكلمة الصحيحة من الحروف المبعثرة',Icons.abc,Colors.indigo,const _WordScrambleGame()),
       const SizedBox(height:10),
       Card(child:Padding(padding:const EdgeInsets.all(14),child:Row(children:[const Icon(Icons.emoji_events,color:Colors.amber,size:30),const SizedBox(width:10),Expanded(child:Text('نتائج جلستك: $_wins فوز • $_losses خسارة',style:const TextStyle(fontWeight:FontWeight.bold)))]))),
       const Padding(padding:EdgeInsets.all(8),child:Text('النقاط تُحفظ في حسابك. الألعاب ترفيهية، وقد تختلف الأسئلة والتحديات مع التحديثات.',textAlign:TextAlign.center,style:TextStyle(fontSize:11,color:Colors.grey))),
@@ -237,4 +273,54 @@ class _SpeedChallengeState extends State<_SpeedChallenge>{
     SizedBox(width:double.infinity,child:FilledButton(onPressed:_done?null:(){setState((){_start??=DateTime.now();_count++;if(_count>=10){_done=true;widget.onWin();}});},child:Text(_done?'أحسنت!':'اضغط بسرعة ⚡'))),
     TextButton(onPressed:()=>setState((){_count=0;_start=null;_done=false;}),child:const Text('إعادة التحدي')),
   ]);
+}
+
+
+class _WordScrambleGame extends StatefulWidget {
+ const _WordScrambleGame();
+ @override State<_WordScrambleGame> createState()=>_WordScrambleGameState();
+}
+class _WordScrambleGameState extends State<_WordScrambleGame> {
+ static const words=['بغداد','العراق','صداقة','مستقبل','نجاح','مكتبة','مغامرة','رياضة','موسيقى','برمجة','أنمي','شجاعة','تعاون','ابتسامة','طموح'];
+ final random=Random();
+ final answer=TextEditingController();
+ late String word;
+ late String mixed;
+ int points=0;
+ bool solved=false;
+ String message='رتّب الحروف واكتب الكلمة الصحيحة';
+ @override void initState(){super.initState();_next();}
+ void _next(){
+  word=words[random.nextInt(words.length)];
+  final chars=word.split('')..shuffle(random);
+  mixed=chars.join(' • ');
+  answer.clear();
+  message='رتّب الحروف واكتب الكلمة الصحيحة';
+  solved=false;
+  setState((){});
+ }
+ void _check(){
+  if(solved)return;
+  if(answer.text.trim().replaceAll(' ','')==word){
+   solved=true;
+   points+=3;
+   setState(()=>message='صحيح! ربحت 3 نقاط 🎉');
+  }else{
+   setState(()=>message='مو صحيح، جرّب مرة ثانية');
+  }
+ }
+ @override void dispose(){answer.dispose();super.dispose();}
+ @override Widget build(BuildContext context)=>Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+  Text(mixed,textAlign:TextAlign.center,style:const TextStyle(fontSize:23,fontWeight:FontWeight.bold,letterSpacing:1)),
+  const SizedBox(height:8),
+  TextField(controller:answer,decoration:const InputDecoration(hintText:'اكتب الكلمة هنا',border:OutlineInputBorder(),isDense:true)),
+  const SizedBox(height:8),
+  Text(message,textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.w600)),
+  Text('نقاطك: $points',textAlign:TextAlign.center),
+  Row(children:[
+   Expanded(child:FilledButton(onPressed:_check,child:const Text('تحقق'))),
+   const SizedBox(width:8),
+   OutlinedButton(onPressed:_next,child:const Text('كلمة جديدة'))
+  ])
+ ]);
 }

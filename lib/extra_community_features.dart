@@ -324,13 +324,13 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     final url=await uploadForumMedia(XFile(f.path!,name:f.name),folder:'shared-files');
     await db.collection('sharedFiles').add({
      'uploaderId':uid,'title':f.name,'fileName':f.name,'extension':ext,
-     'size':f.size,'fileUrl':url,'status':'pending','category':'music',
+     'size':f.size,'fileUrl':url,'status':'approved','category':'music',
      'createdAt':FieldValue.serverTimestamp(),
-     'safetyNote':'ملف صوتي بانتظار مراجعة المشرف. ارفع فقط ما تملك حق مشاركته.'
+     'safetyNote':'نشر مباشر دون مراجعة إدارية. ارفع فقط الملفات التي تملك حق مشاركتها.'
     });
     success++;
    }
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم رفع '+success.toString()+' أغنية، وهي بانتظار موافقة الإدارة')));
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم نشر '+success.toString()+' أغنية مباشرة في مكتبة المجتمع')));
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر رفع الأغاني: '+e.toString())));}
   finally{if(mounted)setState(()=>uploading=false);}
  }
@@ -361,7 +361,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     final playing=s.data?.playing??false;
     return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:StreamBuilder<MediaItem?>(stream:appAudioHandler.mediaItem,builder:(context,m)=>Text(m.data?.title??(current>=0?tracks[current].name:'مشغل الموسيقى'),maxLines:1,overflow:TextOverflow.ellipsis)),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
    })),
-   const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • الملفات المنشورة بعد موافقة الإدارة'))),
+   const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • نشر مباشر دون موافقة الإدارة'))),
    // Pending tracks remain visible to their uploader; the founder can review them here.
    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
     stream: FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com'
@@ -408,7 +408,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final docs=s.data!.docs.where((d)=>['mp3','m4a','aac','wav','ogg','flac'].contains((d.data()['extension']??'').toString().toLowerCase())).toList();
     return ListView(children:[
-     if(docs.isEmpty)const ListTile(title:Text('ماكو أغاني منشورة بعد'),subtitle:Text('ارفع أغنية وانتظر موافقة الإدارة')),
+     if(docs.isEmpty)const ListTile(title:Text('ماكو أغاني منشورة بعد'),subtitle:Text('ارفع أول أغنية وشاركها مع أعضاء الملتقى')),
      ...docs.map((d){final x=d.data();return Card(child:ListTile(
       leading:const CircleAvatar(child:Icon(Icons.audiotrack)),
       title:Text(x['title'] as String? ?? 'مقطع صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
@@ -420,7 +420,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
    const Divider(height:1),
    const Padding(padding:EdgeInsets.all(10),child:Align(alignment:Alignment.centerRight,child:Text('مكتبتي من الجهاز'))),
    SizedBox(height:tracks.isEmpty?64:160,child:tracks.isEmpty?const Center(child:Text('ما أضفت أغاني محلية بعد')):ListView.builder(itemCount:tracks.length,itemBuilder:(context,i)=>ListTile(leading:Icon(current==i?Icons.equalizer:Icons.audiotrack),title:Text(tracks[i].name,maxLines:1,overflow:TextOverflow.ellipsis),onTap:()=>play(i),trailing:IconButton(icon:const Icon(Icons.close),onPressed:() async {setState(()=>tracks.removeAt(i));if(tracks.isEmpty){await appAudioHandler.stop();current=-1;}})))),
-   const Padding(padding:EdgeInsets.all(10),child:Text('التشغيل بالخلفية يستخدم مشغل Android. مشاركة الأغاني تمر بمراجعة الإدارة.',style:TextStyle(fontSize:12)))
+   const Padding(padding:EdgeInsets.all(10),child:Text('التشغيل بالخلفية يستخدم مشغل Android. النشر المباشر مخصص للملفات التي تملك حق مشاركتها.',style:TextStyle(fontSize:12)))
   ])
  );
 }
