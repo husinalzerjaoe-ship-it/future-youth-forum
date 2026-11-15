@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' hide PlayerState;
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -24,14 +27,16 @@ class WatchPartyLobbyPage extends StatefulWidget {
 class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
   final _url = TextEditingController();
   final _name = TextEditingController(text: 'غرفة مشاهدة');
+  final _roomPassword = TextEditingController();
   bool _creating = false;
   bool _privateRoom = false;
+  bool _passwordProtected = false;
   final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   @override
-  void dispose() { _url.dispose(); _name.dispose(); super.dispose(); }
+  void dispose() { _url.dispose(); _name.dispose(); _roomPassword.dispose(); super.dispose(); }
 
   Future<void> _chooseFriends() async {
     final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
@@ -81,6 +86,16 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     final isDirect = path.endsWith('.mp4') || path.endsWith('.m3u8') ||
         path.endsWith('.m4v') || path.endsWith('.mov') || path.endsWith('.webm');
     final sourceType = videoId != null ? 'youtube' : isDirect ? 'direct' : 'web';
+    if (_passwordProtected && _roomPassword.text.trim().length < 4) {
+      setState(() => _error = 'كلمة المرور لازم تكون 4 أحرف على الأقل.');
+      return;
+    }
+    final passwordSalt = _passwordProtected
+        ? List<int>.generate(16, (_) => Random.secure().nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join()
+        : null;
+    final passwordHash = _passwordProtected
+        ? crypto.sha256.convert(utf8.encode('$passwordSalt|${_roomPassword.text.trim()}')).toString()
+        : null;
     setState(() { _creating = true; _error = null; });
     try {
       final ref = await _watchDb.collection('watchRooms').add({
@@ -91,6 +106,9 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         'hostUid': _uid,
         'visibility': _privateRoom ? 'private' : 'public',
         'invitedUids': _privateRoom ? <String>{_uid, ..._invitedUids}.toList() : <String>[],
+        'passwordProtected': _passwordProtected && _privateRoom,
+        if (_passwordProtected && _privateRoom) 'passwordSalt': passwordSalt,
+        if (_passwordProtected && _privateRoom) 'passwordHash': passwordHash,
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -138,7 +156,19 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
               contentPadding: EdgeInsets.zero, value: _privateRoom,
               title: const Text('غرفة خاصة للأصدقاء'),
               subtitle: const Text('لا تظهر للعامة؛ فقط أنت والأصدقاء الذين تختارهم'),
-              onChanged: (value) => setState(() { _privateRoom = value; if (!value) _invitedUids.clear(); }),
+              onChanged: (value) => setState(() { _privateRoom = value; if (!value) { _invitedUids.clear(); _passwordProtected = false; _roomPassword.clear(); } }),
+            ),
+            if (_privateRoom) SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _passwordProtected,
+              title: const Text('حماية الغرفة بكلمة مرور'),
+              subtitle: const Text('الدخول للمدعوين فقط، ويحتاجون كلمة المرور أيضاً'),
+              onChanged: (value) => setState(() { _passwordProtected = value; if (!value) _roomPassword.clear(); }),
+            ),
+            if (_privateRoom && _passwordProtected) Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(controller: _roomPassword, obscureText: true, maxLength: 64,
+                decoration: const InputDecoration(labelText: 'كلمة مرور الغرفة (4 أحرف على الأقل)', border: OutlineInputBorder(), counterText: '')),
             ),
             if (_privateRoom) OutlinedButton.icon(
               onPressed: _chooseFriends, icon: const Icon(Icons.group_add),
@@ -201,6 +231,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   DateTime? _roomVoiceStarted;
   String? _roomVoicePath;
   bool _sendingChat = false;
+  bool _roomReady = false;
   double _playbackSpeed = 1.0;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool get _isHost => _room['hostUid'] == _uid;
@@ -209,15 +240,50 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   @override
   void initState() {
     super.initState();
-    _joinRoom();
-    _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
+    _authorizeAndJoin();
+  }
+
+  Future<void> _authorizeAndJoin() async {
+    try {
+      final first = await _watchDb.collection('watchRooms').doc(widget.roomId).get();
+      if (!first.exists) throw StateError('الغرفة غير موجودة.');
+      final data = first.data() ?? <String, dynamic>{};
+      if (data['active'] == false) throw StateError('الغرفة مغلقة.');
+      if (data['passwordProtected'] == true && data['hostUid'] != _uid) {
+        final passController = TextEditingController();
+        final entered = await showDialog<String>(context: context, barrierDismissible: false,
+          builder: (dialogContext) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+            title: const Text('غرفة محمية بكلمة مرور'),
+            content: TextField(controller: passController, obscureText: true, autofocus: true,
+              decoration: const InputDecoration(labelText: 'أدخل كلمة المرور', border: OutlineInputBorder()),
+              onSubmitted: (value) => Navigator.pop(dialogContext, value)),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, passController.text), child: const Text('دخول'))],
+          )));
+        passController.dispose();
+        if (entered == null) { if (mounted) Navigator.pop(context); return; }
+        final salt = (data['passwordSalt'] ?? '').toString();
+        final expected = (data['passwordHash'] ?? '').toString();
+        final actual = crypto.sha256.convert(utf8.encode('$salt|${entered.trim()}')).toString();
+        if (salt.isEmpty || expected.isEmpty || actual != expected) {
+          if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور غير صحيحة.'))); Navigator.pop(context); }
+          return;
+        }
+      }
+      await _joinRoom();
+      if (!mounted) return;
+      setState(() { _room = data; _roomReady = true; });
+      _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
       if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
       final data = snap.data()!;
       final changed = data['url'] != _loadedUrl;
       if (mounted) setState(() => _room = data);
       if (changed) _setupPlayer(data);
       else _applyRemoteState(data);
-    }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+      }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+    } catch (_) {
+      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ما عندك صلاحية دخول هذه الغرفة أو أن الغرفة مغلقة.'))); Navigator.pop(context); }
+    }
   }
 
   Future<void> _joinRoom() async {
@@ -520,6 +586,45 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     finally { if (mounted) setState(() { _sendingChat = false; _recordingRoomVoice = false; }); }
   }
 
+  Future<void> _inviteMoreFriends() async {
+    if (!_isHost) return;
+    final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
+    if (!mounted) return;
+    final existing = List<String>.from(_room['invitedUids'] ?? const <String>[]);
+    final chosen = <String>{};
+    await showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, updateSheet) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: SizedBox(height: MediaQuery.of(sheetContext).size.height * .65,
+          child: Column(children: [
+            const Padding(padding: EdgeInsets.all(14), child: Text('دعوة أصدقاء إلى الغرفة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            Expanded(child: ListView(children: profiles.docs.where((p) => p.id != _uid && !existing.contains(p.id)).map((p) {
+              final d = p.data(); final selected = chosen.contains(p.id); final photo = (d['photoUrl'] ?? '').toString();
+              return CheckboxListTile(value: selected,
+                secondary: CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null, child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                title: Text((d['name'] ?? 'عضو').toString()),
+                onChanged: (v) => updateSheet(() { if (v == true) chosen.add(p.id); else chosen.remove(p.id); }));
+            }).toList())),
+            Padding(padding: const EdgeInsets.all(12), child: FilledButton(onPressed: () => Navigator.pop(sheetContext), child: Text('إرسال الدعوات (${chosen.length})'))),
+          ]),
+        )),
+      )),
+    );
+    if (chosen.isEmpty) return;
+    final updated = <String>{...existing, ...chosen, _uid}.toList();
+    try {
+      await _watchDb.collection('watchRooms').doc(widget.roomId).update({'invitedUids': updated});
+      final me = await _watchDb.collection('publicProfiles').doc(_uid).get();
+      final actorName = (me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'صديق').toString();
+      for (final friendUid in chosen) {
+        await _watchDb.collection('notifications').add({'recipientId': friendUid, 'actorId': _uid, 'actorName': actorName,
+          'type': 'message', 'text': 'دعاك إلى غرفة مشاهدة: ${_room['name'] ?? 'غرفة مشاهدة'}',
+          'read': false, 'targetType': 'watchRoom', 'targetId': widget.roomId, 'createdAt': FieldValue.serverTimestamp()});
+      }
+      if (mounted) setState(() { _room['invitedUids'] = updated; _error = 'تم إرسال الدعوات بنجاح.'; });
+    } catch (_) { if (mounted) setState(() => _error = 'تعذر إرسال الدعوات. تحقق من قواعد Firestore.'); }
+  }
+
   Future<void> _manageRoomMembers() async {
     if (!_isHost && FirebaseAuth.instance.currentUser?.email?.toLowerCase() != 'husinalzerjaoe@gmail.com') return;
     final people = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').get();
@@ -593,8 +698,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost) IconButton(tooltip: 'تغيير رابط الحلقة', onPressed: _changeRoomUrl, icon: const Icon(Icons.link)), if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
-      body: ListView(padding: const EdgeInsets.all(12), children: [
+      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost) IconButton(tooltip: 'دعوة أصدقاء', onPressed: _inviteMoreFriends, icon: const Icon(Icons.group_add)), if (_isHost) IconButton(tooltip: 'تغيير رابط الحلقة', onPressed: _changeRoomUrl, icon: const Icon(Icons.link)), if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
+      body: !_roomReady ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(
           color: Theme.of(context).colorScheme.errorContainer,
           child: Padding(padding: const EdgeInsets.all(12), child: Column(
