@@ -549,13 +549,79 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
-    Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:const BoxDecoration(gradient:LinearGradient(colors:[Color(0xFF171936),Color(0xFF5144B8),Color(0xFF8C7CF0)])),child:Row(children:[
-      const Icon(Icons.forum,color:Colors.white,size:30),const SizedBox(width:9),
-      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('اسحب الرسالة للرد • اضغط مرتين للإعجاب',style:TextStyle(color:Colors.white70,fontSize:11))])),
-      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Text((s.data?.docs.length??0).toString()+' متصل',style:const TextStyle(color:Colors.white,fontSize:11))),
-      IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
-      if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
-    ])),
+    Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF11162F), Color(0xFF30286F), Color(0xFF6554D9)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        boxShadow: [BoxShadow(color: Color(0x260F1230), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Row(children: [
+        Container(
+          width: 43, height: 43,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 23),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+            SizedBox(height: 3),
+            Text('دردشة مباشرة • اسحب الرسالة للرد', style: TextStyle(color: Color(0xFFDCD7FF), fontSize: 11)),
+          ],
+        )),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _chatDb.collection('chatPresence').where('online', isEqualTo: true).snapshots(),
+          builder: (c, s) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF63E6A5), shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Text('${s.data?.docs.length ?? 0} متصل', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            ]),
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            if (value == 'background') {
+              showModalBottomSheet<void>(
+                context: context,
+                showDragHandle: true,
+                builder: (c) => Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: SafeArea(child: Wrap(children: _backgrounds.map((color) => ListTile(
+                    leading: CircleAvatar(backgroundColor: Color(color)),
+                    title: const Text('اختيار خلفية الدردشة'),
+                    onTap: () {
+                      Navigator.pop(c);
+                      setState(() => _background = color);
+                      _chatDb.collection('chatPreferences').doc(_uid).set({'background': color}, SetOptions(merge: true));
+                    },
+                  )).toList())),
+                ),
+              );
+            } else if (value == 'admin') {
+              _founderTools();
+            }
+          },
+          itemBuilder: (c) => [
+            const PopupMenuItem(value: 'background', child: Text('تغيير الخلفية')),
+            if (_isFounder) const PopupMenuItem(value: 'admin', child: Text('لوحة المؤسس')),
+          ],
+        ),
+      ]),
+    ),
     Padding(
       padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
       child: TextField(
