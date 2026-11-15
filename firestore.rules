@@ -500,6 +500,7 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // Private DMs: only the two listed participants can read or write this conversation.
     match /conversations/{conversationId} {
       // The array-contains query in the app already targets conversations
       // containing the signed-in user. Do not require members.size() here:
