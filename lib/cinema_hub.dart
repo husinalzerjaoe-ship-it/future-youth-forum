@@ -44,7 +44,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
 
   Future<List<_Film>> _load() async {
     const q = 'collection:opensource_movies AND mediatype:movies';
-    final uri = Uri.parse('https://archive.org/advancedsearch.php?q=$${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
+    final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
     final response = await http.get(uri).timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) throw Exception('archive unavailable');
     final root = jsonDecode(response.body) as Map<String, dynamic>;
@@ -59,7 +59,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   List<_Film> _filter(List<_Film> films) {
     final q = _search.text.trim().toLowerCase();
     return films.where((f) {
-      final t = '$${f.title} $${f.year} $${f.description}'.toLowerCase();
+      final t = '${f.title} ${f.year} ${f.description}'.toLowerCase();
       final searchOk = q.isEmpty || t.contains(q);
       final categoryOk = switch (_category) {
         'رعب' => RegExp(r'horror|monster|vampire|ghost|zombie').hasMatch(t),
@@ -127,7 +127,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                 child: Row(children: [const Icon(Icons.local_movies, color: _cinemaAccent), const SizedBox(width: 8),
                   const Expanded(child: Text('مكتبة الأعمال المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
-                  Text('$${films.length} عمل')]))),
+                  Text('${films.length} عمل')]))),
               if (films.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('ما لقينا نتائج بهذا البحث.')))
               else SliverPadding(padding: const EdgeInsets.all(14), sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate((_, i) {
@@ -161,7 +161,7 @@ class _FilmCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(child: Stack(fit: StackFit.expand, children: [
           ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: Image.network('https://archive.org/services/img/$${film.id}', fit: BoxFit.cover,
+            child: Image.network('https://archive.org/services/img/${film.id}', fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, color: _cinemaAccent, size: 50)))),
           Positioned(top: 3, left: 3, child: IconButton.filledTonal(onPressed: onFavorite,
             icon: Icon(favorite ? Icons.favorite : Icons.favorite_border, color: favorite ? Colors.pinkAccent : Colors.white))),
@@ -186,7 +186,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
   Future<void> _checkVideo() async {
     setState(() { _busy = true; _message = null; });
     try {
-      final r = await http.get(Uri.https('archive.org', '/metadata/$${widget.film.id}')).timeout(const Duration(seconds: 20));
+      final r = await http.get(Uri.https('archive.org', '/metadata/${widget.film.id}')).timeout(const Duration(seconds: 20));
       if (r.statusCode != 200) throw Exception();
       final data = jsonDecode(r.body) as Map<String, dynamic>;
       final files = (data['files'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().where((f) {
@@ -197,7 +197,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
       if (files.isEmpty) { setState(() => _message = 'ما لقينا ملف فيديو مباشر. تگدر تفتح المصدر، لكن المزامنة غير مضمونة.'); }
       else {
         final name = (files.first['name'] ?? '').toString();
-        setState(() => _directUrl = 'https://archive.org/download/$${widget.film.id}/$${Uri.encodeComponent(name)}');
+        setState(() => _directUrl = 'https://archive.org/download/${widget.film.id}/${Uri.encodeComponent(name)}');
       }
     } catch (_) { setState(() => _message = 'تعذر فحص ملف التشغيل. افتح صفحة المصدر.'); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -212,7 +212,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
     child: SafeArea(child: Padding(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ClipRRect(borderRadius: BorderRadius.circular(16), child: AspectRatio(aspectRatio: 16/8,
-          child: Image.network('https://archive.org/services/img/$${widget.film.id}', fit: BoxFit.cover,
+          child: Image.network('https://archive.org/services/img/${widget.film.id}', fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, size: 50))))),
         const SizedBox(height: 12),
         Text(widget.film.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -228,7 +228,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
           icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : Icon(_directUrl == null ? Icons.search : Icons.groups),
           label: Text(_busy ? 'جارٍ فحص الفيديو...' : _directUrl == null ? 'فحص التشغيل وإنشاء غرفة' : 'شاهد مع الأصدقاء')),
-        TextButton.icon(onPressed: () => launchUrl(Uri.https('archive.org', '/details/$${widget.film.id}'), mode: LaunchMode.externalApplication),
+        TextButton.icon(onPressed: () => launchUrl(Uri.https('archive.org', '/details/${widget.film.id}'), mode: LaunchMode.externalApplication),
           icon: const Icon(Icons.open_in_new), label: const Text('صفحة المصدر')),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
       ]))));
