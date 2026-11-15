@@ -44,6 +44,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     _url = TextEditingController(text: widget.initialUrl ?? '');
     _name = TextEditingController(text: widget.initialName ?? 'غرفة مشاهدة');
     _privateRoom = widget.cinemaMode;
+    _passwordProtected = widget.cinemaMode;
   }
 
   @override
