@@ -225,9 +225,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
     setState(() { _sending = true; _error = null; });
     try {
       final conversation = _dmDb.collection('conversations').doc(widget.conversationId);
+      // The client can read only its own block records; the Firestore rule
+      // independently checks both directions before accepting a message.
       final blockedA = await _dmDb.collection('userBlocks').doc('${user.uid}_${widget.otherUid}').get();
-      final blockedB = await _dmDb.collection('userBlocks').doc('${widget.otherUid}_${user.uid}').get();
-      if (blockedA.exists || blockedB.exists) {
+      if (blockedA.exists) {
         setState(() => _error = 'لا يمكن المراسلة بسبب وجود حظر بين الحسابين.');
         return;
       }
