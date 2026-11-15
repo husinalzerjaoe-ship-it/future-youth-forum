@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_player/video_player.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
 
@@ -25,6 +26,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   final _text = TextEditingController();
   final _picker = ImagePicker();
   bool _sending = false;
+  bool _mentionPickerOpen = false;
   final AudioRecorder _voiceRecorder = AudioRecorder();
   bool _recordingVoice = false;
   DateTime? _voiceStartedAt;
@@ -32,6 +34,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   DateTime? _lastSuccessfulSend;
   String? _error;
   String? _pulseMessageId;
+  String _searchQuery = '';
   static const _blockedTerms = ['كسمك', 'كس امك', 'يلعن دينك', 'قحبة', 'شرموط', 'منيوك'];
   bool _containsBlockedTerm(String value) {
     final normalized = value.toLowerCase().replaceAll(RegExp(r'[\sـ]+'), '');
@@ -56,6 +59,53 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
     return p.data()?['name'] as String? ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
   }
+  Future<void> _showMentionPicker() async {
+    _mentionPickerOpen = true;
+    try {
+      final profiles = await _chatDb.collection('publicProfiles').limit(80).get();
+      if (!mounted) return;
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context, isScrollControlled: true, showDragHandle: true,
+        builder: (sheetContext) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(child: SizedBox(height: MediaQuery.of(sheetContext).size.height * .62,
+            child: Column(children: [
+              const Padding(padding: EdgeInsets.all(14), child: Text('اختَر عضواً للإشارة إليه', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(child: ListView(children: profiles.docs.where((p) => p.id != _uid).map((p) {
+                final d = p.data();
+                final name = (d['name'] ?? 'عضو').toString();
+                final photo = (d['photoUrl'] ?? '').toString();
+                return ListTile(
+                  leading: CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                    child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                  title: Text(name),
+                  subtitle: const Text('إضافة منشن إلى الرسالة'),
+                  onTap: () => Navigator.pop(sheetContext, {'uid': p.id, 'name': name}),
+                );
+              }).toList())),
+            ]),
+          )),
+        ),
+      );
+      if (selected != null && mounted) {
+        final current = _text.text;
+        final at = current.lastIndexOf('@');
+        final prefix = at >= 0 ? current.substring(0, at) : current;
+        final mentionName = (selected['name'] ?? 'عضو').toString().replaceAll(RegExp(r'\s+'), '_');
+        final insertion = '@$mentionName ';
+        final next = prefix + insertion;
+        _text.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: next.length));
+        await _chatDb.collection('chatTyping').doc(_uid).set({
+          'uid': _uid, 'typing': true, 'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+    } catch (_) {
+      if (mounted) _snack('تعذر تحميل قائمة الأعضاء حالياً');
+    } finally {
+      _mentionPickerOpen = false;
+    }
+  }
+
   Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false,int? durationSeconds}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
     final now = DateTime.now();
@@ -87,15 +137,15 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final membership = (await _chatDb.collection('memberships').doc(_uid).get()).data() ?? {};
       final expiry = membership['expiresAt'];
       final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
-      await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
+      final sentMessage = await _chatDb.collection('messages').add({
+        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
         if(_reply!=null)'replyTo':{'messageId':_reply!.id,'senderName':_reply!.data()?['senderName']??'عضو','text':_reply!.data()?['text']??''},
       });
       if (type == 'text') {
-        final tags = RegExp(r'@([^\s@]+)').allMatches(body).map((m)=>m.group(1)!).toSet().take(10).toList();
+        final tags = RegExp(r'@([^\s@]+)').allMatches(body).map((m)=>m.group(1)!.replaceAll('_', ' ')).toSet().take(10).toList();
         if (tags.isNotEmpty) {
           final matches = await _chatDb.collection('publicProfiles').where('name', whereIn: tags).limit(10).get();
           for (final profile in matches.docs) {
@@ -103,6 +153,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             await _chatDb.collection('notifications').add({
               'recipientId':profile.id,'actorId':_uid,'actorName':senderName,
               'type':'mention','text':'أشار إليك في الدردشة العامة','read':false,
+              'targetType':'publicMessage','targetId':sentMessage.id,'messageId':sentMessage.id,
               'createdAt':FieldValue.serverTimestamp(),
             });
           }
@@ -123,6 +174,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _sendVideo() async {
+    if (_sending) return;
+    try {
+      final file = await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3));
+      if (file == null) return;
+      if (mounted) setState(() { _sending = true; _error = null; });
+      final url = await uploadForumMedia(file, folder: 'public-chat');
+      await _send(body: 'فيديو', mediaUrl: url, type: 'video', uploadInProgress: true);
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الفيديو: $e'); }
+    finally { if (mounted) setState(() => _sending = false); }
+  }
+
   Future<void> _toggleVoiceRecording() async {
     if (_sending) return;
     if (!_recordingVoice) {
@@ -218,7 +281,11 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       reason.dispose();
     }
     if(a=='pin'&&staff)await doc.reference.update({'isPinned':d['isPinned']!=true,'pinnedBy':_uid});
-    if(a=='delete'&&(mine||staff))await doc.reference.delete();
+    if(a=='delete'&&(mine||staff)){
+      final mediaUrl = (d['imageUrl'] ?? d['audioUrl'] ?? d['videoUrl'])?.toString();
+      if (mine && mediaUrl != null && mediaUrl.startsWith('https://')) { try { await deleteForumMedia(mediaUrl); } catch (_) {} }
+      await doc.reference.delete();
+    }
     if(a=='edit'&&mounted){
       final t=TextEditingController(text:d['text'] as String? ?? '');
       final v=await showDialog<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('تعديل الرسالة'),content:TextField(controller:t,maxLength:1000,maxLines:3),actions:[
@@ -432,9 +499,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     final tierLabel = switch (tier) { 'gold' => 'ذهبية', 'silver' => 'فضية', 'diamond' => 'ماسية', 'legendary' => 'أسطورية', _ => 'مميزة' };
     final type=d['type'] as String? ?? 'text';final body=d['text'] as String? ?? '';
     final reply=d['replyTo'] as Map<String,dynamic>?;
-    return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
-      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.90),margin:const EdgeInsets.symmetric(vertical:6),padding:const EdgeInsets.all(10),
-      decoration:BoxDecoration(color:founder?const Color(0xFFFFF4D6):(tierColor!=null?tierColor.withValues(alpha:.13):(mine?const Color(0xFFE8E2FF):Colors.white)),borderRadius:BorderRadius.circular(17),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.7),width:founder?2.6:(tierColor!=null?2:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:10,spreadRadius:1,offset:Offset(0,3))]:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
+    return GestureDetector(onTap:()=>setState(()=>_pulseMessageId=doc.id),onDoubleTap:()=>_react(doc.id,'❤️'),onHorizontalDragEnd:(details){if(details.primaryVelocity!=null&&details.primaryVelocity!.abs()>250){setState(()=>_reply=doc);}},onLongPress:()=>_menu(doc),child:AnimatedScale(scale:_pulseMessageId==doc.id?1.025:1,duration:const Duration(milliseconds:180),curve:Curves.easeOutBack,child:Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
+      constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.84),margin:EdgeInsetsDirectional.only(top:5,bottom:7,start:mine?42:4,end:mine?4:42),padding:const EdgeInsets.symmetric(horizontal:13,vertical:11),
+      decoration:BoxDecoration(gradient:LinearGradient(begin:Alignment.topLeft,end:Alignment.bottomRight,colors:founder?const [Color(0xFFFFFAEA),Color(0xFFFFE9B8)]:(tierColor!=null?[tierColor.withValues(alpha:.22),tierColor.withValues(alpha:.10)]:(mine?const [Color(0xFFF6F2FF),Color(0xFFE3DCFF)]:[Colors.white.withValues(alpha:.94),const Color(0xFFEAF3FF).withValues(alpha:.88)]))),borderRadius:BorderRadius.only(topLeft:const Radius.circular(20),topRight:const Radius.circular(20),bottomLeft:Radius.circular(mine?20:5),bottomRight:Radius.circular(mine?5:20)),border:Border.all(color:founder?const Color(0xFFFFB52E):(tierColor??_chatBrand).withValues(alpha:founder?1:.55),width:founder?2.4:(tierColor!=null?1.8:1)),boxShadow:founder?const [BoxShadow(color:Color(0x33D99A16),blurRadius:12,spreadRadius:1,offset:Offset(0,3))]:[BoxShadow(color:(mine?_chatBrand:Colors.black).withValues(alpha:.09),blurRadius:12,offset:const Offset(0,4))]),
       child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         if(d['isPinned']==true)const Text('📌 مثبتة',style:TextStyle(fontSize:10)),
         Row(mainAxisSize:MainAxisSize.min,children:[
@@ -458,14 +525,23 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
         if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
+        if(type=='video'&&d['videoUrl'] is String)_ChatVideoMessage(url:d['videoUrl'] as String),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
         Row(mainAxisSize:MainAxisSize.min,children:[
-          ...['❤️','😂','🔥','👏'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
+          ...['❤️','😂','🔥','👏','😍','🥹','💜','🎉'].map((e)=>InkWell(onTap:()=>_react(doc.id,e),child:Padding(padding:const EdgeInsets.all(3),child:Text(e)))),
           StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:doc.reference.collection('reactions').snapshots(),builder:(c,s){
             final counts=<String,int>{};for(final r in s.data?.docs??[]){final e=r.data()['emoji'] as String? ?? '';counts[e]=(counts[e]??0)+1;}
             return Text(counts.entries.map((e)=>e.key+e.value.toString()).join(' '),style:const TextStyle(fontSize:11));
           }),
+          if (d['createdAt'] is Timestamp)
+            Padding(padding: const EdgeInsetsDirectional.only(start: 5, end: 2),
+              child: Text(() {
+                final date = (d['createdAt'] as Timestamp).toDate().toLocal();
+                final hour = (date.hour % 12 == 0 ? 12 : date.hour % 12).toString().padLeft(2, '0');
+                final minute = date.minute.toString().padLeft(2, '0');
+                return '$hour:$minute ${date.hour >= 12 ? 'م' : 'ص'}';
+              }(), style: const TextStyle(fontSize: 10, color: Colors.black54))),
           IconButton(visualDensity:VisualDensity.compact,onPressed:()=>_menu(doc),icon:const Icon(Icons.more_horiz,size:17)),
         ]),
       ]),
@@ -473,18 +549,123 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   }
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
-    Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:10),decoration:const BoxDecoration(gradient:LinearGradient(colors:[Color(0xFF171936),Color(0xFF5144B8),Color(0xFF8C7CF0)])),child:Row(children:[
-      const Icon(Icons.forum,color:Colors.white,size:30),const SizedBox(width:9),
-      const Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('الساحة العامة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold,fontSize:17)),Text('صور • GIF • ملصقات • مسابقات',style:TextStyle(color:Colors.white70,fontSize:11))])),
-      StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatPresence').where('online',isEqualTo:true).snapshots(),builder:(c,s)=>Text((s.data?.docs.length??0).toString()+' متصل',style:const TextStyle(color:Colors.white,fontSize:11))),
-      IconButton(onPressed:()=>showModalBottomSheet<void>(context:context,builder:(c)=>Wrap(children:_backgrounds.map((v)=>ListTile(leading:CircleAvatar(backgroundColor:Color(v)),title:Text('خلفية الدردشة'),onTap:(){Navigator.pop(c);setState(()=>_background=v);_chatDb.collection('chatPreferences').doc(_uid).set({'background':v},SetOptions(merge:true));})).toList())),icon:const Icon(Icons.palette,color:Colors.white)),
-      if(_isFounder)IconButton(onPressed:_founderTools,icon:const Icon(Icons.admin_panel_settings,color:Color(0xFFFFD166))),
-    ])),
+    Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [Color(0xFF11162F), Color(0xFF30286F), Color(0xFF6554D9)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        boxShadow: [BoxShadow(color: Color(0x260F1230), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Row(children: [
+        Container(
+          width: 43, height: 43,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 23),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+            SizedBox(height: 3),
+            Text('دردشة مباشرة • اسحب الرسالة للرد', style: TextStyle(color: Color(0xFFDCD7FF), fontSize: 11)),
+          ],
+        )),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _chatDb.collection('chatPresence').where('online', isEqualTo: true).snapshots(),
+          builder: (c, s) => Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF63E6A5), shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Text('${s.data?.docs.length ?? 0} متصل', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+            ]),
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert, color: Colors.white),
+          onSelected: (value) {
+            if (value == 'background') {
+              showModalBottomSheet<void>(
+                context: context,
+                showDragHandle: true,
+                builder: (c) => Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: SafeArea(child: Wrap(children: _backgrounds.map((color) => ListTile(
+                    leading: CircleAvatar(backgroundColor: Color(color)),
+                    title: const Text('اختيار خلفية الدردشة'),
+                    onTap: () {
+                      Navigator.pop(c);
+                      setState(() => _background = color);
+                      _chatDb.collection('chatPreferences').doc(_uid).set({'background': color}, SetOptions(merge: true));
+                    },
+                  )).toList())),
+                ),
+              );
+            } else if (value == 'admin') {
+              _founderTools();
+            }
+          },
+          itemBuilder: (c) => [
+            const PopupMenuItem(value: 'background', child: Text('تغيير الخلفية')),
+            if (_isFounder) const PopupMenuItem(value: 'admin', child: Text('لوحة المؤسس')),
+          ],
+        ),
+      ]),
+    ),
+    Padding(
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
+      child: TextField(
+        onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'ابحث في رسائل الساحة وأسماء الأعضاء...',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+            tooltip: 'مسح البحث', onPressed: () => setState(() => _searchQuery = ''),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: .92),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        ),
+      ),
+    ),
+    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
+      builder:(context,s){
+        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
+        final pinned=s.data!.docs;
+        return Container(margin:const EdgeInsets.fromLTRB(10,6,10,4),decoration:BoxDecoration(color:const Color(0xFFEDE8FF),borderRadius:BorderRadius.circular(13),border:Border.all(color:_chatBrand.withValues(alpha:.35))),child:ExpansionTile(
+          dense:true,leading:const Icon(Icons.push_pin_rounded,color:_chatBrand),title:Text('الرسائل المثبتة (${pinned.length})',style:const TextStyle(color:Color(0xFF34266F),fontWeight:FontWeight.w900)),
+          subtitle:const Text('اضغط لعرض الإعلانات والرسائل المهمة',style:TextStyle(fontSize:10,color:Color(0xFF6554A8))),
+          children:pinned.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.bookmark,color:_chatBrand,size:18),title:Text(d['senderName'] as String? ?? 'عضو',style:const TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF34266F))),subtitle:Text(d['text'] as String? ?? (d['type']=='image'?'📷 صورة':d['type']=='voice'?'🎙️ رسالة صوتية':'مرفق'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Color(0xFF34266F))),onTap:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('رسالة مثبتة'),content:Text(d['text'] as String? ?? 'رسالة مرفقة'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))])));}).toList(),
+        ));
+      },
+    ),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
       if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
       return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
     }),
-    Expanded(child:Container(color:Color(_background),child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
+    Expanded(child:AnimatedContainer(
+      duration: const Duration(milliseconds: 850),
+      curve: Curves.easeInOutCubic,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight, end: Alignment.bottomLeft,
+          colors: [Color(_background), Color(_background).withOpacity(.78), Color(_background).withOpacity(.92)],
+        ),
+      ),
+      child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
       stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
       builder:(context,blocks){
         if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
@@ -495,8 +676,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           builder:(c,s){
             if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
             if(!s.hasData)return const Center(child:CircularProgressIndicator());
-            final visible=s.data!.docs.where((d)=>!blockedIds.contains((d.data()['senderId']??'').toString())).toList();
-            if(visible.isEmpty)return const Center(child:Text('ابدأ أول محادثة في الساحة ✨'));
+            final visible=s.data!.docs.where((d) {
+              final data=d.data();
+              if(blockedIds.contains((data['senderId']??'').toString())) return false;
+              if(_searchQuery.isEmpty) return true;
+              final text = "${data['text'] ?? ''} ${data['senderName'] ?? ''}".toLowerCase();
+              return text.contains(_searchQuery);
+            }).toList();
+            if(visible.isEmpty)return Center(child:Text(_searchQuery.isEmpty?'ابدأ أول محادثة في الساحة ✨':'ما لقينا رسائل تطابق بحثك 🔎'));
             return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
           },
         );
@@ -508,14 +695,22 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }),
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
-    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
-      IconButton(onPressed:_sending?null:_sendImage,icon:const Icon(Icons.image,color:_chatBrand)),
+    Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
+      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:_chatBrand)),
+       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
       IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
       IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
-      Expanded(child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
-        onChanged:(v)=>_chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_){}),
-        onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none))),
-      IconButton(onPressed:_sending?null:()=>_send(body:_text.text),icon:_sending?const CircularProgressIndicator():const Icon(Icons.send,color:_chatBrand)),
+      Expanded(child:Container(
+        margin:const EdgeInsets.symmetric(vertical:4),
+        padding:const EdgeInsets.symmetric(horizontal:12,vertical:2),
+        decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(22),border:Border.all(color:_chatBrand.withValues(alpha:.20)),boxShadow:const [BoxShadow(color:Color(0x10000000),blurRadius:7,offset:Offset(0,2))]),
+        child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
+          onChanged:(v) {
+            _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
+            if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
+          },
+          onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10))))),
+      IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white),icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded)),
     ]))),
   ]));
 }
@@ -606,5 +801,32 @@ class _VoiceMessagePlayerState extends State<_VoiceMessagePlayer> {
         }),
       ])),
     ]),
+  );
+}
+
+
+class _ChatVideoMessage extends StatefulWidget {
+  final String url;
+  const _ChatVideoMessage({required this.url});
+  @override State<_ChatVideoMessage> createState() => _ChatVideoMessageState();
+}
+class _ChatVideoMessageState extends State<_ChatVideoMessage> {
+  late final VideoPlayerController _controller;
+  @override void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))..initialize().then((_) { if (mounted) setState(() {}); });
+  }
+  @override void dispose() { _controller.dispose(); super.dispose(); }
+  @override Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: Container(width: 250, color: Colors.black,
+      child: _controller.value.isInitialized
+        ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [
+            VideoPlayer(_controller),
+            IconButton(color: Colors.white, iconSize: 54, icon: Icon(_controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle),
+              onPressed: () => setState(() => _controller.value.isPlaying ? _controller.pause() : _controller.play())),
+          ]))
+        : const SizedBox(height: 150, child: Center(child: CircularProgressIndicator(color: Colors.white))),
+    ),
   );
 }

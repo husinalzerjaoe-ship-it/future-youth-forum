@@ -1,0 +1,32 @@
+name: Deploy Firebase Security Rules
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Validate Firebase project configuration
+        run: |
+          test -f firebase.json
+          test -f firestore.rules
+          test -f storage.rules
+
+      - name: Deploy Firestore and Storage rules
+        run: firebase deploy --only firestore:rules,storage --project futureyouth-69f8a --non-interactive

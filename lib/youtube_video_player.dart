@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 String? youtubeEmbedUrl(String raw) {
   final uri = Uri.tryParse(raw.trim());
@@ -43,7 +43,7 @@ class YouTubeVideoPlayer extends StatefulWidget {
 }
 
 class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
-  WebViewController? _web;
+  YoutubePlayerController? _youtube;
   VideoPlayerController? _direct;
   bool _loading = true;
   bool _failed = false;
@@ -57,28 +57,38 @@ class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
   }
 
   Future<void> _load() async {
-    await _direct?.dispose();
+    final oldYoutube = _youtube;
+    final oldDirect = _direct;
+    _youtube = null;
     _direct = null;
-    _web = null;
-    _loading = true;
-    _failed = false;
+    await oldYoutube?.close();
+    await oldDirect?.dispose();
+    if (!mounted) return;
+    setState(() { _loading = true; _failed = false; _isDirect = false; });
     final embed = youtubeEmbedUrl(widget.url);
     if (embed != null) {
-      final controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(const Color(0xFF000000))
-        ..setNavigationDelegate(NavigationDelegate(
-          onPageFinished: (_) { if (mounted) setState(() => _loading = false); },
-          onWebResourceError: (error) {
-            if (error.isForMainFrame == true && mounted) {
-              setState(() { _loading = false; _failed = true; });
-            }
-          },
-        ));
-      _web = controller;
+      final uri = Uri.parse(embed);
+      final id = uri.pathSegments.isNotEmpty && uri.pathSegments.last != 'videoseries'
+          ? uri.pathSegments.last : null;
       try {
-        await controller.loadHtmlString('''<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><style>html,body{margin:0;padding:0;background:#000;width:100%;height:100%;overflow:hidden}iframe{position:absolute;inset:0;width:100%;height:100%;border:0}</style></head><body><iframe src="$embed" title="YouTube player" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></body></html>''',
-        baseUrl: 'https://www.youtube-nocookie.com');
+        if (id == null) {
+          // Playlist embeds are opened in the official YouTube app/site, which
+          // avoids pretending that playlist playback is a single video session.
+          if (mounted) setState(() { _loading = false; _failed = true; });
+          return;
+        }
+        final controller = YoutubePlayerController.fromVideoId(
+          videoId: id,
+          autoPlay: false,
+          params: const YoutubePlayerParams(
+            showControls: true,
+            showFullscreenButton: true,
+            strictRelatedVideos: true,
+            playsInline: true,
+          ),
+        );
+        _youtube = controller;
+        if (mounted) setState(() => _loading = false);
         return;
       } catch (_) {
         if (mounted) setState(() { _loading = false; _failed = true; });
@@ -106,18 +116,22 @@ class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
     }
   }
 
-  @override void dispose() { _direct?.dispose(); super.dispose(); }
+  @override void dispose() {
+    _youtube?.close();
+    _direct?.dispose();
+    super.dispose();
+  }
 
   @override Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(12),
     child: AspectRatio(aspectRatio: 16 / 9, child: Stack(fit: StackFit.expand, children: [
-      if (_web != null && !_failed) WebViewWidget(controller: _web!)
+      if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
       else if (_direct != null && _isDirect)
         GestureDetector(
-          onTap: () {
+          onTap: () async {
             final p = _direct!;
-            if (p.value.isPlaying) { p.pause(); } else { p.play(); }
-            setState(() {});
+            if (p.value.isPlaying) { await p.pause(); } else { await p.play(); }
+            if (mounted) setState(() {});
           },
           child: ColoredBox(color: Colors.black, child: Stack(alignment: Alignment.center, children: [
             VideoPlayer(_direct!),
@@ -130,13 +144,13 @@ class _YouTubeVideoPlayerState extends State<YouTubeVideoPlayer> {
         ColoredBox(color: Colors.black87, child: Center(child: TextButton.icon(
           onPressed: _openExternal,
           icon: const Icon(Icons.open_in_new, color: Colors.white),
-          label: const Text('افتح الفيديو خارج التطبيق', style: TextStyle(color: Colors.white)),
+          label: const Text('افتح الفيديو في YouTube', style: TextStyle(color: Colors.white)),
         ))),
       if (_loading) const ColoredBox(color: Colors.black45, child: Center(child: CircularProgressIndicator(color: Colors.white))),
       if (_failed && !_loading) ColoredBox(color: Colors.black54, child: Center(child: TextButton.icon(
         onPressed: _openExternal,
         icon: const Icon(Icons.play_circle_fill, color: Colors.white),
-        label: const Text('تعذر التشغيل؟ افتحه خارج التطبيق', style: TextStyle(color: Colors.white)),
+        label: const Text('هذا المقطع لا يسمح بالتضمين أو تعذر تحميله — افتحه في YouTube', style: TextStyle(color: Colors.white)),
       ))),
     ])),
   );
