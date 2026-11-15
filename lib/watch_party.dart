@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,21 +20,35 @@ const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
 
 class WatchPartyLobbyPage extends StatefulWidget {
-  const WatchPartyLobbyPage({super.key});
+  final String? initialUrl;
+  final String? initialName;
+  final bool cinemaMode;
+  const WatchPartyLobbyPage({super.key, this.initialUrl, this.initialName, this.cinemaMode = false});
   @override State<WatchPartyLobbyPage> createState() => _WatchPartyLobbyPageState();
 }
 
 class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
-  final _url = TextEditingController();
-  final _name = TextEditingController(text: 'غرفة مشاهدة');
+  late final TextEditingController _url;
+  late final TextEditingController _name;
+  final _roomPassword = TextEditingController();
   bool _creating = false;
   bool _privateRoom = false;
+  bool _passwordProtected = false;
   final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   @override
-  void dispose() { _url.dispose(); _name.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    _url = TextEditingController(text: widget.initialUrl ?? '');
+    _name = TextEditingController(text: widget.initialName ?? 'غرفة مشاهدة');
+    _privateRoom = widget.cinemaMode;
+    _passwordProtected = widget.cinemaMode;
+  }
+
+  @override
+  void dispose() { _url.dispose(); _name.dispose(); _roomPassword.dispose(); super.dispose(); }
 
   Future<void> _chooseFriends() async {
     final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
@@ -81,16 +98,31 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     final isDirect = path.endsWith('.mp4') || path.endsWith('.m3u8') ||
         path.endsWith('.m4v') || path.endsWith('.mov') || path.endsWith('.webm');
     final sourceType = videoId != null ? 'youtube' : isDirect ? 'direct' : 'web';
+    if (_passwordProtected && _roomPassword.text.trim().length < 4) {
+      setState(() => _error = 'كلمة المرور لازم تكون 4 أحرف على الأقل.');
+      return;
+    }
+    final passwordSalt = _passwordProtected
+        ? List<int>.generate(16, (_) => Random.secure().nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join()
+        : null;
+    final passwordHash = _passwordProtected
+        ? crypto.sha256.convert(utf8.encode('$passwordSalt|${_roomPassword.text.trim()}')).toString()
+        : null;
     setState(() { _creating = true; _error = null; });
     try {
       final ref = await _watchDb.collection('watchRooms').add({
         'name': _name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim(),
+        'roomType': widget.cinemaMode ? 'cinema' : 'watch',
+        if (widget.cinemaMode) 'contentTitle': _name.text.trim(),
         'url': raw,
         'sourceType': sourceType,
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
         'visibility': _privateRoom ? 'private' : 'public',
         'invitedUids': _privateRoom ? <String>{_uid, ..._invitedUids}.toList() : <String>[],
+        'passwordProtected': _passwordProtected && _privateRoom,
+        if (_passwordProtected && _privateRoom) 'passwordSalt': passwordSalt,
+        if (_passwordProtected && _privateRoom) 'passwordHash': passwordHash,
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -138,7 +170,19 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
               contentPadding: EdgeInsets.zero, value: _privateRoom,
               title: const Text('غرفة خاصة للأصدقاء'),
               subtitle: const Text('لا تظهر للعامة؛ فقط أنت والأصدقاء الذين تختارهم'),
-              onChanged: (value) => setState(() { _privateRoom = value; if (!value) _invitedUids.clear(); }),
+              onChanged: (value) => setState(() { _privateRoom = value; if (!value) { _invitedUids.clear(); _passwordProtected = false; _roomPassword.clear(); } }),
+            ),
+            if (_privateRoom) SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _passwordProtected,
+              title: const Text('حماية الغرفة بكلمة مرور'),
+              subtitle: const Text('الدخول للمدعوين فقط، ويحتاجون كلمة المرور أيضاً'),
+              onChanged: (value) => setState(() { _passwordProtected = value; if (!value) _roomPassword.clear(); }),
+            ),
+            if (_privateRoom && _passwordProtected) Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(controller: _roomPassword, obscureText: true, maxLength: 64,
+                decoration: const InputDecoration(labelText: 'كلمة مرور الغرفة (4 أحرف على الأقل)', border: OutlineInputBorder(), counterText: '')),
             ),
             if (_privateRoom) OutlinedButton.icon(
               onPressed: _chooseFriends, icon: const Icon(Icons.group_add),
@@ -209,15 +253,50 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   @override
   void initState() {
     super.initState();
-    _joinRoom();
-    _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
-      if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
-      final data = snap.data()!;
-      final changed = data['url'] != _loadedUrl;
-      if (mounted) setState(() => _room = data);
-      if (changed) _setupPlayer(data);
-      else _applyRemoteState(data);
-    }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+    _enterRoom();
+  }
+
+  Future<void> _enterRoom() async {
+    try {
+      final first = await _watchDb.collection('watchRooms').doc(widget.roomId).get();
+      if (!first.exists) throw StateError('الغرفة غير موجودة.');
+      final data = first.data() ?? <String, dynamic>{};
+      if (data['active'] == false) throw StateError('الغرفة مغلقة.');
+      if (data['passwordProtected'] == true && data['hostUid'] != _uid) {
+        final passController = TextEditingController();
+        final entered = await showDialog<String>(context: context, barrierDismissible: false,
+          builder: (dialogContext) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+            title: const Text('غرفة محمية بكلمة مرور'),
+            content: TextField(controller: passController, obscureText: true, autofocus: true,
+              decoration: const InputDecoration(labelText: 'أدخل كلمة المرور', border: OutlineInputBorder()),
+              onSubmitted: (value) => Navigator.pop(dialogContext, value)),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, passController.text), child: const Text('دخول'))],
+          )));
+        passController.dispose();
+        if (entered == null) { if (mounted) Navigator.pop(context); return; }
+        final salt = (data['passwordSalt'] ?? '').toString();
+        final expected = (data['passwordHash'] ?? '').toString();
+        final actual = crypto.sha256.convert(utf8.encode('${salt}|${entered.trim()}')).toString();
+        if (salt.isEmpty || expected.isEmpty || actual != expected) {
+          if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور غير صحيحة.'))); Navigator.pop(context); }
+          return;
+        }
+      }
+      await _joinRoom();
+      if (!mounted) return;
+      setState(() => _room = data);
+      _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
+        if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
+        final updated = snap.data()!;
+        final changed = updated['url'] != _loadedUrl;
+        if (mounted) setState(() => _room = updated);
+        if (changed) _setupPlayer(updated);
+        else _applyRemoteState(updated);
+      }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString().replaceFirst('Bad state: ', ''));
+    }
   }
 
   Future<void> _joinRoom() async {
