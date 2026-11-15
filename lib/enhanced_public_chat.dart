@@ -350,8 +350,16 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ])));
   }
   Future<void> _join(String id) async {
-    await _chatDb.collection('weeklyContests').doc(id).collection('entries').doc(_uid).set({'uid':_uid,'joinedAt':FieldValue.serverTimestamp()});
-    _snack('تم تسجيل اشتراكك');
+    try {
+      final entry = _chatDb.collection('weeklyContests').doc(id).collection('entries').doc(_uid);
+      await entry.set({
+        'uid': _uid,
+        'joinedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      if (mounted) _snack('تم تسجيل اشتراكك، واختفت المسابقة من قائمتك');
+    } catch (_) {
+      if (mounted) _snack('تعذر تسجيل الاشتراك. تحقق من اتصال الإنترنت وصلاحيات المسابقات.');
+    }
   }
   Future<void> _moderator() async {
     final uid=TextEditingController();final ok=await showDialog<bool>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:AlertDialog(title:const Text('إضافة مشرف'),content:TextField(controller:uid,decoration:const InputDecoration(labelText:'UID العضو')),actions:[
@@ -550,7 +558,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
     Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topRight,
@@ -562,7 +570,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       ),
       child: Row(children: [
         Container(
-          width: 43, height: 43,
+          width: 38, height: 38,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: .12),
             borderRadius: BorderRadius.circular(14),
@@ -623,39 +631,148 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       ]),
     ),
     Padding(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
-      child: TextField(
-        onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'ابحث في رسائل الساحة وأسماء الأعضاء...',
-          prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: _searchQuery.isEmpty ? null : IconButton(
-            tooltip: 'مسح البحث', onPressed: () => setState(() => _searchQuery = ''),
-            icon: const Icon(Icons.close_rounded),
+      padding: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+      child: SizedBox(
+        height: 40,
+        child: TextField(
+          onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: 'ابحث في الرسائل والأعضاء...',
+            hintStyle: const TextStyle(fontSize: 12),
+            prefixIcon: const Icon(Icons.search_rounded, size: 19),
+            prefixIconConstraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            suffixIcon: _searchQuery.isEmpty ? null : IconButton(
+              tooltip: 'مسح البحث',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+              onPressed: () => setState(() => _searchQuery = ''),
+              icon: const Icon(Icons.close_rounded, size: 17),
+            ),
+            suffixIconConstraints: const BoxConstraints.tightFor(width: 32, height: 34),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: .94),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           ),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: .92),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         ),
       ),
     ),
     StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
-      builder:(context,s){
-        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
-        final pinned=s.data!.docs;
-        return Container(margin:const EdgeInsets.fromLTRB(10,6,10,4),decoration:BoxDecoration(color:const Color(0xFFEDE8FF),borderRadius:BorderRadius.circular(13),border:Border.all(color:_chatBrand.withValues(alpha:.35))),child:ExpansionTile(
-          dense:true,leading:const Icon(Icons.push_pin_rounded,color:_chatBrand),title:Text('الرسائل المثبتة (${pinned.length})',style:const TextStyle(color:Color(0xFF34266F),fontWeight:FontWeight.w900)),
-          subtitle:const Text('اضغط لعرض الإعلانات والرسائل المهمة',style:TextStyle(fontSize:10,color:Color(0xFF6554A8))),
-          children:pinned.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.bookmark,color:_chatBrand,size:18),title:Text(d['senderName'] as String? ?? 'عضو',style:const TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF34266F))),subtitle:Text(d['text'] as String? ?? (d['type']=='image'?'📷 صورة':d['type']=='voice'?'🎙️ رسالة صوتية':'مرفق'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Color(0xFF34266F))),onTap:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('رسالة مثبتة'),content:Text(d['text'] as String? ?? 'رسالة مرفقة'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))])));}).toList(),
-        ));
+      stream: _chatDb.collection('messages').where('isPinned', isEqualTo: true).limit(5).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
+        final pinned = snapshot.data!.docs;
+        return Container(
+          margin: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEDE8FF),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(color: _chatBrand.withValues(alpha: .25)),
+          ),
+          child: ExpansionTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 9),
+            childrenPadding: const EdgeInsets.only(bottom: 3),
+            minTileHeight: 38,
+            leading: const Icon(Icons.push_pin_rounded, color: _chatBrand, size: 17),
+            title: Text(
+              'المثبتة (' + pinned.length.toString() + ')',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF34266F), fontWeight: FontWeight.w800),
+            ),
+            children: pinned.map((doc) {
+              final data = doc.data();
+              final preview = (data['text'] as String?)?.trim().isNotEmpty == true
+                  ? (data['text'] as String).trim()
+                  : data['type'] == 'image' ? '📷 صورة'
+                  : data['type'] == 'voice' ? '🎙️ رسالة صوتية'
+                  : data['type'] == 'video' ? '🎬 فيديو' : 'مرفق';
+              return ListTile(
+                dense: true,
+                visualDensity: VisualDensity.compact,
+                minTileHeight: 34,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                leading: const Icon(Icons.bookmark_outline, color: _chatBrand, size: 16),
+                title: Text(
+                  (data['senderName'] as String? ?? 'عضو') + ' • ' + preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF34266F), fontWeight: FontWeight.w600),
+                ),
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('رسالة مثبتة'),
+                    content: Text(preview),
+                    actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        );
       },
     ),
-    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
-      if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
-      return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
-    }),
+    StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _chatDb.collection('weeklyContests').where('status', isEqualTo: 'open').limit(3).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: snapshot.data!.docs.map((contest) {
+            return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              stream: contest.reference.collection('entries').doc(_uid).snapshots(),
+              builder: (context, entry) {
+                if (entry.data?.exists == true) return const SizedBox.shrink();
+                final data = contest.data();
+                return Container(
+                  margin: const EdgeInsets.fromLTRB(8, 2, 8, 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF6D9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE7C66D).withValues(alpha: .55)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.emoji_events_rounded, color: Colors.orange, size: 19),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(data['title'] as String? ?? 'مسابقة الأسبوع',
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                            if ((data['details'] as String? ?? '').trim().isNotEmpty)
+                              Text(data['details'] as String, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF795D22))),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                          minimumSize: const Size(48, 30),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        onPressed: entry.connectionState == ConnectionState.waiting ? null : () => _join(contest.id),
+                        child: const Text('اشترك', style: TextStyle(fontSize: 11)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          }).toList(),
+        );
+      },
+    ),
     Expanded(child:AnimatedContainer(
       duration: const Duration(milliseconds: 850),
       curve: Curves.easeInOutCubic,
@@ -696,10 +813,10 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
     if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
     Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
-      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:_chatBrand)),
-       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
-      IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
-      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
+      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',visualDensity:VisualDensity.compact,padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:36,height:36),icon:const Icon(Icons.image,color:_chatBrand,size:21)),
+       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',visualDensity:VisualDensity.compact,padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:36,height:36),icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83),size:21)),
+      IconButton(onPressed:_sending?null:_showStickers,visualDensity:VisualDensity.compact,padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:36,height:36),icon:const Icon(Icons.emoji_emotions,color:Colors.orange,size:21)),
+      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',visualDensity:VisualDensity.compact,padding:EdgeInsets.zero,constraints:const BoxConstraints.tightFor(width:36,height:36),icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand,size:21)),
       Expanded(child:Container(
         margin:const EdgeInsets.symmetric(vertical:4),
         padding:const EdgeInsets.symmetric(horizontal:12,vertical:2),
@@ -710,7 +827,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
           },
           onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10))))),
-      IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white),icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded)),
+      IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white,minimumSize:const Size(36,36),padding:EdgeInsets.zero,visualDensity:VisualDensity.compact),icon:_sending?const SizedBox(width:16,height:16,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded,size:19)),
     ]))),
   ]));
 }
