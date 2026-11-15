@@ -512,7 +512,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
   final senderPhoto=d['senderPhoto'] as String?;
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
-   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
+   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.88),
    decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
     border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
     boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
