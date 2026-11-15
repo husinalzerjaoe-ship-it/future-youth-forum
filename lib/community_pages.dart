@@ -265,7 +265,22 @@ class _StoriesPageState extends State<StoriesPage>{
    if (file != null && await file.exists()) await file.delete();
   }
  }
- Future<void> add()async{
+ Future<void> deleteStory(String id, Map<String,dynamic> data) async {
+   final me = FirebaseAuth.instance.currentUser;
+   if (me == null || data['authorId'] != me.uid) return;
+   final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+    title: const Text('حذف الستوري؟'), content: const Text('سيتم حذف القصة من الملتقى.'),
+    actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف'))],
+   ));
+   if (confirm != true) return;
+   try {
+    final url = (data['mediaUrl'] ?? '').toString();
+    if (url.startsWith('https://')) { try { await deleteForumMedia(url); } catch (_) {} }
+    await db2.collection('stories').doc(id).delete();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الستوري')));
+   } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر حذف الستوري: $e'))); }
+  }
+  Future<void> add()async{
   final pick=ImagePicker();
   final type=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Wrap(children:[
    ListTile(leading:const Icon(Icons.image),title:const Text('صورة'),onTap:()=>Navigator.pop(c,'image')),
@@ -292,7 +307,7 @@ class _StoriesPageState extends State<StoriesPage>{
    if(docs.isEmpty)return const Center(child:Text('ماكو ستوريات حالياً'));
    return ListView(children:docs.map((doc){final d=doc.data();final video=d['mediaType']=='video';final url=d['mediaUrl'] as String;
     return Card(clipBehavior:Clip.antiAlias,child:Column(children:[
-     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو')),
+     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو'),trailing: (d['authorId'] == FirebaseAuth.instance.currentUser?.uid) ? PopupMenuButton<String>(onSelected: (v) { if (v == 'delete') deleteStory(doc.id, d); }, itemBuilder: (_) => const [PopupMenuItem(value:'delete',child:Text('حذف الستوري'))]) : null),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
