@@ -214,6 +214,8 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.resource.data.hostUid == resource.data.hostUid
         && (
+          (isFounder() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active']) && request.resource.data.active == false)
+          ||
           (resource.data.hostUid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['status', 'positionSeconds', 'updatedAt', 'active']))
@@ -240,7 +242,17 @@ service cloud.firestore {
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
 
-      // Watch-room chat must follow the same public/private membership rules.
+      function roomChatNotMuted() {
+        let mutePath = /databases/$(database)/documents/watchRooms/$(roomId)/roomMutes/$(request.auth.uid);
+        return !exists(mutePath) || (get(mutePath).data.permanent != true && (!('until' in get(mutePath).data) || get(mutePath).data.until <= request.time));
+      }
+      match /roomMutes/{userId} {
+        allow read: if canAccessRoom();
+        allow create, update: if request.auth != null && (isFounder() || get(/databases/$(database)/documents/watchRooms/$(roomId)).data.hostUid == request.auth.uid)
+          && request.resource.data.uid == userId && request.resource.data.by == request.auth.uid && request.resource.data.permanent is bool;
+        allow delete: if request.auth != null && (isFounder() || get(/databases/$(database)/documents/watchRooms/$(roomId)).data.hostUid == request.auth.uid);
+      }
+      // Watch-room chat supports text, images and voice.
       match /messages/{messageId} {
         allow read: if canAccessRoom();
         allow create: if canAccessRoom()
@@ -248,9 +260,13 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderName is string
           && request.resource.data.senderName.size() <= 60
+          && roomChatNotMuted() && accountNotBanned()
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.type in ['text', 'image', 'voice']
+          && ((request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
+            || (request.resource.data.type == 'image' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
+            || (request.resource.data.type == 'voice' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*') && request.resource.data.durationSeconds is int && request.resource.data.durationSeconds >= 1 && request.resource.data.durationSeconds <= 180));
         allow update: if false;
         allow delete: if canAccessRoom()
           && request.auth != null
