@@ -8,7 +8,8 @@ import 'package:livekit_client/livekit_client.dart' as lk;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LiveKitCallsPage extends StatefulWidget {
-  const LiveKitCallsPage({super.key});
+  final String? initialRoom;
+  const LiveKitCallsPage({super.key, this.initialRoom});
 
   @override
   State<LiveKitCallsPage> createState() => _LiveKitCallsPageState();
@@ -32,6 +33,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   @override
   void initState() {
     super.initState();
+    _roomController.text = widget.initialRoom ?? '';
     _loadEndpoint();
   }
 
