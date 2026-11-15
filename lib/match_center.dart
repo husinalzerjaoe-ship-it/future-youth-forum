@@ -9,6 +9,24 @@ class MatchCenterPage extends StatefulWidget {
 }
 
 class _MatchCenterPageState extends State<MatchCenterPage> {
+  Widget _teamCrest(Map<String, dynamic>? team, {double size = 56}) {
+    final logos = team?['logos'];
+    final firstLogo = logos is List && logos.isNotEmpty ? logos.first : null;
+    final url = (team?['logo'] ?? (firstLogo is Map ? firstLogo['href'] : null) ?? '').toString();
+    return Container(
+      width: size, height: size,
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: url.startsWith('http')
+          ? Image.network(url, fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.shield_rounded, size: 34))
+          : const Icon(Icons.shield_rounded, size: 34),
+    );
+  }
   static const leagues = <String, String>{
     'الدوري الإنجليزي': 'eng.1',
     'الدوري الإسباني': 'esp.1',
@@ -113,9 +131,9 @@ class _MatchCenterPageState extends State<MatchCenterPage> {
                           const SizedBox(height: 14),
                           Row(children: [
                             Expanded(child: Column(children: [
-                              const Icon(Icons.shield_outlined, size: 28),
-                              const SizedBox(height: 5),
-                              Text(home?['team']?['displayName']?.toString() ?? 'الفريق الأول', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              _teamCrest(home?['team'] as Map<String, dynamic>?, size: 58),
+                              const SizedBox(height: 7),
+                              Text(home?['team']?['displayName']?.toString() ?? 'الفريق الأول', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
                             ])),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -125,9 +143,9 @@ class _MatchCenterPageState extends State<MatchCenterPage> {
                               ),
                             ),
                             Expanded(child: Column(children: [
-                              const Icon(Icons.shield_outlined, size: 28),
-                              const SizedBox(height: 5),
-                              Text(away?['team']?['displayName']?.toString() ?? 'الفريق الثاني', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+                              _teamCrest(away?['team'] as Map<String, dynamic>?, size: 58),
+                              const SizedBox(height: 7),
+                              Text(away?['team']?['displayName']?.toString() ?? 'الفريق الثاني', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
                             ])),
                           ]),
                           const SizedBox(height: 10),

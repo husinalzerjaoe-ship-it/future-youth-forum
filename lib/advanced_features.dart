@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'watch_party.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
+import 'package:http/http.dart' as http;
+import 'package:gal/gal.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -98,10 +103,19 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
     child: Scaffold(
       appBar: AppBar(title: const Text('اختيار عضو')),
       body: Column(children: [
-        Padding(padding: const EdgeInsets.all(12), child: TextField(
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'ابحث عن عضو بالاسم', border: OutlineInputBorder()),
+        Padding(padding: const EdgeInsets.fromLTRB(10, 6, 10, 3), child: SizedBox(height: 40, child: TextField(
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            isDense: true,
+            prefixIcon: const Icon(Icons.search, size: 19),
+            prefixIconConstraints: const BoxConstraints.tightFor(width: 34, height: 34),
+            hintText: 'ابحث عن عضو بالاسم',
+            hintStyle: const TextStyle(fontSize: 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
-        )),
+        ))),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('publicProfiles').orderBy('name').limit(200).snapshots(),
           builder: (context, s) {
@@ -126,14 +140,18 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                   final myProfile = await _db.collection('publicProfiles').doc(_uid).get();
                   try {
                     final conversation = _db.collection('conversations').doc(id);
-                    final existing = await conversation.get();
-                    if (!existing.exists) {
-                      await conversation.set({
-                        'members': [_uid, d.id],
-                        'memberNames': {_uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو', d.id: name},
-                        'updatedAt': FieldValue.serverTimestamp(),
-                      });
-                    }
+                    // Avoid reading a missing conversation: Firestore denies get()
+                    // on a non-existent private chat, preventing first-time DMs.
+                    // A stable participant order keeps the same two-member room ID.
+                    final members = <String>[_uid, d.id]..sort();
+                    await conversation.set({
+                      'members': members,
+                      'memberNames': {
+                        _uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو',
+                        d.id: name,
+                      },
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    }, SetOptions(merge: true));
                     if (!context.mounted) return;
                     Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: d.id, otherName: name)));
                   } on FirebaseException catch (e) {
@@ -161,8 +179,10 @@ class _DirectChatPageState extends State<DirectChatPage> {
   bool changingBackground = false;
   bool recordingVoice = false;
   DateTime? voiceStartedAt;
+  Map<String, dynamic>? replyTo;
   final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
+  String searchQuery = '';
   @override void initState() { super.initState(); _loadBackground(); }
   Future<void> _loadBackground() async {
     try {
@@ -212,9 +232,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
   @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl, String? audioUrl, int? durationSeconds}) async {
+  Future<void> send({String? imageUrl, String? audioUrl, String? videoUrl, int? durationSeconds}) async {
     final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null && audioUrl == null) || busy) return;
+    if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null) || busy) return;
     setState(() => busy = true);
     try {
       // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
@@ -236,14 +256,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : videoUrl != null ? 'video' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (videoUrl != null) 'videoUrl': videoUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : videoUrl != null ? '🎬 فيديو' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
+      if (mounted) setState(() => replyTo = null);
       try {
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
+          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : videoUrl != null ? 'أرسل لك فيديو' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
@@ -271,6 +292,23 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) setState(() => busy = false);
     }
   }
+  Future<void> sendVideo() async {
+    if (busy) return;
+    final picked = await ImagePicker().pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 3));
+    if (picked == null || !mounted) return;
+    setState(() => busy = true);
+    try {
+      final url = await uploadForumMedia(picked, folder: 'private-chat');
+      if (!mounted) return;
+      setState(() => busy = false);
+      await send(videoUrl: url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر رفع الفيديو: $e')));
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> toggleVoiceRecording() async {
     if (busy) return;
     if (!recordingVoice) {
@@ -321,10 +359,26 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Future<void> showMessageActions(DocumentSnapshot<Map<String,dynamic>> doc) async {
     final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
+        ListTile(leading: const Icon(Icons.reply, color: _brand), title: const Text('الرد على هذه الرسالة'), onTap: () => Navigator.pop(c, 'reply')),
+        if (doc.data()?['senderId'] == _uid)
+          ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('حذف الرسالة'), onTap: () => Navigator.pop(c, 'delete')),
         const ListTile(title: Text('تفاعل مع الرسالة')),
         ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
       ])));
-    if (choice != null) await reactToMessage(doc.id, choice);
+    if (choice == 'reply') {
+      final d = doc.data();
+      if (d == null) return;
+      final type = d['type'];
+      final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
+      if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
+    } else if (choice == 'delete') {
+      final d = doc.data() ?? {};
+      final mediaUrl = (d['audioUrl'] ?? d['imageUrl'] ?? d['videoUrl']) as String?;
+      if (mediaUrl != null) { try { await deleteForumMedia(mediaUrl); } catch (_) {} }
+      await doc.reference.delete();
+    } else if (choice != null) {
+      await reactToMessage(doc.id, choice);
+    }
   }
   @override
   Widget build(BuildContext context) => Directionality(
@@ -385,16 +439,52 @@ class _DirectChatPageState extends State<DirectChatPage> {
           Positioned(top: 22, right: 18, child: Icon(Icons.auto_awesome, color: _brand.withValues(alpha: .10), size: 54)),
           Positioned(bottom: 90, left: 16, child: Icon(Icons.star_rounded, color: Colors.pink.withValues(alpha: .10), size: 68)),
           Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+          child: SizedBox(
+            height: 40,
+            child: TextField(
+              onChanged: (value) => setState(() => searchQuery = value.trim().toLowerCase()),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: 'ابحث في هذه المحادثة...',
+                hintStyle: const TextStyle(fontSize: 12),
+                prefixIcon: const Icon(Icons.search_rounded, size: 19),
+                prefixIconConstraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                suffixIcon: searchQuery.isEmpty ? null : IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(width: 30, height: 30),
+                  onPressed: () => setState(() => searchQuery = ''),
+                  icon: const Icon(Icons.close_rounded, size: 17),
+                ),
+                suffixIconConstraints: const BoxConstraints.tightFor(width: 32, height: 34),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: .94),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+        ),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _db.collection('conversations').doc(widget.conversationId).collection('messages').orderBy('createdAt', descending: true).limit(300).snapshots(),
           builder: (context, s) {
             if (s.hasError) return const Center(child: Text('تعذر تحميل المحادثة'));
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
-            return ListView(padding: const EdgeInsets.all(12), children: s.data!.docs.reversed.map((doc) {
+            final visible = s.data!.docs.where((doc) {
+              if (searchQuery.isEmpty) return true;
+              final d = doc.data();
+              final haystack = '${d['text'] ?? ''} ${d['senderName'] ?? ''}'.toLowerCase();
+              return haystack.contains(searchQuery);
+            }).toList();
+            if (visible.isEmpty) return Center(child: Text(searchQuery.isEmpty ? 'ابدأ محادثتك الآن ✨' : 'ماكو رسائل تطابق البحث'));
+            return ListView(padding: const EdgeInsets.all(12), children: visible.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
               return GestureDetector(onLongPress: () => showMessageActions(doc), child: Align(alignment: mine ? Alignment.centerRight : Alignment.centerLeft, child: Container(
                 margin: const EdgeInsets.symmetric(vertical: 4), padding: const EdgeInsets.all(12),
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .78),
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .88),
                 decoration: BoxDecoration(color: mine ? const Color(0xFFE8E2FF) : Colors.white, border: Border.all(color: const Color(0xFFB9B9C8)), borderRadius: BorderRadius.circular(14), boxShadow: const [BoxShadow(color: Color(0x14000000), blurRadius: 5, offset: Offset(0, 2))]),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   if ((d['senderId'] as String? ?? '').isNotEmpty)
@@ -421,8 +511,12 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
+                  if (d['replyToMessageId'] is String)
+                    Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
+                  if (d['type'] == 'video' && d['videoUrl'] is String)
+                    _DirectVideoMessage(url: d['videoUrl'] as String),
                   if (d['type'] == 'voice' && d['audioUrl'] is String)
                     _DirectVoicePlayer(url: d['audioUrl'] as String, durationSeconds: (d['durationSeconds'] as num?)?.toInt() ?? 0),
                   if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(color: Color(0xFF171717), fontSize: 18, height: 1.65, fontWeight: FontWeight.w500)),
@@ -437,13 +531,16 @@ class _DirectChatPageState extends State<DirectChatPage> {
             }).toList());
           },
         )),
-        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Row(children: [
-          IconButton(onPressed: busy ? null : sendImage, icon: const Icon(Icons.image_outlined)),
+        SafeArea(top: false, child: Padding(padding: const EdgeInsets.all(10), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (replyTo != null) Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الرد على ${replyTo!['senderName']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)), Text(replyTo!['preview'] as String, maxLines: 1, overflow: TextOverflow.ellipsis)])), IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => replyTo = null), icon: const Icon(Icons.close, size: 18))])),
+          Row(children: [
+          IconButton(onPressed: busy ? null : sendImage, tooltip: 'إرسال صورة', icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : sendVideo, tooltip: 'إرسال فيديو', icon: const Icon(Icons.video_library_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
-        ]))),
+        ])]))),
           ]),
         ]),
       ),
@@ -501,13 +598,87 @@ class NotificationsPage extends StatelessWidget {
               title: Text(d['text'] as String? ?? 'إشعار جديد'),
               subtitle: Text(d['actorName'] as String? ?? 'الملتقى'),
               trailing: d['read'] == true ? const Icon(Icons.done, color: Colors.green) : const Icon(Icons.circle, size: 9, color: _brand),
-              onTap: () => doc.reference.update({'read': true}),
+              onTap: () async {
+                await doc.reference.update({'read': true});
+                final targetType = (d['targetType'] ?? '').toString();
+                final targetId = (d['targetId'] ?? d['messageId'] ?? '').toString();
+                if (targetId.isNotEmpty && (targetType == 'publicMessage' || targetType == 'post' || targetType == 'watchRoom')) {
+                  if (!context.mounted) return;
+                  if (targetType == 'watchRoom') {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: targetId)));
+                  } else {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationTargetPage(
+                      targetId: targetId, isPost: targetType == 'post',
+                      title: targetType == 'post' ? 'المنشور الذي أشار إليك' : 'الرسالة التي أشار إليك بها',
+                    )));
+                  }
+                }
+              },
             );
           }).toList());
         },
       ),
     ),
   );
+}
+
+
+class NotificationTargetPage extends StatelessWidget {
+  final String targetId;
+  final bool isPost;
+  final String title;
+  const NotificationTargetPage({super.key, required this.targetId, required this.isPost, required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    final collection = isPost ? 'posts' : 'messages';
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+          stream: _db.collection(collection).doc(targetId).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Center(child: Text('تعذر فتح المحتوى'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snapshot.data!.exists) return const Center(child: Text('هذا المحتوى لم يعد متاحاً أو تم حذفه'));
+            final data = snapshot.data!.data() ?? {};
+            final author = (data['authorName'] ?? data['senderName'] ?? 'عضو').toString();
+            final body = (data['text'] ?? data['caption'] ?? 'محتوى بدون نص').toString();
+            final photo = (data['authorPhoto'] ?? '').toString();
+            return ListView(padding: const EdgeInsets.all(18), children: [
+              Card(
+                elevation: 2,
+                child: Padding(padding: const EdgeInsets.all(18), child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                        child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(author, style: const TextStyle(fontWeight: FontWeight.bold))),
+                      const Icon(Icons.alternate_email, color: _brand),
+                    ]),
+                    const SizedBox(height: 18),
+                    SelectableText(body, style: const TextStyle(fontSize: 17, height: 1.6)),
+                    if ((data['imageUrl'] ?? '').toString().startsWith('http')) ...[
+                      const SizedBox(height: 14),
+                      ClipRRect(borderRadius: BorderRadius.circular(14),
+                        child: Image.network(data['imageUrl'].toString(), fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(isPost ? 'المنشور المشار إليه' : 'الرسالة المشار إليها',
+                      style: const TextStyle(color: _brand, fontWeight: FontWeight.w700)),
+                  ],
+                )),
+              ),
+            ]);
+          },
+        ),
+      ),
+    );
+  }
 }
 
 
@@ -835,5 +1006,167 @@ class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
         });
       })),
     ]),
+  );
+}
+
+class _DirectVideoMessage extends StatelessWidget {
+  final String url;
+  const _DirectVideoMessage({required this.url});
+
+  Future<void> _download(BuildContext context) async {
+    try {
+      final uri = Uri.tryParse(url);
+      if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+        throw const FormatException('رابط الفيديو غير صالح');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جارٍ تحميل الفيديو...')));
+      final response = await http.get(uri).timeout(const Duration(minutes: 2));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+        throw StateError('تعذر تنزيل الفيديو من الخادم');
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/forum_video_${DateTime.now().microsecondsSinceEpoch}.mp4');
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+      await Gal.putVideo(file.path, album: 'Future Youth Forum');
+      await file.delete();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الفيديو في معرض الهاتف')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحميل الفيديو: $e')));
+      }
+    }
+  }
+
+  @override Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: SizedBox(
+      width: 250,
+      child: Stack(alignment: Alignment.center, children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: const ColoredBox(color: Colors.black, child: Center(
+            child: Icon(Icons.video_library_outlined, color: Colors.white54, size: 44),
+          )),
+        ),
+        Positioned.fill(child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => _FullScreenDirectVideoPage(url: url),
+            )),
+            child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 58)),
+          ),
+        )),
+        Positioned(
+          bottom: 6, left: 6,
+          child: IconButton.filledTonal(
+            tooltip: 'تحميل الفيديو',
+            onPressed: () => _download(context),
+            icon: const Icon(Icons.download),
+          ),
+        ),
+        const Positioned(top: 8, right: 8, child: Icon(Icons.fullscreen, color: Colors.white)),
+      ]),
+    ),
+  );
+}
+
+class _FullScreenDirectVideoPage extends StatefulWidget {
+  final String url;
+  const _FullScreenDirectVideoPage({required this.url});
+  @override State<_FullScreenDirectVideoPage> createState() => _FullScreenDirectVideoPageState();
+}
+
+class _FullScreenDirectVideoPageState extends State<_FullScreenDirectVideoPage> {
+  late final VideoPlayerController _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  bool _ready = false;
+  String? _error;
+
+  @override void initState() {
+    super.initState();
+    _controller.initialize().then((_) {
+      if (mounted) setState(() => _ready = true);
+    }).catchError((_) {
+      if (mounted) setState(() => _error = 'تعذر تشغيل الفيديو. تحقق من الاتصال.');
+    });
+  }
+
+  @override void dispose() { _controller.dispose(); super.dispose(); }
+
+  Future<void> _seek(Duration offset) async {
+    final current = _controller.value.position;
+    final total = _controller.value.duration;
+    var target = current + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > total) target = total;
+    await _controller.seekTo(target);
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      title: const Text('مشاهدة الفيديو'),
+    ),
+    body: Center(
+      child: _error != null
+        ? Text(_error!, style: const TextStyle(color: Colors.white))
+        : !_ready
+          ? const CircularProgressIndicator(color: Colors.white)
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: VideoPlayer(_controller),
+                ),
+                const SizedBox(height: 16),
+                VideoProgressIndicator(
+                  _controller,
+                  allowScrubbing: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  colors: const VideoProgressColors(
+                    playedColor: Colors.deepPurpleAccent,
+                    bufferedColor: Colors.white38,
+                    backgroundColor: Colors.white12,
+                  ),
+                ),
+                ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: _controller,
+                  builder: (context, value, _) => Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        color: Colors.white,
+                        onPressed: () => _seek(const Duration(seconds: -10)),
+                        icon: const Icon(Icons.replay_10),
+                      ),
+                      IconButton.filled(
+                        onPressed: () async {
+                          if (value.isPlaying) {
+                            await _controller.pause();
+                          } else {
+                            if (value.position >= value.duration) {
+                              await _controller.seekTo(Duration.zero);
+                            }
+                            await _controller.play();
+                          }
+                        },
+                        icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
+                      ),
+                      IconButton(
+                        color: Colors.white,
+                        onPressed: () => _seek(const Duration(seconds: 10)),
+                        icon: const Icon(Icons.forward_10),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    ),
   );
 }

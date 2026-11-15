@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DailyWorldPage extends StatefulWidget {
   const DailyWorldPage({super.key});
@@ -11,7 +12,28 @@ class _DailyWorldPageState extends State<DailyWorldPage> with SingleTickerProvid
   String mood='😊 مرتاح';
   final note=TextEditingController();
   bool done=false;
+  @override void initState(){super.initState();_restoreLocalData();}
   @override void dispose(){tabs.dispose();note.dispose();super.dispose();}
+  String get _todayKey {final d=DateTime.now();return '${d.year}-${d.month}-${d.day}';}
+  Future<void> _restoreLocalData() async {
+    final prefs=await SharedPreferences.getInstance();
+    final savedBirthday=prefs.getString('daily_world_birthday');
+    final savedDate=prefs.getString('daily_world_date');
+    if(savedBirthday!=null) birthday=DateTime.tryParse(savedBirthday);
+    if(savedDate==_todayKey){
+      mood=prefs.getString('daily_world_mood')??mood;
+      done=prefs.getBool('daily_world_done')??false;
+      note.text=prefs.getString('daily_world_note')??'';
+    }
+    if(mounted)setState((){});
+  }
+  Future<void> _saveToday() async {
+    final prefs=await SharedPreferences.getInstance();
+    await prefs.setString('daily_world_date',_todayKey);
+    await prefs.setString('daily_world_mood',mood);
+    await prefs.setBool('daily_world_done',done);
+    await prefs.setString('daily_world_note',note.text);
+  }
   static const signs=[
     ['الجدي','♑','التراب','12/22','1/19','هادئ وعملي ويحب التخطيط.','خطوة ثابتة اليوم أفضل من استعجال النتيجة.'],
     ['الدلو','♒','الهواء','1/20','2/18','مستقل ويحب الأفكار الجديدة.','شارك فكرة لطيفة واستمع لرأي مختلف.'],
@@ -55,7 +77,7 @@ class _DailyWorldPageState extends State<DailyWorldPage> with SingleTickerProvid
   }
   Future<void> pick()async{
     final d=await showDatePicker(context:context,initialDate:birthday??DateTime(2000),firstDate:DateTime(1900),lastDate:now);
-    if(d!=null)setState(()=>birthday=d);
+    if(d!=null){setState(()=>birthday=d);final prefs=await SharedPreferences.getInstance();await prefs.setString('daily_world_birthday',d.toIso8601String());}
   }
   Future<void> copy(String s)async{
     await Clipboard.setData(ClipboardData(text:s));
@@ -105,19 +127,22 @@ class _DailyWorldPageState extends State<DailyWorldPage> with SingleTickerProvid
     hero('مساحتك اليومية','تابع مزاجك وخذ خطوة صغيرة لنفسك.',Icons.spa),
     Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('شلون مزاجك اليوم؟',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
-      Wrap(spacing:7,children:['😊 مرتاح','😐 عادي','😔 متضايق','🤩 متحمس','😴 تعبان'].map((m)=>ChoiceChip(label:Text(m),selected:mood==m,onSelected:(_)=>setState(()=>mood=m))).toList()),
+      Wrap(spacing:7,children:['😊 مرتاح','😐 عادي','😔 متضايق','🤩 متحمس','😴 تعبان'].map((m)=>ChoiceChip(label:Text(m),selected:mood==m,onSelected:(_){setState(()=>mood=m);_saveToday();})).toList()),
       Text('اختيارك: '+mood)
     ]))),
     Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('تحدي اليوم',style:TextStyle(fontWeight:FontWeight.bold,fontSize:19)),const SizedBox(height:8),
       Text(tasks[taskIndex],style:const TextStyle(fontSize:18,height:1.6)),
-      CheckboxListTile(value:done,onChanged:(v)=>setState(()=>done=v??false),title:const Text('أنجزت تحدي اليوم'),contentPadding:EdgeInsets.zero)
+      CheckboxListTile(value:done,onChanged:(v){setState(()=>done=v??false);_saveToday();},title:const Text('أنجزت تحدي اليوم'),contentPadding:EdgeInsets.zero)
     ]))),
     Card(child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       const Text('فضفضة قصيرة',style:TextStyle(fontWeight:FontWeight.bold,fontSize:18)),
       TextField(controller:note,maxLines:4,maxLength:500,decoration:const InputDecoration(hintText:'اكتب فكرة أو شيئاً ممتناً له اليوم...',border:OutlineInputBorder())),
-      const Text('الملاحظة مؤقتة داخل الشاشة ولا تُحفظ بعد إغلاقها.',style:TextStyle(color:Colors.grey,fontSize:12)),
-      Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>copy(note.text),icon:const Icon(Icons.copy),label:const Text('نسخ ملاحظتي')))
+      const Text('تُحفظ يومياتك ومزاجك وتحدي اليوم على هذا الجهاز فقط.',style:TextStyle(color:Colors.grey,fontSize:12)),
+      Wrap(alignment:WrapAlignment.end,spacing:8,children:[
+        FilledButton.icon(onPressed:()async{await _saveToday();if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ يومياتك على الجهاز')));},icon:const Icon(Icons.save_outlined),label:const Text('حفظ اليوميات')),
+        TextButton.icon(onPressed:()=>copy(note.text),icon:const Icon(Icons.copy),label:const Text('نسخ ملاحظتي'))
+      ])
     ])))
   ]);
 }

@@ -1,0 +1,8 @@
+name = "future-youth-forum-livekit-token"
+main = "src/index.js"
+compatibility_date = "2026-11-14"
+workers_dev = true
+
+[vars]
+FIREBASE_PROJECT_ID = "futureyouth-69f8a"
+LIVEKIT_URL = "wss://youth-forum-future-lu43byvc.livekit.cloud"

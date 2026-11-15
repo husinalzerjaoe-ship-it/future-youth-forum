@@ -11,6 +11,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'local_bot.dart';
 import 'engagement_features.dart';
 import 'game_center.dart';
@@ -21,57 +22,117 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'watch_party.dart';
+import 'arcade_hub.dart';
+import 'inspiration_hub.dart';
+import 'match_center.dart';
+import 'livekit_calls.dart';
+import 'daily_world.dart';
+import 'v6_community_suite.dart';
+import 'knowledge_corner.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
 const founderEmail='husinalzerjaoe@gmail.com';
 bool get isForumFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase()==founderEmail;
 
-class CommunityHubPage extends StatelessWidget {
+class CommunityHubPage extends StatefulWidget {
  const CommunityHubPage({super.key});
- @override Widget build(BuildContext context) {
+ @override State<CommunityHubPage> createState()=>_CommunityHubPageState();
+}
+
+class _CommunityHubPageState extends State<CommunityHubPage> {
+ final TextEditingController _search=TextEditingController();
+ String _category='الكل';
+
+ late final List<({String title,String subtitle,String category,IconData icon,Widget page})> _items=[
+  (title:'الستوريات',subtitle:'صور وفيديوهات لمدة 24 ساعة',category:'التواصل',icon:Icons.camera_alt,page:const StoriesPage()),
+  (title:'دردشات الدول',subtitle:'العراق وسوريا وثلاث غرف أخرى',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
+  (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
+  (title:'يوتيوب والترفيه',subtitle:'أغانٍ وفيديوهات وروابط أفلام رسمية',category:'الترفيه',icon:Icons.play_circle_fill,page:const YouTubeShelfPage()),
+  (title:'مكالمات الصوت والفيديو',subtitle:'مكالمات جماعية وخاصة عبر LiveKit',category:'التواصل',icon:Icons.video_call_rounded,page:const LiveKitCallsPage()),
+  (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
+  (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
+  (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
+  (title:'مركز المباريات',subtitle:'مواعيد ونتائج ومتابعة أخبار الكرة',category:'الألعاب',icon:Icons.sports_soccer,page:const MatchCenterPage()),
+  (title:'المساعد الذكي',subtitle:'مساعد مجاني داخل التطبيق',category:'المعرفة',icon:Icons.smart_toy,page:const LocalHelperBotPage()),
+  (title:'ركن المعرفة والترفيه',subtitle:'معلومات يومية ونصائح وألغاز وكتابة إبداعية',category:'المعرفة',icon:Icons.auto_stories_rounded,page:const KnowledgeCornerPage()),
+  (title:'عالمك اليومي',subtitle:'تحديات يومية ومزاجك وأدوات مفيدة',category:'المعرفة',icon:Icons.today_rounded,page:const DailyWorldPage()),
+  (title:'إلهام يومي',subtitle:'أفكار واقتباسات ومحتوى إيجابي',category:'المعرفة',icon:Icons.lightbulb_outline,page:const InspirationHubPage()),
+  (title:'الشعر',subtitle:'قصائد الأعضاء',category:'الثقافة',icon:Icons.auto_awesome,page:const PoetryPage()),
+  (title:'الاقتباسات',subtitle:'انسخ أجمل العبارات',category:'الثقافة',icon:Icons.format_quote,page:const QuotesPage()),
+  (title:'مكتبة الأدب والعبارات',subtitle:'شعر وأدعية وأذكار ونكت وبطاقات',category:'الثقافة',icon:Icons.menu_book,page:const CreativeLibraryPage()),
+  (title:'عالم الأنمي',subtitle:'خلفيات مرخّصة وقائمة مشاهدة واختبارات',category:'الترفيه',icon:Icons.animation,page:const AnimeExperiencePage()),
+  (title:'تصويتات الملتقى',subtitle:'استفتاءات وآراء الأعضاء',category:'المجتمع',icon:Icons.poll,page:const CommunityPollsPage()),
+  (title:'فعاليات الملتقى',subtitle:'مسابقات ولقاءات وتسجيل مشاركة',category:'المجتمع',icon:Icons.event_available,page:const CommunityEventsPage()),
+  (title:'أندية الاهتمامات',subtitle:'أنشئ نادياً أو انضم لأصحاب اهتماماتك',category:'المجتمع',icon:Icons.diversity_3_rounded,page:const V6CommunitySuitePage()),
+  (title:'مساحة التركيز',subtitle:'مؤقت بومودورو وجلسات إنجاز واستراحات',category:'المعرفة',icon:Icons.timer_rounded,page:const FocusRoomPage()),
+  (title:'مساحتي الشخصية',subtitle:'مزاجك وأهدافك وعاداتك ودفتر يومياتك',category:'المعرفة',icon:Icons.auto_graph_rounded,page:const PersonalGrowthPage()),
+  (title:'الغرف والملفات والموسيقى',subtitle:'غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',category:'الترفيه',icon:Icons.hub,page:const ExtraCommunityFeaturesPage()),
+  (title:'أبراج وحساب العمر',subtitle:'أدوات خفيفة ومعلومات ترفيهية',category:'المعرفة',icon:Icons.cake_outlined,page:const LifeToolsPage()),
+ ];
+
+ @override void dispose(){_search.dispose();super.dispose();}
+
+ @override Widget build(BuildContext context){
   final cs=Theme.of(context).colorScheme;
-  final items=[
-   ('الشعر','قصائد الأعضاء',Icons.auto_awesome,const PoetryPage()),
-   ('الاقتباسات','انسخ أجمل العبارات',Icons.format_quote,const QuotesPage()),
-   ('الستوريات','صور وفيديوهات لمدة 24 ساعة',Icons.camera_alt,const StoriesPage()),
-   ('دردشات الدول','العراق وسوريا وثلاث غرف أخرى',Icons.forum,const RegionChatRoomsPage()),
-   ('المساعد الذكي','مساعد مجاني داخل التطبيق',Icons.smart_toy,const LocalHelperBotPage()),
-   ('يوتيوب والترفيه','أغانٍ وفيديوهات وروابط أفلام رسمية',Icons.play_circle_fill,const YouTubeShelfPage()),
-   ('المشاهدة الجماعية','شاهدوا يوتيوب والبث المباشر معاً',Icons.groups_rounded,const WatchPartyLobbyPage()),
-   ('النقاط والتحديات','مكافآت يومية وأخبار',Icons.emoji_events,const EngagementHubPage()),
-   ('مركز الألعاب','كرة قدم وأسئلة وتحديات الأصدقاء',Icons.sports_esports,const GameCenterPage()),
-   ('عالم الأنمي','خلفيات مرخّصة وقائمة مشاهدة واختبارات',Icons.auto_awesome,const AnimeExperiencePage()),
-   ('تصويتات الملتقى','استفتاءات وآراء الأعضاء',Icons.poll,const CommunityPollsPage()),
-   ('فعاليات الملتقى','مسابقات ولقاءات وتسجيل مشاركة',Icons.event_available,const CommunityEventsPage()),
-   ('مكتبة الأدب والعبارات','شعر فصيح وشعبي وأدعية وأذكار ونكت وبطاقات تحميل',Icons.menu_book,const CreativeLibraryPage()),
-   ('الغرف الخاصة والملفات والموسيقى','غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',Icons.hub,const ExtraCommunityFeaturesPage()),
-  ];
-  return Directionality(textDirection:TextDirection.rtl,child:ListView(padding:const EdgeInsets.all(16),children:[
-   Container(padding:const EdgeInsets.all(20),decoration:BoxDecoration(
-    gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),borderRadius:BorderRadius.circular(20)),
-    child:const Text('مساحات ملتقى الأنمي ✨\nشارك إبداعك وتواصل مع عشّاق الأنمي',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.bold))),
-   const SizedBox(height:14),
-   GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:items.length,
-    gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:1.1,crossAxisSpacing:10,mainAxisSpacing:10),
-    itemBuilder:(c,i)=>Card(
-     elevation:0,color:cs.surfaceContainerLow,
-     shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.55))),
-     child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>items[i].$4)),
-      child:Padding(padding:const EdgeInsets.all(12),child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
-       Container(width:58,height:58,decoration:BoxDecoration(
-        gradient:const LinearGradient(colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
-        borderRadius:BorderRadius.circular(18)),
-        child:Icon(items[i].$3,size:30,color:Colors.white)),
-       const SizedBox(height:10),
-       Text(items[i].$1,textAlign:TextAlign.center,style:TextStyle(fontWeight:FontWeight.bold,fontSize:16,color:cs.onSurface)),
-       const SizedBox(height:5),
-       Expanded(child:Center(child:Text(items[i].$2,textAlign:TextAlign.center,maxLines:2,overflow:TextOverflow.ellipsis,style:TextStyle(fontSize:11,color:cs.onSurfaceVariant)))),
-       Align(alignment:Alignment.centerLeft,child:Icon(Icons.arrow_back_rounded,size:18,color:cs.primary)),
-      ])))),
-   ),
+  final q=_search.text.trim().toLowerCase();
+  final visible=_items.where((e)=>(_category=='الكل'||e.category==_category)&&
+    (q.isEmpty||('${e.title} ${e.subtitle} ${e.category}').toLowerCase().contains(q))).toList();
+  const categories=['الكل','التواصل','الألعاب','الترفيه','المجتمع','المعرفة','الثقافة'];
+  return Directionality(textDirection:TextDirection.rtl,child:CustomScrollView(slivers:[
+   SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,14,14,10),child:Container(
+    padding:const EdgeInsets.all(20),
+    decoration:BoxDecoration(
+     gradient:const LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF171936),p,Color(0xFF35BCEB)]),
+     borderRadius:BorderRadius.circular(24),
+     boxShadow:[BoxShadow(color:p.withValues(alpha:.2),blurRadius:18,offset:const Offset(0,8))]),
+    child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+     Row(children:[Container(width:48,height:48,decoration:BoxDecoration(color:Colors.white.withValues(alpha:.14),borderRadius:BorderRadius.circular(15)),child:const Icon(Icons.hub_rounded,color:Colors.white,size:28)),const Spacer(),const Text('FUTURE YOUTH • COMMUNITY',style:TextStyle(color:Colors.white70,fontSize:10,fontWeight:FontWeight.w900,letterSpacing:.6))]),
+     const SizedBox(height:14),
+     const Text('كل عالم الملتقى بمكان واحد ✨',style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.w900)),
+     const SizedBox(height:6),
+     const Text('تواصل، العب، شاهد، تعلّم وشارك أصدقاءك لحظاتك.',style:TextStyle(color:Colors.white70,height:1.5)),
+     const SizedBox(height:15),
+     Row(children:[
+      _hubStat(_items.length.toString(),'قسم وخدمة'),
+      const SizedBox(width:9),
+      _hubStat('24/7','مجتمعك'),
+      const SizedBox(width:9),
+      _hubStat('LIVE','مع الأصدقاء'),
+     ]),
+    ]),
+   ))),
+   SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.fromLTRB(14,4,14,8),child:TextField(
+    controller:_search,onChanged:(_)=>setState(()=>{}),
+    decoration:InputDecoration(hintText:'ابحث عن قسم أو ميزة...',prefixIcon:const Icon(Icons.search_rounded),filled:true,fillColor:cs.surfaceContainerLow,
+     border:OutlineInputBorder(borderRadius:BorderRadius.circular(16),borderSide:BorderSide.none),
+     suffixIcon:_search.text.isEmpty?null:IconButton(onPressed:()=>setState(_search.clear),icon:const Icon(Icons.close_rounded))),
+   ))),
+   SliverToBoxAdapter(child:SizedBox(height:52,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10,vertical:5),children:categories.map((c)=>Padding(
+    padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(c),selected:_category==c,onSelected:(_)=>setState(()=>_category=c)),
+   )).toList()))),
+   SliverPadding(padding:const EdgeInsets.fromLTRB(12,8,12,24),sliver:visible.isEmpty
+    ?SliverToBoxAdapter(child:Padding(padding:const EdgeInsets.all(30),child:Center(child:Text('ما لقينا قسم بهذا الاسم. جرّب كلمة ثانية.',style:TextStyle(color:cs.onSurfaceVariant)))))
+    :SliverGrid(delegate:SliverChildBuilderDelegate((c,i){
+      final item=visible[i];
+      final colors=[p,const Color(0xFF168E9B),const Color(0xFFB65BC8),const Color(0xFF2878C7)];
+      final accent=colors[i%colors.length];
+      return Card(elevation:0,color:cs.surfaceContainerLow,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(20),side:BorderSide(color:cs.outlineVariant.withValues(alpha:.5))),
+       child:InkWell(borderRadius:BorderRadius.circular(20),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>item.page)),
+        child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+         Container(width:48,height:48,decoration:BoxDecoration(color:accent.withValues(alpha:.13),borderRadius:BorderRadius.circular(15)),child:Icon(item.icon,color:accent,size:27)),
+         const Spacer(),
+         Text(item.title,style:TextStyle(fontWeight:FontWeight.w900,fontSize:14,color:cs.onSurface),maxLines:2,overflow:TextOverflow.ellipsis),
+         const SizedBox(height:5),
+         Text(item.subtitle,style:TextStyle(fontSize:11,height:1.35,color:cs.onSurfaceVariant),maxLines:2,overflow:TextOverflow.ellipsis),
+         const SizedBox(height:7),
+         Row(children:[Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:3),decoration:BoxDecoration(color:accent.withValues(alpha:.1),borderRadius:BorderRadius.circular(20)),child:Text(item.category,style:TextStyle(color:accent,fontSize:10,fontWeight:FontWeight.bold))),const Spacer(),Icon(Icons.arrow_back_rounded,size:17,color:accent)]),
+        ]))),
+      );
+    },childCount:visible.length),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:.93,crossAxisSpacing:10,mainAxisSpacing:10))),
   ]));
  }
+ Widget _hubStat(String value,String label)=>Expanded(child:Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:9),decoration:BoxDecoration(color:Colors.white.withValues(alpha:.12),borderRadius:BorderRadius.circular(13)),child:Column(children:[Text(value,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:15)),const SizedBox(height:2),Text(label,style:const TextStyle(color:Colors.white70,fontSize:10))])));
 }
 
 class TextShelf extends StatefulWidget {
@@ -85,9 +146,60 @@ class _TextShelfState extends State<TextShelf> {
  static const _poemEnds=['وأظل أزرع في الطريق خطاي وأملي.','فالفجر يولد كلما اشتد الظلام.','والطيب يبقى رغم تبدل كل شيء.','والقلب يعرف وجهته مهما ابتعد.','ومن الوفاء تصير أيامنا أجمل.','ما دام فينا للغد نفسٌ جديد.','وتظل أحلام الشباب هي الدليل.','فالحب أصدق ما يضيء من الكلام.','والذكر يبقى طيباً بين البشر.','ونعود أقوى كلما هبّت رياح.'];
  static const _quoteOpen=['لا تؤجل فرحتك','القوة ليست في ألا تسقط','الأصدقاء الحقيقيون','كل بداية صغيرة','لا تقارن رحلتك','الكلمة الطيبة','احفظ قلبك','النجاح يحتاج','من يعرف قيمة وقته','الأمل لا يطرق','كن لطيفاً','الهدوء أحياناً','لا تجعل رأي الناس','التجارب تعلمنا','الوفاء موقف','أجمل الانتصارات','حين تتعب','لا تخف من التغيير','العقل الهادئ','ازرع خيراً','الطموح','الكرامة','الاعتذار','القراءة','الإنسان الجميل','الصبر','لا تبحث عن الكمال','الذكريات','من يزرع المعروف','الحياة'];
  static const _quoteEnds=['فالحياة لا تنتظر اكتمال الظروف.','بل في قدرتك على النهوض من جديد.','يظهرون وقت الحاجة لا وقت المصلحة.','قد تفتح باباً واسعاً للمستقبل.','فلكل إنسان توقيته وطريقه.','قد تغيّر يوماً كاملاً في حياة أحدهم.','ولا تمنح ثقتك إلا لمن يصونها.','صبر وعمل واستمرار لا ضجيج.','يصنع من الدقائق إنجازاً.','إلا لقلب قرر أن يثق بالله.','فلا تعرف ما الذي يمر به الآخرون.','يكون أبلغ من ألف جواب.','مقياساً لقيمتك أو نجاحك.','ما لا تعلمه الكتب وحدها.','لا يحتاج إلى جمهور كي يثبت نفسه.','أن تنتصر على ضعف الأمس.','تذكر كم مرة تجاوزت ما ظننته مستحيلاً.','فقد يكون خلفها باب أجمل.','يرى الحل قبل أن يرى المشكلة.','فقد تحصد خيراً لم تتوقعه.','يبدأ بخطوة صادقة كل يوم.','لا تعني القسوة بل معرفة حدودك.','شجاعة حين يكون الخطأ واضحاً.','تمنحك عالماً أوسع من مكانك.','يترك أثراً طيباً دون أن يتكلم.','ليس انتظاراً بل ثبات مع السعي.','فالجمال في الصدق والبساطة.','تسكن التفاصيل الصغيرة أكثر من الصور.','يجد الخير في طريقه يوماً.','تستحق أن تعاش بقلب حاضر.'];
+ static const _freshPoems = [
+  'إذا ضاقت بك الدنيا تذكّر\nبأن الفجر يولد من عتمة الليل.',
+  'بغداد يا شمساً على كتف الفرات\nفي كل زقاقٍ منك حكاية وبيت.',
+  'نمضي وفي أرواحنا حلمٌ كبير\nلا ينحني مهما تثاقلنا المسير.',
+  'يا صاحبي خذ من المواقف عبرة\nفالطيب يظهر حين تضيق السبل.',
+  'أحببت فيك الصدق لا زيف الكلام\nفالروح تعرف من يصون لها السلام.',
+  'على باب الأمل انتظر صباحاً\nفما بعد التعب إلا اتساع.',
+  'يمّه دعاؤك في دروبي نجمة\nتهدي خطاي إذا تعثّر بي الطريق.',
+  'لا تحسبنّ الصمت ضعفاً دائماً\nفالبحر يخفي في سكونه ألف موج.',
+  'سنزرع الورد في أرضٍ أتعبتها\nأقدام يأسٍ، والرجاء هو المطر.',
+  'يا دجلة الخير احملي أحلامنا\nنحو الغد الموعود بالأمنيات.',
+  'من عاش للناس الكرامة منهجاً\nترك القلوب تردّد الإحسان.',
+  'إذا تعثّرت الخطى لا تنكسر\nفالدرب يفتح للصبور منافذاً.',
+  'أصدقاء صدقٍ لا تغيّرهم مسافة\nيبقون في القلب الجميل منارة.',
+  'وما الحياة سوى فصولٍ عابرة\nفاجعل جميل الذكر آخر سطرها.',
+  'تعلمت أن العزّ فعلٌ ثابتٌ\nلا أن يكون المرء أعلى صوتاً.',
+  'يا نجمةً في ليل غربتنا أضيئي\nفالحلم يكبر كلما اشتد الظلام.',
+ ];
+ static const _freshQuotes = [
+  'لا تجعل يوماً صعباً يقنعك أن حياتك كلها صعبة.',
+  'بعض الإنجازات تبدأ بقرار صغير لا يراه أحد.',
+  'كن واضحاً في نيتك، لطيفاً في كلامك، ثابتاً في مواقفك.',
+  'الوقت الذي تستثمره في نفسك لا يضيع.',
+  'لا تقِس قيمتك بسرعة وصولك؛ لكل رحلة إيقاعها.',
+  'الصديق الحقيقي مساحة أمان، لا ساحة منافسة.',
+  'حين لا تستطيع تغيير الظروف، ابدأ بتغيير خطوتك التالية.',
+  'ليس كل تأخير خسارة؛ أحياناً هو فرصة للاستعداد.',
+  'احفظ الود، لكن لا تهمل كرامتك.',
+  'الاعتذار الصادق شجاعة، وتغيير السلوك هو الدليل.',
+  'اقرأ قليلاً كل يوم، فالمعرفة تتراكم بهدوء.',
+  'لا تسخر من بداية أحد؛ كل خبير كان مبتدئاً.',
+  'اجعل حضورك خفيفاً وأثرك عميقاً.',
+  'النجاح الذي لا يسلبك إنسانيتك هو الأجمل.',
+  'لا تنتظر الحافز دائماً؛ اصنع عادة تساعدك على البدء.',
+  'الهدوء ليس غياب المشاعر، بل حسن إدارتها.',
+  'من يحترم اختلافك يستحق أن يسمع رأيك.',
+  'لا تترك كلمة طيبة في قلبك؛ قلها في وقتها.',
+  'التواضع لا يقلل من قيمتك، بل يرفع قدرك.',
+  'كل يوم فرصة لتتعلم شيئاً وتصلح شيئاً وتفرح بشيء.',
+  'لا تجعل المقارنة تسرق منك متعة التقدم.',
+  'أجمل ما في الإنسان أن يكون مأمون الجانب.',
+  'اسأل لتفهم، لا لتنتصر في النقاش.',
+  'الأمل ليس انتظاراً؛ إنه عمل مع ثقة.',
+  'حين تتعب، استرح قليلاً ولا تتخلّ عن الطريق.',
+ ];
  List<Map<String,String>> get _builtIns {
-  if(widget.collection=='poems') return List.generate(200,(i)=>{'text':'${_poemOpen[i%_poemOpen.length]}، ${_poemEnds[(i ~/ _poemOpen.length + i)%_poemEnds.length]}','category':i.isEven?'فصحى':'شعبي','authorName':'مكتبة الملتقى','id':'builtin-poem-$i'});
-  return List.generate(300,(i)=>{'text':'${_quoteOpen[i%_quoteOpen.length]}، ${_quoteEnds[(i ~/ _quoteOpen.length + i)%_quoteEnds.length]}','category':'اقتباسات','authorName':'مكتبة الملتقى','id':'builtin-quote-$i'});
+  if(widget.collection=='poems') return [
+   ...List.generate(200,(i)=>{'text':'${_poemOpen[i%_poemOpen.length]}، ${_poemEnds[(i ~/ _poemOpen.length + i)%_poemEnds.length]}','category':i.isEven?'فصحى':'شعبي','authorName':'مكتبة الملتقى','id':'builtin-poem-$i'}),
+   ..._freshPoems.asMap().entries.map((e)=>{'text':e.value,'category':e.key%3==0?'شعبي':'فصحى','authorName':'مكتبة الملتقى • جديد','id':'fresh-poem-${e.key}'}),
+  ];
+  return [
+   ...List.generate(300,(i)=>{'text':'${_quoteOpen[i%_quoteOpen.length]}، ${_quoteEnds[(i ~/ _quoteOpen.length + i)%_quoteEnds.length]}','category':'اقتباسات','authorName':'مكتبة الملتقى','id':'builtin-quote-$i'}),
+   ..._freshQuotes.asMap().entries.map((e)=>{'text':e.value,'category':'اقتباسات','authorName':'مكتبة الملتقى • جديد','id':'fresh-quote-${e.key}'}),
+  ];
  }
  Future<void> add(BuildContext c) async {
   final t=TextEditingController(); String selected=widget.collection=='poems'?'فصحى':'اقتباسات';
@@ -153,7 +265,22 @@ class _StoriesPageState extends State<StoriesPage>{
    if (file != null && await file.exists()) await file.delete();
   }
  }
- Future<void> add()async{
+ Future<void> deleteStory(String id, Map<String,dynamic> data) async {
+   final me = FirebaseAuth.instance.currentUser;
+   if (me == null || data['authorId'] != me.uid) return;
+   final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+    title: const Text('حذف الستوري؟'), content: const Text('سيتم حذف القصة من الملتقى.'),
+    actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف'))],
+   ));
+   if (confirm != true) return;
+   try {
+    final url = (data['mediaUrl'] ?? '').toString();
+    if (url.startsWith('https://')) { try { await deleteForumMedia(url); } catch (_) {} }
+    await db2.collection('stories').doc(id).delete();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حذف الستوري')));
+   } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر حذف الستوري: $e'))); }
+  }
+  Future<void> add()async{
   final pick=ImagePicker();
   final type=await showModalBottomSheet<String>(context:context,builder:(c)=>SafeArea(child:Wrap(children:[
    ListTile(leading:const Icon(Icons.image),title:const Text('صورة'),onTap:()=>Navigator.pop(c,'image')),
@@ -180,7 +307,7 @@ class _StoriesPageState extends State<StoriesPage>{
    if(docs.isEmpty)return const Center(child:Text('ماكو ستوريات حالياً'));
    return ListView(children:docs.map((doc){final d=doc.data();final video=d['mediaType']=='video';final url=d['mediaUrl'] as String;
     return Card(clipBehavior:Clip.antiAlias,child:Column(children:[
-     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو')),
+     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو'),trailing: (d['authorId'] == FirebaseAuth.instance.currentUser?.uid) ? PopupMenuButton<String>(onSelected: (v) { if (v == 'delete') deleteStory(doc.id, d); }, itemBuilder: (_) => const [PopupMenuItem(value:'delete',child:Text('حذف الستوري'))]) : null),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
@@ -385,7 +512,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
   final senderPhoto=d['senderPhoto'] as String?;
   return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
    margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
-   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
+   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.88),
    decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
     border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
     boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
@@ -444,7 +571,124 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
  final url=TextEditingController();
  String category='أغاني';
  bool busy=false;
+
  static const categories=['أغاني','فيديوهات','أفلام ومقاطع رسمية','تعليم','متنوع'];
+ static const featuredTracks=[
+  {'title':"موسيقى عراقية تراثية",'artist':"تراث عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام اللامي",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"مقام عراقي – مقام الحجاز",'artist':"مقام عراقي",'category':"عراقي وتراث"},
+  {'title':"جورج وسوف – كلام الناس",'artist':"جورج وسوف",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – زيديني عشقاً",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – مدرسة الحب",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"ماجدة الرومي – كلمات",'artist':"ماجدة الرومي",'category':"طرب عربي"},
+  {'title':"فيروز – نسم علينا الهوى",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"فيروز – كان عنا طاحون",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"أم كلثوم – ألف ليلة وليلة",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"عبد الحليم حافظ – قارئة الفنجان",'artist':"عبد الحليم حافظ",'category':"طرب عربي"},
+  {'title':"محمد عبده – الأماكن",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"راشد الماجد – المسافر",'artist':"راشد الماجد",'category':"خليجي"},
+  {'title':"عبد المجيد عبد الله – تتنفسك دنياي",'artist':"عبد المجيد عبد الله",'category':"خليجي"},
+  {'title':"أصالة – عيش سكر وطن",'artist':"أصالة",'category':"عربي حديث"},
+  {'title':"شيرين – مشاعر",'artist':"شيرين",'category':"عربي حديث"},
+  {'title':"عمرو دياب – تملي معاك",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"عمرو دياب – نور العين",'artist':"عمرو دياب",'category':"عربي حديث"},
+  {'title':"محمد حماقي – أجمل يوم",'artist':"محمد حماقي",'category':"عربي حديث"},
+  {'title':"إليسا – عايشالك",'artist':"إليسا",'category':"عربي حديث"},
+  {'title':"نانسي عجرم – يا سلام",'artist':"نانسي عجرم",'category':"عربي حديث"},
+  {'title':"حمزة نمرة – داري يا قلبي",'artist':"حمزة نمرة",'category':"عربي حديث"},
+  {'title':"أدهم نابلسي – هو الحب",'artist':"أدهم نابلسي",'category':"عربي حديث"},
+  {'title':"سيف نبيل – فدوه اروحلك",'artist':"سيف نبيل",'category':"عراقي حديث"},
+  {'title':"ماجد المهندس – تناديك",'artist':"ماجد المهندس",'category':"عراقي حديث"},
+  {'title':"رحمة رياض – وعد مني",'artist':"رحمة رياض",'category':"عراقي حديث"},
+  {'title':"إلهام المدفعي – خيّال",'artist':"إلهام المدفعي",'category':"عراقي وتراث"},
+  {'title':"ناظم الغزالي – طالعة من بيت أبوها",'artist':"ناظم الغزالي",'category':"عراقي وتراث"},
+  {'title':"سعدون جابر – يا طيور الطايرة",'artist':"سعدون جابر",'category':"عراقي وتراث"},
+  {'title':"فؤاد سالم – غريبة الروح",'artist':"فؤاد سالم",'category':"عراقي وتراث"},
+  {'title':"The Beatles – Here Comes the Sun",'artist':"The Beatles",'category':"عالمي"},
+  {'title':"Queen – Bohemian Rhapsody",'artist':"Queen",'category':"عالمي"},
+  {'title':"Coldplay – Viva La Vida",'artist':"Coldplay",'category':"عالمي"},
+  {'title':"Ed Sheeran – Perfect",'artist':"Ed Sheeran",'category':"عالمي"},
+  {'title':"Adele – Someone Like You",'artist':"Adele",'category':"عالمي"},
+  {'title':"Imagine Dragons – Demons",'artist':"Imagine Dragons",'category':"عالمي"},
+  {'title':"Ludovico Einaudi – Nuvole Bianche",'artist':"Ludovico Einaudi",'category':"هادئ وآلات"},
+  {'title':"Yiruma – River Flows in You",'artist':"Yiruma",'category':"هادئ وآلات"},
+  {'title':"Debussy – Clair de Lune",'artist':"Claude Debussy",'category':"كلاسيكي"},
+  {'title':"Beethoven – Moonlight Sonata",'artist':"Ludwig van Beethoven",'category':"كلاسيكي"},
+  {'title':"Mozart – Eine kleine Nachtmusik",'artist':"Wolfgang Amadeus Mozart",'category':"كلاسيكي"},
+  {'title':"Vivaldi – The Four Seasons Spring",'artist':"Antonio Vivaldi",'category':"كلاسيكي"},
+  {'title':"Bach – Air on the G String",'artist':"Johann Sebastian Bach",'category':"كلاسيكي"},
+  {'title':"Chopin – Nocturne Op.9 No.2",'artist':"Frédéric Chopin",'category':"كلاسيكي"},
+  {'title':"Tchaikovsky – Swan Lake",'artist':"Pyotr Ilyich Tchaikovsky",'category':"كلاسيكي"},
+  {'title':"Erik Satie – Gymnopédie No.1",'artist':"Erik Satie",'category':"هادئ وآلات"},
+  {'title':"Kevin MacLeod – Carefree",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Kevin MacLeod – Monkeys Spinning Monkeys",'artist':"Kevin MacLeod",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – Signal to Noise",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Scott Buckley – The Illusionist",'artist':"Scott Buckley",'category':"موسيقى مجانية"},
+  {'title':"Chris Zabriskie – Cylinder Seven",'artist':"Chris Zabriskie",'category':"موسيقى مجانية"},
+  {'title':"كاظم الساهر – أنا وليلى",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"كاظم الساهر – هل عندك شك",'artist':"كاظم الساهر",'category':"طرب عربي"},
+  {'title':"فيروز – كيفك إنت",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"فيروز – رجعت الشتوية",'artist':"فيروز",'category':"طرب عربي"},
+  {'title':"أم كلثوم – أنت عمري",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"أم كلثوم – سيرة الحب",'artist':"أم كلثوم",'category':"طرب عربي"},
+  {'title':"عبد الحليم حافظ – جانا الهوى",'artist':"عبد الحليم حافظ",'category':"طرب عربي"},
+  {'title':"وردة الجزائرية – بتونس بيك",'artist':"وردة الجزائرية",'category':"طرب عربي"},
+  {'title':"صباح فخري – قدك المياس",'artist':"صباح فخري",'category':"طرب عربي"},
+  {'title':"ملحم بركات – على بابي واقف قمرين",'artist':"ملحم بركات",'category':"طرب عربي"},
+  {'title':"محمد عبده – الأماكن",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"محمد عبده – مذهلة",'artist':"محمد عبده",'category':"خليجي"},
+  {'title':"راشد الماجد – ويلي",'artist':"راشد الماجد",'category':"خليجي"},
+  {'title':"عبد الله الرويشد – رحلتي",'artist':"عبد الله الرويشد",'category':"خليجي"},
+  {'title':"أحلام – تدري ليش",'artist':"أحلام",'category':"خليجي"},
+  {'title':"نوال الكويتية – أنت طيب",'artist':"نوال الكويتية",'category':"خليجي"},
+  {'title':"حسين الجسمي – أحبك",'artist':"حسين الجسمي",'category':"عربي حديث"},
+  {'title':"بلقيس – انتهى",'artist':"بلقيس",'category':"عربي حديث"},
+  {'title':"تامر حسني – قرب حبيبي",'artist':"تامر حسني",'category':"عربي حديث"},
+  {'title':"مصطفى قمر – السود عيونه",'artist':"مصطفى قمر",'category':"عربي حديث"},
+  {'title':"رامي صبري – يمكن خير",'artist':"رامي صبري",'category':"عربي حديث"},
+  {'title':"أبو – 3 دقات",'artist':"أبو",'category':"عربي حديث"},
+  {'title':"مسار إجباري – نهايات الحكاوي",'artist':"مسار إجباري",'category':"عربي حديث"},
+  {'title':"ويجز – البخت",'artist':"ويجز",'category':"عربي حديث"},
+  {'title':"عزيز مرقة – مين قال",'artist':"عزيز مرقة",'category':"عربي حديث"},
+  {'title':"كاظم الساهر – بغداد",'artist':"كاظم الساهر",'category':"عراقي حديث"},
+  {'title':"نصرت البدر – تعال",'artist':"نصرت البدر",'category':"عراقي حديث"},
+  {'title':"حسام الرسام – هذا العراق",'artist':"حسام الرسام",'category':"عراقي حديث"},
+  {'title':"علي جاسم – عندي احساس",'artist':"علي جاسم",'category':"عراقي حديث"},
+  {'title':"محمد السالم – قلب قلب",'artist':"محمد السالم",'category':"عراقي حديث"},
+  {'title':"أصيل هميم – سر الحياة",'artist':"أصيل هميم",'category':"عراقي حديث"},
+  {'title':"رحمة رياض – أصعد للكمر",'artist':"رحمة رياض",'category':"عراقي حديث"},
+  {'title':"سعدون جابر – اعبر على جفوني",'artist':"سعدون جابر",'category':"عراقي وتراث"},
+  {'title':"فاضل عواد – لا خبر",'artist':"فاضل عواد",'category':"عراقي وتراث"},
+  {'title':"ناظم الغزالي – ميحانة",'artist':"ناظم الغزالي",'category':"عراقي وتراث"},
+  {'title':"Elton John – Your Song",'artist':"Elton John",'category':"عالمي"},
+  {'title':"Michael Jackson – Billie Jean",'artist':"Michael Jackson",'category':"عالمي"},
+  {'title':"ABBA – Dancing Queen",'artist':"ABBA",'category':"عالمي"},
+  {'title':"Eagles – Hotel California",'artist':"Eagles",'category':"عالمي"},
+  {'title':"John Lennon – Imagine",'artist':"John Lennon",'category':"عالمي"},
+  {'title':"Whitney Houston – I Will Always Love You",'artist':"Whitney Houston",'category':"عالمي"},
+  {'title':"Bruno Mars – Just the Way You Are",'artist':"Bruno Mars",'category':"عالمي"},
+  {'title':"Taylor Swift – Love Story",'artist':"Taylor Swift",'category':"عالمي"},
+  {'title':"OneRepublic – Counting Stars",'artist':"OneRepublic",'category':"عالمي"},
+  {'title':"Hans Zimmer – Time",'artist':"Hans Zimmer",'category':"موسيقى تصويرية"},
+  {'title':"Hans Zimmer – Interstellar Main Theme",'artist':"Hans Zimmer",'category':"موسيقى تصويرية"},
+  {'title':"John Williams – Hedwig's Theme",'artist':"John Williams",'category':"موسيقى تصويرية"},
+  {'title':"Ennio Morricone – Gabriel's Oboe",'artist':"Ennio Morricone",'category':"موسيقى تصويرية"},
+  {'title':"Ramin Djawadi – Light of the Seven",'artist':"Ramin Djawadi",'category':"موسيقى تصويرية"},
+ ];
+ List<Widget> _featuredCards()=>featuredTracks.map((track)=>Card(child:ListTile(
+  leading:const CircleAvatar(child:Icon(Icons.music_note)),
+  title:Text(track['title']!),
+  subtitle:Text('${track['artist']} • ${track['category']}'),
+  trailing:const Icon(Icons.open_in_new),
+  onTap:()=>openFeatured(track),
+ ))).toList();
+ Future<void> openFeatured(Map<String,String> track) async {
+  final query='${track['artist']} ${track['title']} official audio';
+  final uri=Uri.https('www.youtube.com','/results',{'search_query':query});
+  try { await launchUrl(uri,mode:LaunchMode.externalApplication); }
+  catch (_) { if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر فتح نتائج الموسيقى'))); }
+ }
+
  bool validYoutube(String value) => isSupportedYoutubeUrl(value);
  Future<void> add() async {
   if(title.text.trim().isEmpty||!validYoutube(url.text)) {
@@ -497,10 +741,12 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
    body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
     stream:db2.collection('mediaLinks').orderBy('createdAt',descending:true).limit(100).snapshots(),
     builder:(c,s){
-     if(s.hasError)return const Center(child:Text('تعذر تحميل الروابط. انشر قواعد Firestore الجديدة'));
+     if(s.hasError)return ListView(padding:const EdgeInsets.all(12),children:[const Text('تعذر تحميل روابط الأعضاء حالياً؛ دليل الموسيقى الجاهز متاح أدناه.'),..._featuredCards()]);
      if(!s.hasData)return const Center(child:CircularProgressIndicator());
-     if(s.data!.docs.isEmpty)return const Center(child:Text('ماكو روابط بعد. أضف أول أغنية أو فيديو'));
-     return ListView(padding:const EdgeInsets.all(12),children:s.data!.docs.map((doc){
+          return ListView(padding:const EdgeInsets.all(12),children:[
+     Card(color:Theme.of(c).colorScheme.primaryContainer,child:const Padding(padding:EdgeInsets.all(14),child:Text('دليل موسيقي جاهز • 100 اختيار من الطرب العراقي والعربي والخليجي والعالمي والكلاسيكي. افتح أي اختيار للبحث عن النسخة الرسمية أو المرخّصة على يوتيوب.',style:TextStyle(fontWeight:FontWeight.w600)))),
+     ..._featuredCards(),
+     ...s.data!.docs.map((doc){
       final d=doc.data();
       return Card(child:ListTile(
        leading:const CircleAvatar(child:Icon(Icons.play_arrow)),
@@ -509,7 +755,8 @@ class _YouTubeShelfPageState extends State<YouTubeShelfPage> {
        trailing:IconButton(icon:const Icon(Icons.open_in_new),onPressed:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو')),
        onTap:()=>openVideo(d['url'] as String? ??'',d['title'] as String? ?? 'فيديو'),
       ));
-     }).toList());
+     }),
+    ]);
     },
    ),
   ),
@@ -543,4 +790,67 @@ class _RegionVoicePlayerState extends State<_RegionVoicePlayer>{
    });
   })),
  ]));
+}
+
+
+/// أدوات شخصية خفيفة: حساب العمر والبرج الفلكي للترفيه فقط.
+class LifeToolsPage extends StatefulWidget {
+ const LifeToolsPage({super.key});
+ @override State<LifeToolsPage> createState()=>_LifeToolsPageState();
+}
+class _LifeToolsPageState extends State<LifeToolsPage> {
+ DateTime? birthday;
+ String get ageDetail {
+  final b=birthday!, now=DateTime.now();
+  var years=now.year-b.year, months=now.month-b.month, days=now.day-b.day;
+  if(days<0){final previous=DateTime(now.year,now.month,0);days+=previous.day;months--;}
+  if(months<0){months+=12;years--;}
+  return '$years سنة • $months شهر • $days يوم';
+ }
+ String get zodiac {
+  final d=birthday!; final m=d.month, day=d.day;
+  if((m==3&&day>=21)||(m==4&&day<=19))return 'الحمل ♈';
+  if((m==4&&day>=20)||(m==5&&day<=20))return 'الثور ♉';
+  if((m==5&&day>=21)||(m==6&&day<=20))return 'الجوزاء ♊';
+  if((m==6&&day>=21)||(m==7&&day<=22))return 'السرطان ♋';
+  if((m==7&&day>=23)||(m==8&&day<=22))return 'الأسد ♌';
+  if((m==8&&day>=23)||(m==9&&day<=22))return 'العذراء ♍';
+  if((m==9&&day>=23)||(m==10&&day<=22))return 'الميزان ♎';
+  if((m==10&&day>=23)||(m==11&&day<=21))return 'العقرب ♏';
+  if((m==11&&day>=22)||(m==12&&day<=21))return 'القوس ♐';
+  if((m==12&&day>=22)||(m==1&&day<=19))return 'الجدي ♑';
+  if((m==1&&day>=20)||(m==2&&day<=18))return 'الدلو ♒';
+  return 'الحوت ♓';
+ }
+ Future<void> chooseBirthday() async {
+  final now=DateTime.now();
+  final picked=await showDatePicker(context:context,initialDate:birthday??DateTime(now.year-18,now.month,now.day),firstDate:DateTime(1900),lastDate:now,helpText:'اختر تاريخ ميلادك');
+  if(picked!=null)setState(()=>birthday=picked);
+ }
+ @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('أدوات العمر والأبراج')),
+  body:ListView(padding:const EdgeInsets.all(18),children:[
+   Card(child:Padding(padding:const EdgeInsets.all(18),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+    const Icon(Icons.cake_rounded,size:48,color:p),
+    const SizedBox(height:8),
+    const Text('حاسبة العمر',textAlign:TextAlign.center,style:TextStyle(fontSize:21,fontWeight:FontWeight.bold)),
+    const Text('اعرف عمرك بالسنوات والأشهر والأيام',textAlign:TextAlign.center),
+    const SizedBox(height:16),
+    OutlinedButton.icon(onPressed:chooseBirthday,icon:const Icon(Icons.calendar_month),label:Text(birthday==null?'اختيار تاريخ الميلاد':'تاريخ الميلاد: ${birthday!.year}/${birthday!.month}/${birthday!.day}')),
+    if(birthday!=null)...[
+     const SizedBox(height:12),
+     Text(ageDetail,textAlign:TextAlign.center,style:const TextStyle(fontSize:22,fontWeight:FontWeight.bold,color:p)),
+     Text('عمرك بالأيام تقريباً: ${DateTime.now().difference(birthday!).inDays} يوم',textAlign:TextAlign.center),
+     const Divider(height:28),
+     Text('برجك: $zodiac',textAlign:TextAlign.center,style:const TextStyle(fontSize:24,fontWeight:FontWeight.bold)),
+    ]
+   ]))),
+   const SizedBox(height:12),
+   const Card(child:Padding(padding:EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+    Text('عن الأبراج',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
+    SizedBox(height:8),
+    Text('الأبراج هنا للتسلية والتعرّف على التقسيمات الفلكية الشائعة فقط؛ لا تتنبأ بالمستقبل ولا تحدد الشخصية أو القرارات.'),
+   ]))),
+  ]),
+ ));
 }

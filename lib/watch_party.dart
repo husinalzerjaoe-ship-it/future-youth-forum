@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
@@ -18,11 +19,49 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
   final _url = TextEditingController();
   final _name = TextEditingController(text: 'غرفة مشاهدة');
   bool _creating = false;
+  bool _privateRoom = false;
+  final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void dispose() { _url.dispose(); _name.dispose(); super.dispose(); }
+
+  Future<void> _chooseFriends() async {
+    final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
+    if (!mounted) return;
+    final chosen = Set<String>.from(_invitedUids);
+    await showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(builder: (sheetContext, updateSheet) =>
+        Directionality(textDirection: TextDirection.rtl, child: SafeArea(
+          child: SizedBox(height: MediaQuery.of(sheetContext).size.height * .65,
+            child: Column(children: [
+              const Padding(padding: EdgeInsets.all(14), child: Text('اختَر أصدقاء الغرفة الخاصة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              Expanded(child: ListView(children: profiles.docs.where((p) => p.id != _uid).map((p) {
+                final d = p.data();
+                final selected = chosen.contains(p.id);
+                final photo = (d['photoUrl'] ?? '').toString();
+                return CheckboxListTile(
+                  value: selected,
+                  secondary: CircleAvatar(backgroundImage: photo.startsWith('http') ? NetworkImage(photo) : null,
+                    child: !photo.startsWith('http') ? const Icon(Icons.person) : null),
+                  title: Text((d['name'] ?? 'عضو').toString()),
+                  onChanged: (value) => updateSheet(() {
+                    if (value == true) chosen.add(p.id); else chosen.remove(p.id);
+                  }),
+                );
+              }).toList())),
+              Padding(padding: const EdgeInsets.all(12), child: FilledButton(
+                onPressed: () { _invitedUids..clear()..addAll(chosen); Navigator.pop(sheetContext); if (mounted) setState(() {}); },
+                child: Text('تأكيد الاختيار (${chosen.length})'),
+              )),
+            ]),
+          ),
+        )),
+      ),
+    );
+  }
 
   Future<void> _createRoom() async {
     final raw = _url.text.trim();
@@ -47,12 +86,26 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         'sourceType': videoId == null ? 'direct' : 'youtube',
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
+        'visibility': _privateRoom ? 'private' : 'public',
+        'invitedUids': _privateRoom ? <String>{_uid, ..._invitedUids}.toList() : <String>[],
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
         'active': true,
       });
+      if (_privateRoom && _invitedUids.isNotEmpty) {
+        final me = await _watchDb.collection('publicProfiles').doc(_uid).get();
+        final actorName = (me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'صديق').toString();
+        for (final friendUid in _invitedUids) {
+          await _watchDb.collection('notifications').add({
+            'recipientId': friendUid, 'actorId': _uid, 'actorName': actorName,
+            'type': 'message', 'text': 'دعاك إلى غرفة مشاهدة خاصة: ${_name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim()}',
+            'read': false, 'targetType': 'watchRoom', 'targetId': ref.id,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: ref.id)));
     } catch (_) {
@@ -76,7 +129,18 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
             const SizedBox(height: 12),
             TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم الغرفة', border: OutlineInputBorder())),
             const SizedBox(height: 10),
-            TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط يوتيوب أو رابط فيديو مباشر', hintText: 'https://', border: OutlineInputBorder())),
+            TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط يوتيوب أو فيديو تملكه/مصرّح بمشاركته', hintText: 'https://', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero, value: _privateRoom,
+              title: const Text('غرفة خاصة للأصدقاء'),
+              subtitle: const Text('لا تظهر للعامة؛ فقط أنت والأصدقاء الذين تختارهم'),
+              onChanged: (value) => setState(() { _privateRoom = value; if (!value) _invitedUids.clear(); }),
+            ),
+            if (_privateRoom) OutlinedButton.icon(
+              onPressed: _chooseFriends, icon: const Icon(Icons.group_add),
+              label: Text('اختيار الأصدقاء (${_invitedUids.length})'),
+            ),
             if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: const TextStyle(color: Colors.red))),
             const SizedBox(height: 12),
             FilledButton.icon(onPressed: _creating ? null : _createRoom, icon: const Icon(Icons.play_circle_fill), label: Text(_creating ? 'جارٍ الإنشاء...' : 'إنشاء غرفة وتشغيل الفيديو')),
@@ -85,7 +149,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         const SizedBox(height: 12),
         const Text('الغرف المباشرة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).limit(40).snapshots(),
+          stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).where('visibility', isEqualTo: 'public').limit(40).snapshots(),
           builder: (context, snapshot) {
             if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الغرف. تحقق من قواعد Firestore.'));
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -124,6 +188,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   String? _error;
   bool _applyingRemote = false;
   bool _busy = false;
+  bool _viewerPlaybackUnlocked = false;
   Map<String, dynamic> _room = {};
   final _chatText = TextEditingController();
   bool _sendingChat = false;
@@ -141,7 +206,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       final changed = data['url'] != _loadedUrl;
       if (mounted) setState(() => _room = data);
       if (changed) _setupPlayer(data);
-      else if (!_isHost) _applyRemoteState(data);
+      else _applyRemoteState(data);
     }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
   }
 
@@ -163,6 +228,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
 
   Future<void> _setupPlayer(Map<String, dynamic> data) async {
     _syncTimer?.cancel();
+    _viewerPlaybackUnlocked = false;
     await _ytSub?.cancel();
     await _youtube?.close();
     await _video?.dispose();
@@ -180,7 +246,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
-          if (!_isHost || _applyingRemote) return;
+          if (_applyingRemote) return;
           if (value.playerState == PlayerState.playing) _publish('playing');
           if (value.playerState == PlayerState.paused) _publish('paused');
         });
@@ -195,7 +261,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       _applyRemoteState(data);
       _syncTimer = Timer.periodic(const Duration(seconds: 5), (_) => _publishCurrentPosition());
     } catch (_) {
-      if (mounted) setState(() => _error = 'تعذر تشغيل الرابط. تأكد أنه فيديو مباشر أو أن ناشر YouTube يسمح بالتضمين.');
+      if (mounted) setState(() => _error = data['sourceType'] == 'youtube' ? 'تعذر تضمين هذا المقطع. قد يكون خاصاً أو مقيّداً أو أن صاحبه منع التشغيل داخل التطبيقات.' : 'تعذر تشغيل رابط الفيديو المباشر. تأكد من صلاحية الرابط واتصال الإنترنت.');
     }
   }
 
@@ -208,7 +274,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _applyRemoteState(Map<String, dynamic> data) async {
-    if (_isHost || _loadedUrl != data['url']) return;
+    if (data['controlUid'] == _uid || _loadedUrl != data['url']) return;
     _applyingRemote = true;
     try {
       final target = _targetPosition(data);
@@ -240,7 +306,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _publish(String status) async {
-    if (!_isHost || _applyingRemote || _busy) return;
+    if (_applyingRemote || _busy) return;
     _busy = true;
     try {
       final position = await _currentPosition();
@@ -248,6 +314,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         'status': status,
         'positionSeconds': position,
         'updatedAt': FieldValue.serverTimestamp(),
+        'controlUid': _uid,
       });
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذر مزامنة حالة المشاهدة.');
@@ -266,8 +333,26 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     } catch (_) {} finally { _busy = false; }
   }
 
+  // Embedded players on Android/WebView may block remote autoplay until the
+  // viewer performs one local gesture. Unlock once, then remote room sync works.
+  Future<void> _enableViewerPlayback() async {
+    try {
+      if (_isYoutube && _youtube != null) {
+        await _youtube!.playVideo();
+        await _youtube!.pauseVideo();
+      } else if (_video?.value.isInitialized == true) {
+        await _video!.play();
+        await _video!.pause();
+      }
+      if (!mounted) return;
+      setState(() => _viewerPlaybackUnlocked = true);
+      await _applyRemoteState(_room);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تفعيل تشغيل الفيديو على جهازك. جرّب فتح المقطع في YouTube.');
+    }
+  }
+
   Future<void> _togglePlayback() async {
-    if (!_isHost) return;
     if (_isYoutube && _youtube != null) {
       if (_youtube!.value.playerState == PlayerState.playing) {
         await _youtube!.pauseVideo();
@@ -289,7 +374,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _seekBy(int seconds) async {
-    if (!_isHost) return;
     final current = await _currentPosition();
     final next = (current + seconds).clamp(0, 864000).toDouble();
     if (_isYoutube && _youtube != null) {
@@ -342,11 +426,39 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     child: Scaffold(
       appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة')),
       body: ListView(padding: const EdgeInsets.all(12), children: [
-        if (_error != null) Card(color: Theme.of(context).colorScheme.errorContainer, child: Padding(padding: const EdgeInsets.all(12), child: Text(_error!))),
-        if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
-        else if (_video?.value.isInitialized == true)
-          AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
-        else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+        if (_error != null) Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: Padding(padding: const EdgeInsets.all(12), child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(_error!),
+              if (_isYoutube && (_room['url'] as String? ?? '').isNotEmpty)
+                Align(alignment: AlignmentDirectional.centerStart, child: TextButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.tryParse(_room['url'] as String? ?? '');
+                    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('فتح المقطع في تطبيق YouTube'),
+                )),
+            ],
+          )),
+        ),
+        Stack(children: [
+          if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
+          else if (_video?.value.isInitialized == true)
+            AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
+          else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+          if (!_isHost && !_viewerPlaybackUnlocked && (_youtube != null || _video?.value.isInitialized == true))
+            Positioned.fill(child: Material(
+              color: Colors.black54,
+              child: Center(child: FilledButton.icon(
+                onPressed: _enableViewerPlayback,
+                icon: const Icon(Icons.touch_app_rounded),
+                label: const Text('اضغط لتفعيل المشاهدة المتزامنة'),
+              )),
+            )),
+        ]),
         const SizedBox(height: 12),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').snapshots(),
@@ -391,11 +503,12 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             const SizedBox(width: 8),
             Expanded(child: Text(_isHost ? 'أنت مضيف الغرفة — تحكم بالتشغيل للجميع' : 'مشاهدة متزامنة مع المضيف', style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
-          if (_isHost) Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             IconButton(onPressed: () => _seekBy(-10), icon: const Icon(Icons.replay_10), tooltip: 'رجوع 10 ثوانٍ'),
             FilledButton.icon(onPressed: _togglePlayback, icon: Icon(_room['status'] == 'playing' ? Icons.pause : Icons.play_arrow), label: Text(_room['status'] == 'playing' ? 'إيقاف مؤقت' : 'تشغيل للجميع')),
             IconButton(onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10), tooltip: 'تقديم 10 ثوانٍ'),
-          ]) else const Padding(padding: EdgeInsets.only(top: 8), child: Text('المضيف وحده يتحكم بالتشغيل والتقديم حتى تبقون على نفس المقطع.')),
+           ]),
+          const Padding(padding: EdgeInsets.only(top: 4), child: Text('التحكم بالتشغيل والتقديم متاح لكل أعضاء الغرفة.', style: TextStyle(fontSize: 11))),
         ]))),
         const SizedBox(height: 8),
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
@@ -407,7 +520,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
               Text('دردشة غرفة المشاهدة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const SizedBox(height: 8),
-            SizedBox(height: 220, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            SizedBox(height: 280, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _watchDb.collection('watchRooms').doc(widget.roomId)
                   .collection('messages').orderBy('createdAt', descending: true).limit(60).snapshots(),
               builder: (context, snapshot) {
