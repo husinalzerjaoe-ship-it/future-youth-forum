@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -203,6 +204,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   DateTime? _roomVoiceStarted;
   String? _roomVoicePath;
   bool _sendingChat = false;
+  double _playbackSpeed = 1.0;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool get _isHost => _room['hostUid'] == _uid;
   bool get _isYoutube => _room['sourceType'] == 'youtube';
@@ -246,6 +248,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     _youtube = null; _video = null;
     final url = data['url'] as String? ?? '';
     _loadedUrl = url;
+    if (data['sourceType'] == 'web') { if (mounted) setState(() => _error = null); return; }
     try {
       if (data['sourceType'] == 'youtube') {
         final id = data['videoId'] as String? ?? YoutubePlayerController.convertUrlToId(url);
@@ -253,7 +256,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         final controller = YoutubePlayerController.fromVideoId(
           videoId: id,
           autoPlay: false,
-          params: const YoutubePlayerParams(showControls: false, showFullscreenButton: true, strictRelatedVideos: true),
+          params: const YoutubePlayerParams(showControls: true, showFullscreenButton: true, strictRelatedVideos: true),
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
@@ -397,6 +400,66 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
 
 
 
+
+  bool _isDirectVideoUrl(Uri uri) {
+    final p = uri.path.toLowerCase();
+    return p.endsWith('.mp4') || p.endsWith('.m3u8') || p.endsWith('.m4v') || p.endsWith('.mov') || p.endsWith('.webm');
+  }
+  Future<void> _changeRoomUrl() async {
+    if (!_isHost) return;
+    final input = TextEditingController(text: _room['url'] as String? ?? '');
+    String? error;
+    final raw = await showDialog<String>(context: context, builder: (c) => StatefulBuilder(builder: (c, refresh) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(title: const Text('تغيير الحلقة أو رابط المشاهدة'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('ألصق رابط الحلقة الجديدة أو رابط موقع للمشاهدة.'),
+          const SizedBox(height: 10),
+          TextField(controller: input, keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'https://', border: OutlineInputBorder())),
+          if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
+          FilledButton(onPressed: () {
+            final u = Uri.tryParse(input.text.trim());
+            if (u == null || !u.hasScheme || !['http','https'].contains(u.scheme)) { refresh(() => error = 'الرابط غير صحيح.'); return; }
+            Navigator.pop(c, input.text.trim());
+          }, child: const Text('تحديث للجميع')),
+        ],
+      ),
+    )));
+    input.dispose();
+    if (raw == null) return;
+    final uri = Uri.parse(raw);
+    final id = YoutubePlayerController.convertUrlToId(raw);
+    final type = id != null ? 'youtube' : _isDirectVideoUrl(uri) ? 'direct' : 'web';
+    try {
+      await _watchDb.collection('watchRooms').doc(widget.roomId).update({
+        'url': raw, 'sourceType': type, 'videoId': id,
+        'status': 'paused', 'positionSeconds': 0,
+        'updatedAt': FieldValue.serverTimestamp(), 'controlUid': _uid,
+      });
+      if (mounted) setState(() => _error = null);
+    } catch (_) { if (mounted) setState(() => _error = 'تعذر تغيير الرابط. تأكد من تحديث قواعد Firestore.'); }
+  }
+  Future<void> _openRoomWebsite() async {
+    final uri = Uri.tryParse(_room['url'] as String? ?? '');
+    if (uri != null && uri.hasScheme) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+  Future<void> _setPlaybackSpeed(double speed) async {
+    try {
+      if (_isYoutube && _youtube != null) { await _youtube!.setPlaybackRate(speed); }
+      else if (_video?.value.isInitialized == true) { await _video!.setPlaybackSpeed(speed); }
+      if (mounted) setState(() => _playbackSpeed = speed);
+    } catch (_) { if (mounted) setState(() => _error = 'مصدر الفيديو لا يدعم تغيير السرعة.'); }
+  }
+  Future<void> _openFullscreen() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => _WatchPartyFullscreenPage(
+      youtube: _youtube, video: _video, isYoutube: _isYoutube,
+      onSeek: _seekBy, onToggle: _togglePlayback, onSpeed: _setPlaybackSpeed, speed: _playbackSpeed,
+    )));
+  }
+
   Future<bool> _roomChatIsMuted() async {
     final mute = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('roomMutes').doc(_uid).get();
     final d = mute.data() ?? {};
@@ -533,7 +596,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
+      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost) IconButton(tooltip: 'تغيير رابط الحلقة', onPressed: _changeRoomUrl, icon: const Icon(Icons.link)), if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(
           color: Theme.of(context).colorScheme.errorContainer,
@@ -553,11 +616,13 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             ],
           )),
         ),
-        Stack(children: [
+        if (_room['sourceType'] == 'web') Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const Icon(Icons.public, size: 42), const Text('موقع مشاهدة خارجي'), const SizedBox(height: 8), const Text('افتحوا الموقع على أجهزتكم. بعض المواقع لا تسمح بالمزامنة داخل التطبيقات.'), FilledButton.icon(onPressed: _openRoomWebsite, icon: const Icon(Icons.open_in_browser), label: const Text('فتح الموقع'))]))),
+        if (_room['sourceType'] != 'web') Stack(children: [
           if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
           else if (_video?.value.isInitialized == true)
             AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
           else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+          Positioned(top: 8, left: 8, child: IconButton.filled(onPressed: _openFullscreen, tooltip: 'ملء الشاشة', icon: const Icon(Icons.fullscreen))),
           if (!_isHost && !_viewerPlaybackUnlocked && (_youtube != null || _video?.value.isInitialized == true))
             Positioned.fill(child: Material(
               color: Colors.black54,
@@ -569,6 +634,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             )),
         ]),
         const SizedBox(height: 12),
+        if (_room['sourceType'] == 'web') Align(alignment: AlignmentDirectional.centerStart, child: TextButton.icon(onPressed: _isHost ? _changeRoomUrl : null, icon: const Icon(Icons.link), label: const Text('تغيير رابط الموقع'))),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').snapshots(),
           builder: (context, snapshot) {
@@ -613,11 +679,15 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             Expanded(child: Text(_isHost ? 'أنت مضيف الغرفة — تحكم بالتشغيل للجميع' : 'مشاهدة متزامنة مع المضيف', style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            IconButton(onPressed: () => _seekBy(-30), icon: const Icon(Icons.replay_30), tooltip: 'رجوع 30 ثانية'),
             IconButton(onPressed: () => _seekBy(-10), icon: const Icon(Icons.replay_10), tooltip: 'رجوع 10 ثوانٍ'),
             FilledButton.icon(onPressed: _togglePlayback, icon: Icon(_room['status'] == 'playing' ? Icons.pause : Icons.play_arrow), label: Text(_room['status'] == 'playing' ? 'إيقاف مؤقت' : 'تشغيل للجميع')),
             IconButton(onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10), tooltip: 'تقديم 10 ثوانٍ'),
+            IconButton(onPressed: () => _seekBy(30), icon: const Icon(Icons.forward_30), tooltip: 'تقديم 30 ثانية'),
            ]),
           const Padding(padding: EdgeInsets.only(top: 4), child: Text('التحكم بالتشغيل والتقديم متاح لكل أعضاء الغرفة.', style: TextStyle(fontSize: 11))),
+          const SizedBox(height: 8),
+          Wrap(alignment: WrapAlignment.center, spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [const Text('سرعة التشغيل'), DropdownButton<double>(value: _playbackSpeed, items: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((v) => DropdownMenuItem(value: v, child: Text('${v}x'))).toList(), onChanged: (v) { if (v != null) _setPlaybackSpeed(v); }), if (_isHost) TextButton.icon(onPressed: _changeRoomUrl, icon: const Icon(Icons.swap_horiz), label: const Text('الحلقة التالية'))]),
         ]))),
         const SizedBox(height: 8),
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
@@ -693,4 +763,35 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       ]),
     ),
   );
+}
+
+
+class _WatchPartyFullscreenPage extends StatefulWidget {
+  final YoutubePlayerController? youtube;
+  final VideoPlayerController? video;
+  final bool isYoutube;
+  final Future<void> Function(int) onSeek;
+  final Future<void> Function() onToggle;
+  final Future<void> Function(double) onSpeed;
+  final double speed;
+  const _WatchPartyFullscreenPage({required this.youtube, required this.video, required this.isYoutube, required this.onSeek, required this.onToggle, required this.onSpeed, required this.speed});
+  @override State<_WatchPartyFullscreenPage> createState() => _WatchPartyFullscreenPageState();
+}
+class _WatchPartyFullscreenPageState extends State<_WatchPartyFullscreenPage> {
+  @override
+  void initState() { super.initState(); SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky); SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]); }
+  @override
+  void dispose() { SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); SystemChrome.setPreferredOrientations(DeviceOrientation.values); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, body: SafeArea(child: Stack(children: [
+    Positioned.fill(child: Center(child: widget.isYoutube && widget.youtube != null ? YoutubePlayer(controller: widget.youtube!, aspectRatio: 16/9) : widget.video?.value.isInitialized == true ? AspectRatio(aspectRatio: widget.video!.value.aspectRatio, child: VideoPlayer(widget.video!)) : const CircularProgressIndicator())),
+    Positioned(top: 8, right: 8, child: IconButton.filledTonal(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.fullscreen_exit), tooltip: 'إغلاق ملء الشاشة')),
+    Positioned(bottom: 12, left: 12, right: 12, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      IconButton.filledTonal(onPressed: () => widget.onSeek(-30), icon: const Icon(Icons.replay_30)),
+      IconButton.filled(onPressed: widget.onToggle, icon: const Icon(Icons.play_arrow)),
+      IconButton.filledTonal(onPressed: () => widget.onSeek(30), icon: const Icon(Icons.forward_30)),
+      const SizedBox(width: 14),
+      DropdownButton<double>(value: widget.speed, dropdownColor: Colors.black87, style: const TextStyle(color: Colors.white), items: const [0.5,0.75,1.0,1.25,1.5,2.0].map((v) => DropdownMenuItem(value:v, child: Text('${v}x'))).toList(), onChanged: (v) { if(v!=null) widget.onSpeed(v); }),
+    ])),
+  ])));
 }
