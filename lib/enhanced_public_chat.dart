@@ -558,44 +558,44 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
 
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
     Container(
-      padding: const EdgeInsets.fromLTRB(12, 7, 8, 7),
+      padding: const EdgeInsets.fromLTRB(8, 3, 6, 3),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topRight,
           end: Alignment.bottomLeft,
           colors: [Color(0xFF11162F), Color(0xFF30286F), Color(0xFF6554D9)],
         ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
         boxShadow: [BoxShadow(color: Color(0x260F1230), blurRadius: 12, offset: Offset(0, 4))],
       ),
       child: Row(children: [
         Container(
-          width: 38, height: 38,
+          width: 30, height: 30,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.white24),
           ),
-          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 23),
+          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 19),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 7),
         const Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-            SizedBox(height: 3),
-            Text('دردشة مباشرة • اسحب الرسالة للرد', style: TextStyle(color: Color(0xFFDCD7FF), fontSize: 11)),
+            Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+            SizedBox(height: 1),
+            Text('دردشة مباشرة', style: TextStyle(color: Color(0xFFDCD7FF), fontSize: 9)), 
           ],
         )),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _chatDb.collection('chatPresence').where('online', isEqualTo: true).snapshots(),
           builder: (c, s) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
             decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF63E6A5), shape: BoxShape.circle)),
               const SizedBox(width: 5),
-              Text('${s.data?.docs.length ?? 0} متصل', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              Text('${s.data?.docs.length ?? 0} متصل', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
             ]),
           ),
         ),
@@ -631,9 +631,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       ]),
     ),
     Padding(
-      padding: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+      padding: const EdgeInsets.fromLTRB(7, 1, 7, 1),
       child: SizedBox(
-        height: 40,
+        height: 32,
         child: TextField(
           onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
           style: const TextStyle(fontSize: 13),
@@ -652,10 +652,10 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
               icon: const Icon(Icons.close_rounded, size: 17),
             ),
             suffixIconConstraints: const BoxConstraints.tightFor(width: 32, height: 34),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
             filled: true,
             fillColor: Colors.white.withValues(alpha: .94),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: BorderSide.none),
           ),
         ),
       ),
@@ -666,7 +666,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
         final pinned = snapshot.data!.docs;
         return Container(
-          margin: const EdgeInsets.fromLTRB(8, 3, 8, 2),
+          margin: const EdgeInsets.fromLTRB(7, 1, 7, 1),
           decoration: BoxDecoration(
             color: const Color(0xFFEDE8FF),
             borderRadius: BorderRadius.circular(11),
@@ -675,9 +675,9 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
           child: ExpansionTile(
             dense: true,
             visualDensity: VisualDensity.compact,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 9),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 7),
             childrenPadding: const EdgeInsets.only(bottom: 3),
-            minTileHeight: 38,
+            minTileHeight: 31,
             leading: const Icon(Icons.push_pin_rounded, color: _chatBrand, size: 17),
             title: Text(
               'المثبتة (' + pinned.length.toString() + ')',
