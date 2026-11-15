@@ -41,12 +41,11 @@ class _GameRoomSocialPanelState extends State<GameRoomSocialPanel> {
     try {
       final user = FirebaseAuth.instance.currentUser!;
       final profile = await FirebaseFirestore.instance.collection('publicProfiles').doc(uid).get();
+      final rawName = (profile.data()?['name'] ?? user.displayName ?? 'لاعب').toString();
+      final safeName = rawName.length > 60 ? rawName.substring(0, 60) : rawName;
       await _messages.add({
         'uid': uid,
-        'name': (profile.data()?['name'] ?? user.displayName ?? 'لاعب').toString().substring(
-          0,
-          (profile.data()?['name'] ?? user.displayName ?? 'لاعب').toString().length.clamp(0, 60),
-        ),
+        'name': safeName,
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
       });
