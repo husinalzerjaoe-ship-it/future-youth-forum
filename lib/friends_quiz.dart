@@ -18,6 +18,18 @@ const _friendsQuizQuestions = <_FriendsQuestion>[
   _FriendsQuestion('من فاز بكأس العالم 2018؟', ['فرنسا','ألمانيا','كرواتيا','إسبانيا'], 0),
   _FriendsQuestion('من اللاعب البرتغالي الشهير بالرقم 7؟', ['برونو','كريستيانو رونالدو','ناني','برناردو'], 1),
   _FriendsQuestion('أي نادٍ ملعبه سانتياغو برنابيو؟', ['برشلونة','ريال مدريد','أتلتيكو','إشبيلية'], 1),
+  _FriendsQuestion('من فاز بأول نسخة من كأس العالم عام 1930؟', ['البرازيل','الأرجنتين','الأوروغواي','إيطاليا'], 2),
+  _FriendsQuestion('ما المنتخب الأكثر تتويجاً بكأس أمم أفريقيا؟', ['مصر','الكاميرون','نيجيريا','غانا'], 0),
+  _FriendsQuestion('أي نادٍ حقق الثلاثية الأوروبية التاريخية عام 1999؟', ['ريال مدريد','مانشستر يونايتد','بايرن ميونخ','يوفنتوس'], 1),
+  _FriendsQuestion('من سجل هدف إسبانيا في نهائي كأس العالم 2010؟', ['دافيد فيا','تشافي','أندريس إنييستا','فرناندو توريس'], 2),
+  _FriendsQuestion('ما اسم البطولة الأوروبية الثانية للأندية من حيث المستوى؟', ['دوري المؤتمر','الدوري الأوروبي','السوبر الأوروبي','كأس العالم للأندية'], 1),
+  _FriendsQuestion('أي حارس فاز بالكرة الذهبية عام 1963؟', ['إيكر كاسياس','ليف ياشين','بوفون','مانويل نوير'], 1),
+  _FriendsQuestion('أي منتخب وصل نهائي كأس العالم 2014؟', ['هولندا','الأرجنتين','البرازيل','فرنسا'], 1),
+  _FriendsQuestion('من هو الهداف التاريخي لدوري أبطال أوروبا حتى موسم 2024-25؟', ['ليونيل ميسي','كريستيانو رونالدو','روبرت ليفاندوفسكي','كريم بنزيما'], 1),
+  _FriendsQuestion('أي نادٍ إيطالي يُلقب بالروسونيري؟', ['إنتر','لاتسيو','ميلان','روما'], 2),
+  _FriendsQuestion('كم مرة فازت ألمانيا بكأس العالم للرجال حتى 2022؟', ['3','4','5','6'], 1),
+  _FriendsQuestion('من فاز بجائزة أفضل لاعب في كأس العالم 2018؟', ['لوكا مودريتش','كيليان مبابي','أنطوان غريزمان','إيدين هازارد'], 0),
+  _FriendsQuestion('أي نادٍ فاز بدوري أبطال أوروبا 2004؟', ['موناكو','بورتو','ديبورتيفو','ميلان'], 1),
 ];
 
 class _FriendsQuestion {
@@ -37,6 +49,7 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
   final _db = FirebaseFirestore.instance;
   final _code = TextEditingController();
   bool _busy = false;
+  String _mode = '1v1';
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   String get _name => FirebaseAuth.instance.currentUser?.displayName ?? 'لاعب';
 
@@ -54,7 +67,7 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
       await ref.set({
         'game': 'football_quiz', 'hostId': _uid, 'roomCode': code,
         'members': [_uid], 'memberNames': {_uid: _name},
-        'status': 'waiting', 'round': 0, 'answers': {}, 'scores': {_uid: 0},
+        'status': 'waiting', 'round': 0, 'answers': {}, 'scores': {_uid: 0}, 'mode': _mode,
         'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
@@ -80,7 +93,7 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
         final data = snap.data()!;
         final members = List<String>.from(data['members'] ?? []);
         if (members.contains(_uid)) { joined = true; return; }
-        if (data['game'] != 'football_quiz' || data['status'] != 'waiting' || members.length >= 4) {
+        if (data['game'] != 'football_quiz' || data['status'] != 'waiting' || members.length >= ((data['mode'] == '2v2') ? 4 : 2)) {
           throw Exception('المسابقة بدأت أو اكتمل عدد اللاعبين');
         }
         final scores = Map<String, dynamic>.from(data['scores'] ?? {});
@@ -121,10 +134,20 @@ class _FriendsQuizPageState extends State<FriendsQuizPage> {
             Icon(Icons.quiz_rounded, color: Colors.white, size: 38),
             SizedBox(height: 10),
             Text('من يعرف أكثر؟ 🏆', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-            Text('مسابقة مباشرة من 2 إلى 4 لاعبين • 12 سؤالاً • نقاط وترتيب لحظي', style: TextStyle(color: Colors.white70)),
+            Text('اختر 1 ضد 1 أو فرق 2 ضد 2 • أسئلة بمستوى متقدم • نقاط وترتيب لحظي', style: TextStyle(color: Colors.white70)),
           ]),
         ),
         const SizedBox(height: 14),
+        DropdownButtonFormField<String>(
+          value: _mode,
+          decoration: const InputDecoration(labelText: 'نمط اللعب', border: OutlineInputBorder()),
+          items: const [
+            DropdownMenuItem(value: '1v1', child: Text('فردي 1 ضد 1')),
+            DropdownMenuItem(value: '2v2', child: Text('فرق 2 ضد 2')),
+          ],
+          onChanged: _busy ? null : (value) => setState(() => _mode = value ?? '1v1'),
+        ),
+        const SizedBox(height: 10),
         FilledButton.icon(
           onPressed: _busy ? null : _createRoom,
           icon: const Icon(Icons.add_circle_outline),
@@ -273,6 +296,15 @@ class _FriendsQuizRoomPageState extends State<FriendsQuizRoomPage> {
               }, icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
               if (data['hostId'] == _uid) TextButton.icon(onPressed: () => _invite(context, data), icon: const Icon(Icons.person_add_alt_1), label: const Text('دعوة صديق')),
             ]))),
+            if (data['mode'] == '2v2' && members.length >= 2) ...[
+              Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+                const Text('نتيجة الفرق', style: TextStyle(fontWeight: FontWeight.bold)),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                  Text('الفريق A: ${members.take(2).fold<int>(0, (sum, id) => sum + ((scores[id] as num?)?.toInt() ?? 0))}'),
+                  Text('الفريق B: ${members.skip(2).fold<int>(0, (sum, id) => sum + ((scores[id] as num?)?.toInt() ?? 0))}'),
+                ]),
+              ]))),
+            ],
             Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
               const Text('ترتيب اللاعبين', style: TextStyle(fontWeight: FontWeight.bold)),
               ...members.map((id) => ListTile(dense: true, title: Text(names[id]?.toString() ?? 'لاعب'), trailing: Text('${scores[id] ?? 0} نقطة'))),
