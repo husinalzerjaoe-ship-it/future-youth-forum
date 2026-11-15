@@ -520,7 +520,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
               Text('دردشة غرفة المشاهدة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const SizedBox(height: 8),
-            SizedBox(height: 220, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            SizedBox(height: 280, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _watchDb.collection('watchRooms').doc(widget.roomId)
                   .collection('messages').orderBy('createdAt', descending: true).limit(60).snapshots(),
               builder: (context, snapshot) {
