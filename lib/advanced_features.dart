@@ -7,6 +7,8 @@ import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:http/http.dart' as http;
+import 'package:gal/gal.dart';
 import 'media_upload_service.dart';
 
 const _brand = Color(0xFF6554D9);
@@ -982,22 +984,164 @@ class _DirectVoicePlayerState extends State<_DirectVoicePlayer> {
   );
 }
 
-class _DirectVideoMessage extends StatefulWidget {
+class _DirectVideoMessage extends StatelessWidget {
   final String url;
   const _DirectVideoMessage({required this.url});
-  @override State<_DirectVideoMessage> createState() => _DirectVideoMessageState();
-}
-class _DirectVideoMessageState extends State<_DirectVideoMessage> {
-  late final VideoPlayerController _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
-  @override void initState() { super.initState(); _controller.initialize().then((_) { if (mounted) setState(() {}); }).catchError((_) { if (mounted) setState(() {}); }); }
-  @override void dispose() { _controller.dispose(); super.dispose(); }
+
+  Future<void> _download(BuildContext context) async {
+    try {
+      final uri = Uri.tryParse(url);
+      if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
+        throw const FormatException('رابط الفيديو غير صالح');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('جارٍ تحميل الفيديو...')));
+      final response = await http.get(uri).timeout(const Duration(minutes: 2));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+        throw StateError('تعذر تنزيل الفيديو من الخادم');
+      }
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/forum_video_${DateTime.now().microsecondsSinceEpoch}.mp4');
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+      await Gal.putVideo(file.path, album: 'Future Youth Forum');
+      await file.delete();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ الفيديو في معرض الهاتف')));
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحميل الفيديو: $e')));
+      }
+    }
+  }
+
   @override Widget build(BuildContext context) => ClipRRect(
     borderRadius: BorderRadius.circular(12),
-    child: SizedBox(width: 240, child: _controller.value.isInitialized
-      ? AspectRatio(aspectRatio: _controller.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [
-          VideoPlayer(_controller),
-          IconButton.filledTonal(onPressed: () { setState(() { _controller.value.isPlaying ? _controller.pause() : _controller.play(); }); }, icon: Icon(_controller.value.isPlaying ? Icons.pause : Icons.play_arrow)),
-        ]))
-      : const SizedBox(height: 140, child: Center(child: CircularProgressIndicator()))),
+    child: SizedBox(
+      width: 250,
+      child: Stack(alignment: Alignment.center, children: [
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: const ColoredBox(color: Colors.black, child: Center(
+            child: Icon(Icons.video_library_outlined, color: Colors.white54, size: 44),
+          )),
+        ),
+        Positioned.fill(child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => _FullScreenDirectVideoPage(url: url),
+            )),
+            child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white, size: 58)),
+          ),
+        )),
+        Positioned(
+          bottom: 6, left: 6,
+          child: IconButton.filledTonal(
+            tooltip: 'تحميل الفيديو',
+            onPressed: () => _download(context),
+            icon: const Icon(Icons.download),
+          ),
+        ),
+        const Positioned(top: 8, right: 8, child: Icon(Icons.fullscreen, color: Colors.white)),
+      ]),
+    ),
+  );
+}
+
+class _FullScreenDirectVideoPage extends StatefulWidget {
+  final String url;
+  const _FullScreenDirectVideoPage({required this.url});
+  @override State<_FullScreenDirectVideoPage> createState() => _FullScreenDirectVideoPageState();
+}
+
+class _FullScreenDirectVideoPageState extends State<_FullScreenDirectVideoPage> {
+  late final VideoPlayerController _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  bool _ready = false;
+  String? _error;
+
+  @override void initState() {
+    super.initState();
+    _controller.initialize().then((_) {
+      if (mounted) setState(() => _ready = true);
+    }).catchError((_) {
+      if (mounted) setState(() => _error = 'تعذر تشغيل الفيديو. تحقق من الاتصال.');
+    });
+  }
+
+  @override void dispose() { _controller.dispose(); super.dispose(); }
+
+  Future<void> _seek(Duration offset) async {
+    final current = _controller.value.position;
+    final total = _controller.value.duration;
+    var target = current + offset;
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > total) target = total;
+    await _controller.seekTo(target);
+  }
+
+  @override Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      foregroundColor: Colors.white,
+      title: const Text('مشاهدة الفيديو'),
+    ),
+    body: Center(
+      child: _error != null
+        ? Text(_error!, style: const TextStyle(color: Colors.white))
+        : !_ready
+          ? const CircularProgressIndicator(color: Colors.white)
+          : Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: VideoPlayer(_controller),
+                ),
+                const SizedBox(height: 16),
+                VideoProgressIndicator(
+                  _controller,
+                  allowScrubbing: true,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  colors: const VideoProgressColors(
+                    playedColor: Colors.deepPurpleAccent,
+                    bufferedColor: Colors.white38,
+                    backgroundColor: Colors.white12,
+                  ),
+                ),
+                ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: _controller,
+                  builder: (context, value, _) => Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        color: Colors.white,
+                        onPressed: () => _seek(const Duration(seconds: -10)),
+                        icon: const Icon(Icons.replay_10),
+                      ),
+                      IconButton.filled(
+                        onPressed: () async {
+                          if (value.isPlaying) {
+                            await _controller.pause();
+                          } else {
+                            if (value.position >= value.duration) {
+                              await _controller.seekTo(Duration.zero);
+                            }
+                            await _controller.play();
+                          }
+                        },
+                        icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
+                      ),
+                      IconButton(
+                        color: Colors.white,
+                        onPressed: () => _seek(const Duration(seconds: 10)),
+                        icon: const Icon(Icons.forward_10),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    ),
   );
 }
