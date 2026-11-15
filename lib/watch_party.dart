@@ -503,6 +503,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
           .collection('messages').add({
         'senderUid': _uid,
         'senderName': name,
+        'type': 'text',
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
       });
