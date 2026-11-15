@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'game_room_social.dart';
 
 const _friendsQuizQuestions = <_FriendsQuestion>[
   _FriendsQuestion('كم لاعباً يبدأ به كل فريق مباراة كرة القدم؟', ['9','10','11','12'], 2),
@@ -289,6 +290,8 @@ class _FriendsQuizRoomPageState extends State<FriendsQuizRoomPage> {
               )),
             ],
             if (done) const Card(child: Padding(padding: EdgeInsets.all(18), child: Text('انتهت المسابقة! مبروك للفائز 🏆'))),
+            const SizedBox(height: 12),
+            GameRoomSocialPanel(roomId: widget.roomId),
           ]);
         },
       ),
