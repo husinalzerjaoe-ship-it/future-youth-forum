@@ -503,6 +503,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v17':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V17SmartHubPage()));
+                  break;
                 case 'v15':
                 case 'v14':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V14CommandCenterPage()));
@@ -583,6 +586,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v17', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز V17 الذكي الجديد'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v15', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز الملتقى الشامل V15'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v14', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('مركز الملتقى V14'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v12', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V12 المستقبلية الجديدة'), contentPadding: EdgeInsets.zero)),
