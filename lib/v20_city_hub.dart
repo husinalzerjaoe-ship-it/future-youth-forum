@@ -47,7 +47,7 @@ class _V20CityHubPageState extends State<V20CityHubPage> {
 
   String get _dayKey {
     final now = DateTime.now();
-    return 'v20_daily_claim_\${now.year}_\${now.month}_\${now.day}';
+    return 'v20_daily_claim_${now.year}_${now.month}_${now.day}';
   }
 
   @override
