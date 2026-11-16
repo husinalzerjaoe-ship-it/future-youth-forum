@@ -711,12 +711,15 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
               children: s.data!.docs.map((d) {
                 final data = d.data();
                 return Padding(padding: const EdgeInsetsDirectional.only(end: 6),
-                  child: ActionChip(
-                    visualDensity: VisualDensity.compact,
-                    avatar: const Icon(Icons.emoji_events_rounded, color: Colors.orange, size: 16),
-                    label: Text(data['title'] as String? ?? 'مسابقة الأسبوع', maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                    onPressed: () => _join(d.id),
+                  child: GestureDetector(
+                    onLongPress: _isFounder ? () => _entries(d.id) : null,
+                    child: ActionChip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: const Icon(Icons.emoji_events_rounded, color: Colors.orange, size: 16),
+                      label: Text(data['title'] as String? ?? 'مسابقة الأسبوع', maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      onPressed: () => _join(d.id),
+                    ),
                   ));
               }).toList(),
             ));
