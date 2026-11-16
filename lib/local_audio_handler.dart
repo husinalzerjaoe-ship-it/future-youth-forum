@@ -80,11 +80,12 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override Future<void> skipToPrevious() => _player.seekToPrevious();
 }
 
-LocalAudioHandler? appAudioHandler;
+late LocalAudioHandler appAudioHandler;
+bool isAudioServiceInitialized = false;
 Future<LocalAudioHandler>? _audioInitialization;
 
 Future<void> initializeLocalAudioService() async {
-  if (appAudioHandler != null) return;
+  if (isAudioServiceInitialized) return;
   _audioInitialization ??= AudioService.init<LocalAudioHandler>(
     builder: LocalAudioHandler.new,
     config: const AudioServiceConfig(
@@ -92,12 +93,10 @@ Future<void> initializeLocalAudioService() async {
       androidNotificationChannelName: 'موسيقى ملتقى الأنمي',
       androidNotificationOngoing: true,
     ),
-  ).then((handler) {
-    appAudioHandler = handler;
-    return handler;
-  });
+  );
   try {
-    await _audioInitialization;
+    appAudioHandler = await _audioInitialization!;
+    isAudioServiceInitialized = true;
   } catch (_) {
     _audioInitialization = null;
     rethrow;
