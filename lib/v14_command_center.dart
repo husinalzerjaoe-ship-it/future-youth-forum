@@ -110,7 +110,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
     _V14Tool('التواصل', 'مركز الإشعارات', 'تنبيهات المنشن والتفاعلات والأحداث الجديدة', Icons.notifications_active_rounded, () => const NotificationsPage()),
     _V14Tool('المجتمع', 'دليل الأعضاء', 'اكتشف مجتمعات وأعضاء الملتقى', Icons.people_alt_rounded, () => const CommunityDirectoryPage()),
     _V14Tool('المجتمع', 'مساحات المشاهدة', 'استكشف غرف ومجموعات المشاهدة', Icons.live_tv_rounded, () => const WatchPartiesPage()),
-    _V14Tool('المجتمع', 'مجتمعات الاهتمام', 'انضم إلى نقاشات حسب اهتماماتك', Icons.diversity_2_rounded, () => const InterestCommunityPage()),
+    _V14Tool('المجتمع', 'مجتمعات الاهتمام', 'انضم إلى نقاشات حسب اهتماماتك', Icons.diversity_2_rounded, () => const InterestCommunityPage(category: 'عام')),
     _V14Tool('الترفيه', 'عالم الأنمي', 'خلفيات الأنمي وقائمة المشاهدة والاختبارات', Icons.animation_rounded, () => const AnimeExperiencePage()),
     _V14Tool('الإبداع والمعرفة', 'عالمك اليومي', 'تحديات ومحتوى وأدوات يومية', Icons.today_rounded, () => const DailyWorldPage()),
     _V14Tool('الإبداع والمعرفة', 'إلهام يومي', 'اقتباسات وأفكار ومساحات كتابة', Icons.lightbulb_rounded, () => const InspirationHubPage()),
