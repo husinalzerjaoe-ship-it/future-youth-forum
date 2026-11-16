@@ -26,7 +26,7 @@ class _FutureGrowthPageState extends State<FutureGrowthPage> {
 
   String get _today {
     final now = DateTime.now();
-    return '\${now.year.toString().padLeft(4, '0')}-\${now.month.toString().padLeft(2, '0')}-\${now.day.toString().padLeft(2, '0')}';
+    return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
   @override void initState() { super.initState(); _load(); }
@@ -79,7 +79,7 @@ class _FutureGrowthPageState extends State<FutureGrowthPage> {
     final prefs = await SharedPreferences.getInstance();
     final last = prefs.getString(_dayKey) ?? '';
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
-    final yesterdayKey = '\${yesterday.year.toString().padLeft(4, '0')}-\${yesterday.month.toString().padLeft(2, '0')}-\${yesterday.day.toString().padLeft(2, '0')}';
+    final yesterdayKey = '${yesterday.year.toString().padLeft(4, '0')}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
     _streak = last == yesterdayKey ? _streak + 1 : 1;
     _checkedIn = true;
     await prefs.setInt(_streakKey, _streak);
@@ -128,7 +128,7 @@ class _FutureGrowthPageState extends State<FutureGrowthPage> {
             Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 const Text('أهداف اليوم', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
-                Text('$completed / \${_goals.length}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6554D9))),
+                Text('$completed / ${_goals.length}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6554D9))),
               ]),
               const SizedBox(height: 10),
               ClipRRect(borderRadius: BorderRadius.circular(20), child: LinearProgressIndicator(value: progress, minHeight: 9)),
