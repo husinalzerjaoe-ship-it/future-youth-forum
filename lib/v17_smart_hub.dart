@@ -5,6 +5,7 @@ import 'v20_city_hub.dart';
 import 'v21_ultimate_hub.dart';
 import 'v28_gaming_library.dart';
 import 'v30_future_academy.dart';
+import 'community_pages.dart' show RegionChatRoomsPage;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
 import 'advanced_features.dart';
@@ -52,6 +53,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('عالم الملتقى V21', 'المكتبة الثقافية والأكاديمية واستوديو الإبداع ومخطط الإنجاز والتحديات', Icons.auto_awesome_rounded, () => const V21UltimateHubPage(), 'V21 عالم مكتبة أكاديمية إبداع مهام امتنان تحدي يومي'),
     _Destination('مكتبة V18 الشاملة', 'ديوان وأذكار وأكاديمية وعلوم ومطبخ وثقافة وبودكاست', Icons.auto_awesome_rounded, () => const V18DiscoveryHubPage(), 'شعر دعاء ذكر قرآن تعليم علوم فضاء مطبخ العراق بودكاست ثقافة'),
     _Destination('أكاديمية المستقبل', 'مسارات مهارات ومخطط مهام ودفتر أفكار ومشاريع', Icons.school_rounded, () => const V30FutureAcademyPage(), 'أكاديمية تعلم مهارات برمجة تصميم لغة تفكير سلامة رقمية مشاريع مهام أفكار'),
+    _Destination('مجتمعات العراق والمحافظات', 'غرف لكل محافظة وغرف للألعاب والكرة والأنمي والتقنية', Icons.location_city_rounded, () => const RegionChatRoomsPage(), 'العراق بغداد البصرة الموصل أربيل السليمانية دهوك كركوك ديالى الأنبار بابل كربلاء نجف ذي قار ميسان واسط محافظات دردشة'),
   ];
 
   @override
