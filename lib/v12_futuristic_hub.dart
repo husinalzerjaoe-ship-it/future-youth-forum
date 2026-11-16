@@ -11,6 +11,7 @@ import 'game_center.dart';
 import 'knowledge_corner.dart';
 import 'premium_media_hub.dart';
 import 'v6_community_suite.dart';
+import 'v12_personal_studio.dart';
 
 const _navy=Color(0xFF0B1024),_purple=Color(0xFF927CFF),_cyan=Color(0xFF42D9E8);
 
@@ -48,6 +49,7 @@ class _V12FuturisticHubPageState extends State<V12FuturisticHubPage>{
       ...List.generate(4,(i)=>CheckboxListTile(value:_done[i],onChanged:(v)=>_mission(i,v??false),activeColor:_purple,title:Text(_missions[i],style:const TextStyle(color:Colors.white,fontSize:13)),secondary:const CircleAvatar(backgroundColor:Color(0xFF30285F),child:Icon(Icons.bolt,color:_purple)),tileColor:const Color(0xFF171D36),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(15)))),
       const SizedBox(height:18),_section('تحدي المعرفة اليومي','سؤال اليوم • نقاط إضافية للإجابة الصحيحة'),_quiz(q,answers),
       const SizedBox(height:20),_section('عوالم الملتقى','مداخل سريعة إلى أقسامك المفضلة'),
+      _tile('استوديو المستقبل','هويتك ومسوداتك وذكرياتك وتفضيلاتك',Icons.dashboard_customize,_cyan,()=>_open(const V12PersonalStudioPage())),
       _tile('المجتمع والأندية','غرف واهتمامات ونقاشات',Icons.groups,_cyan,()=>_open(const V6CommunitySuitePage())),
       _tile('مركز الألعاب','ألعاب وتحديات متنوعة',Icons.sports_esports,_purple,()=>_open(const GameCenterPage())),
       _tile('منافسات الأصدقاء','تحديات ومواجهات جماعية',Icons.people_alt,Colors.greenAccent,()=>_open(const FriendsBattleArenaPage())),
