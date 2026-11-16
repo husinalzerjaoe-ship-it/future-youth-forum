@@ -42,6 +42,7 @@ import 'v11_premium_hub.dart';
 import 'v12_futuristic_hub.dart';
 import 'v14_command_center.dart';
 import 'v17_smart_hub.dart';
+import 'v31_member_titles.dart';
 import 'v22_cinema_discovery.dart';
 
 const brand = Color(0xFF6554D9);
@@ -589,6 +590,9 @@ class _HomePageState extends State<HomePage> {
                 case 'moderation':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const ModerationLogPage()));
                   break;
+                case 'memberTitles':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderMemberTitlesPage()));
+                  break;
                 case 'logout':
                   FirebaseAuth.instance.signOut();
                   break;
@@ -624,6 +628,8 @@ class _HomePageState extends State<HomePage> {
                 const PopupMenuItem(value: 'reports', child: ListTile(leading: Icon(Icons.admin_panel_settings), title: Text('لوحة البلاغات'), contentPadding: EdgeInsets.zero)),
               if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
                 const PopupMenuItem(value: 'moderation', child: ListTile(leading: Icon(Icons.history), title: Text('سجل المشرفين'), contentPadding: EdgeInsets.zero)),
+              if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
+                const PopupMenuItem(value: 'memberTitles', child: ListTile(leading: Icon(Icons.workspace_premium_outlined), title: Text('إدارة ألقاب الأعضاء'), contentPadding: EdgeInsets.zero)),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'), contentPadding: EdgeInsets.zero)),
             ],
@@ -1146,6 +1152,8 @@ class MyProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
+          if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
+            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
@@ -1357,6 +1365,8 @@ class MemberProfilePage extends StatelessWidget {
             Center(child: UserAvatar(url: d['photoUrl'] as String?)),
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
+              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
             if (uid != FirebaseAuth.instance.currentUser!.uid)
