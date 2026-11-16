@@ -271,7 +271,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     }, childCount: entries.length));
   }
 
-  Widget? _nowPlaying() => StreamBuilder<MediaItem?>(
+  Widget _nowPlaying() => StreamBuilder<MediaItem?>(
     stream: appAudioHandler.mediaItem,
     builder: (context, media) {
       final item = media.data;

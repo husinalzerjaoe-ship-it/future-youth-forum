@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'media_upload_service.dart';
 
@@ -18,15 +20,16 @@ class AnimeExperiencePage extends StatelessWidget {
   const AnimeExperiencePage({super.key});
   @override Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
-    child: DefaultTabController(length: 3, child: Scaffold(
+    child: DefaultTabController(length: 4, child: Scaffold(
       appBar: AppBar(title: const Text('عالم الأنمي'), foregroundColor: Colors.white,
         flexibleSpace: Container(decoration: const BoxDecoration(gradient: LinearGradient(colors: [_ink, _violet, Color(0xFF168E9B)]))),
         bottom: const TabBar(isScrollable: true, tabs: [
           Tab(icon: Icon(Icons.wallpaper), text: 'الخلفيات'),
+          Tab(icon: Icon(Icons.explore_rounded), text: 'اكتشف الأنمي'),
           Tab(icon: Icon(Icons.bookmarks), text: 'قائمتي'),
           Tab(icon: Icon(Icons.quiz), text: 'اختبر نفسك'),
         ])),
-      body: const TabBarView(children: [AnimeWallpaperGallery(), AnimeWatchlistPage(), AnimeQuizPage()]),
+      body: const TabBarView(children: [AnimeWallpaperGallery(), AnimeDiscoverPage(), AnimeWatchlistPage(), AnimeQuizPage()]),
     )),
   );
 }
@@ -293,6 +296,208 @@ class _AnimeWatchlistPageState extends State<AnimeWatchlistPage> {
             })),
           )),
         ]);
+      },
+    )),
+  ]);
+}
+
+class AnimeDiscoverPage extends StatefulWidget {
+  const AnimeDiscoverPage({super.key});
+  @override State<AnimeDiscoverPage> createState() => _AnimeDiscoverPageState();
+}
+
+class _AnimeDiscoverPageState extends State<AnimeDiscoverPage> {
+  final _search = TextEditingController();
+  late Future<List<Map<String, dynamic>>> _catalog;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _catalog = _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<List<Map<String, dynamic>>> _load({String query = ''}) async {
+    final uri = query.trim().isEmpty
+        ? Uri.https('api.jikan.moe', '/v4/top/anime', {'limit': '24'})
+        : Uri.https('api.jikan.moe', '/v4/anime', {'q': query.trim(), 'limit': '24', 'sfw': 'true'});
+    final response = await http.get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 18));
+    if (response.statusCode == 429) {
+      throw Exception('المكتبة تستقبل طلبات كثيرة؛ انتظر قليلاً ثم أعد المحاولة.');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('تعذر الاتصال بمكتبة الأنمي حالياً (HTTP ${response.statusCode}).');
+    }
+    final root = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = root['data'];
+    if (data is! List) return <Map<String, dynamic>>[];
+    return data.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+  }
+
+  void _runSearch() {
+    setState(() {
+      _query = _search.text.trim();
+      _catalog = _load(query: _query);
+    });
+  }
+
+  String _genres(Map<String, dynamic> anime) {
+    final genres = anime['genres'];
+    if (genres is! List) return 'أنمي';
+    final names = genres.whereType<Map>().map((g) => (g['name'] ?? '').toString())
+        .where((name) => name.isNotEmpty).take(3).toList();
+    return names.isEmpty ? 'أنمي' : names.join(' • ');
+  }
+
+  Future<void> _saveToList(Map<String, dynamic> anime) async {
+    final id = anime['mal_id'];
+    final title = (anime['title'] ?? anime['title_english'] ?? 'أنمي').toString();
+    if (id == null) return;
+    try {
+      final ref = _db.collection('users').doc(_uid).collection('animeWatchlist').doc('mal_$id');
+      final existing = await ref.get();
+      if (existing.exists) {
+        await ref.update({'status': 'planned'});
+      } else {
+        await ref.set({
+          'title': title,
+          'genre': _genres(anime),
+          'status': 'planned',
+          'externalId': id,
+          'source': 'jikan',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('أُضيف $title إلى قائمتك.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر حفظ الأنمي في قائمتك.')));
+    }
+  }
+
+  void _details(Map<String, dynamic> anime) {
+    final images = anime['images'];
+    final jpg = images is Map ? images['jpg'] : null;
+    final imageUrl = jpg is Map ? (jpg['large_image_url'] ?? jpg['image_url'] ?? '').toString() : '';
+    final title = (anime['title'] ?? 'أنمي').toString();
+    final synopsis = (anime['synopsis'] ?? 'لا يتوفر وصف لهذا العمل حالياً.').toString();
+    showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * .78,
+          child: ListView(padding: const EdgeInsets.all(16), children: [
+            if (imageUrl.startsWith('https://'))
+              ClipRRect(borderRadius: BorderRadius.circular(16),
+                child: Image.network(imageUrl, height: 230, fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox(height: 100, child: Icon(Icons.broken_image)))),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text(_genres(anime), style: const TextStyle(color: _violet, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('التقييم: ${anime['score'] ?? 'غير متوفر'} • الحلقات: ${anime['episodes'] ?? 'غير معروف'}'),
+            const SizedBox(height: 12),
+            Text(synopsis, style: const TextStyle(height: 1.6)),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () { Navigator.pop(sheetContext); _saveToList(anime); },
+              icon: const Icon(Icons.bookmark_add_rounded), label: const Text('أضفه إلى قائمتي')),
+          ]),
+        )),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+      child: Row(children: [
+        Expanded(child: TextField(
+          controller: _search,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => _runSearch(),
+          decoration: InputDecoration(
+            hintText: 'ابحث عن أنمي بالاسم...',
+            prefixIcon: const Icon(Icons.search_rounded),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            isDense: true,
+          ),
+        )),
+        const SizedBox(width: 7),
+        IconButton.filled(onPressed: _runSearch, icon: const Icon(Icons.arrow_forward_rounded)),
+      ]),
+    ),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Row(children: [
+        Expanded(child: Text(_query.isEmpty ? 'الأعلى ضمن مكتبة الأنمي' : 'نتائج البحث عن: $_query',
+          style: const TextStyle(fontWeight: FontWeight.bold))),
+        IconButton(tooltip: 'تحديث المكتبة', onPressed: () => setState(() => _catalog = _load(query: _query)),
+          icon: const Icon(Icons.refresh_rounded)),
+      ]),
+    ),
+    Expanded(child: FutureBuilder<List<Map<String, dynamic>>>(
+      future: _catalog,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.cloud_off_rounded, size: 42),
+              const SizedBox(height: 8),
+              Text(snapshot.error.toString().replaceFirst('Exception: ', ''), textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              FilledButton.tonalIcon(
+                onPressed: () => setState(() => _catalog = _load(query: _query)),
+                icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+            ]),
+          ));
+        }
+        final items = snapshot.data ?? [];
+        if (items.isEmpty) return const Center(child: Text('ما لقينا نتائج. جرّب اسماً آخر.'));
+        return GridView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: items.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2, childAspectRatio: .60, crossAxisSpacing: 10, mainAxisSpacing: 10),
+          itemBuilder: (context, index) {
+            final anime = items[index];
+            final images = anime['images'];
+            final jpg = images is Map ? images['jpg'] : null;
+            final imageUrl = jpg is Map ? (jpg['large_image_url'] ?? jpg['image_url'] ?? '').toString() : '';
+            final title = (anime['title'] ?? 'أنمي').toString();
+            return Card(clipBehavior: Clip.antiAlias, child: InkWell(
+              onTap: () => _details(anime),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Expanded(child: imageUrl.startsWith('https://')
+                  ? Image.network(imageUrl, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.movie_creation_outlined, size: 42)))
+                  : const Center(child: Icon(Icons.movie_creation_outlined, size: 42))),
+                Padding(padding: const EdgeInsets.fromLTRB(8, 7, 8, 2),
+                  child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold))),
+                Padding(padding: const EdgeInsets.fromLTRB(8, 2, 8, 7),
+                  child: Text('${_genres(anime)} • ★ ${anime['score'] ?? '—'}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, color: _violet))),
+              ]),
+            ));
+          },
+        );
       },
     )),
   ]);
