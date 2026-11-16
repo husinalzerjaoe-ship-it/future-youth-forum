@@ -1106,14 +1106,21 @@ class MyProfilePage extends StatelessWidget {
         return ListView(padding: const EdgeInsets.all(18), children: [
           const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
           const SizedBox(height: 15),
-          Center(child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFFFB52E) : brand, width: 4),
-            ),
-            child: UserAvatar(url: d['photoUrl'] as String?),
-          )),
+          ValueListenableBuilder<Color>(
+            valueListenable: v17AccentNotifier,
+            builder: (context, accent, _) => Center(child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com'
+                      ? const Color(0xFFFFB52E) : accent,
+                  width: 4,
+                ),
+              ),
+              child: UserAvatar(url: d['photoUrl'] as String?),
+            )),
+          ),
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
