@@ -142,7 +142,6 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
   Future<void> _toggleTournamentEntry(
     DocumentSnapshot<Map<String, dynamic>> tournament,
     bool joined,
-    int count,
   ) async {
     final data = tournament.data() ?? {};
     if (data['status'] != 'open') {
@@ -401,7 +400,7 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
                   const SizedBox(height: 8),
                   Row(children: [
                     Expanded(child: FilledButton.tonal(
-                      onPressed: open ? () => _toggleTournamentEntry(doc, joined, count) : null,
+                      onPressed: open ? () => _toggleTournamentEntry(doc, joined) : null,
                       child: Text(joined ? 'إلغاء تسجيلي' : 'انضم للبطولة'),
                     )),
                     if (owner && open) ...[
