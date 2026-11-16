@@ -31,18 +31,24 @@ class _V12FuturisticHubPageState extends State<V12FuturisticHubPage>{
   int _xp=0,_correct=0,_q=0;
   bool _high=false,_loaded=false,_answered=false;
   List<bool> _done=List<bool>.filled(4,false);
+  String get _todayKey{final d=DateTime.now();return '${d.year}-${d.month}-${d.day}';}
   int get _level=>1+(_xp~/100);
   int get _progress=>_xp%100;
   @override void initState(){super.initState();_q=DateTime.now().day%_questions.length;_load();}
   Future<void> _load()async{
     final p=await SharedPreferences.getInstance();if(!mounted)return;
-    setState((){_xp=p.getInt('v12_xp')??0;_high=p.getBool('v12_high')??false;_done=List<bool>.generate(4,(i)=>p.getBool('v12_mission_$i')??false);_loaded=true;});
+    final sameDay=p.getString('v12_mission_date')==_todayKey;
+    if(!sameDay){
+      for(var i=0;i<4;i++){await p.setBool('v12_mission_$i',false);}
+      await p.setString('v12_mission_date',_todayKey);
+    }
+    setState((){_xp=p.getInt('v12_xp')??0;_high=p.getBool('v12_high')??false;_done=List<bool>.generate(4,(i)=>sameDay?(p.getBool('v12_mission_$i')??false):false);_answered=p.getString('v12_quiz_date')==_todayKey;_loaded=true;});
   }
-  Future<void> _save()async{final p=await SharedPreferences.getInstance();await p.setInt('v12_xp',_xp);for(var i=0;i<4;i++){await p.setBool('v12_mission_$i',_done[i]);}}
-  Future<void> _mission(int i,bool v)async{setState((){_done[i]=v;_xp=math.max(0,_xp+(v?20:-20)).toInt();});await _save();}
+  Future<void> _save()async{final p=await SharedPreferences.getInstance();await p.setInt('v12_xp',_xp);await p.setString('v12_mission_date',_todayKey);for(var i=0;i<4;i++){await p.setBool('v12_mission_$i',_done[i]);}}
+  Future<void> _mission(int i,bool v)async{if(!v||_done[i])return;setState((){_done[i]=true;_xp+=20;});await _save();}
   Future<void> _performance(bool v)async{setState(()=>_high=v);final p=await SharedPreferences.getInstance();await p.setBool('v12_high',v);}
   void _open(Widget page)=>Navigator.push(context,MaterialPageRoute(builder:(_)=>page));
-  void _answer(int i){if(_answered)return;final ok=i==_questions[_q]['c'];setState((){_answered=true;if(ok){_correct++;_xp+=15;}});_save();ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(ok?'إجابة صحيحة! +15 XP':'مو مشكلة، جرّب تحدي باچر!')));}
+  Future<void> _answer(int i)async{if(_answered)return;final ok=i==_questions[_q]['c'];setState((){_answered=true;if(ok){_correct++;_xp+=15;}});final p=await SharedPreferences.getInstance();await p.setString('v12_quiz_date',_todayKey);await _save();if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(ok?'إجابة صحيحة! +15 XP':'مو مشكلة، جرّب تحدي باچر!')));}
   @override Widget build(BuildContext context){
     final q=_questions[_q],answers=q['a'] as List<String>;
     return Directionality(textDirection:TextDirection.rtl,child:Scaffold(backgroundColor:_navy,appBar:AppBar(title:const Text('V12 • عالم المستقبل'),backgroundColor:_navy,foregroundColor:Colors.white,actions:[IconButton(onPressed:_showPerformance,icon:const Icon(Icons.speed_rounded))]),body:!_loaded?const Center(child:CircularProgressIndicator(color:_cyan)):ListView(padding:const EdgeInsets.all(16),children:[
