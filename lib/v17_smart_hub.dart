@@ -3,6 +3,7 @@ import 'v18_discovery_hub.dart';
 import 'v19_interactive_hub.dart';
 import 'v20_city_hub.dart';
 import 'v21_ultimate_hub.dart';
+import 'v28_gaming_library.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
 import 'advanced_features.dart';
@@ -36,6 +37,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('مركز الكرة المباشر', 'النتائج والمواعيد والقنوات الرسمية', Icons.sports_soccer_rounded, () => const FootballLiveCenterPage(), 'رياضة كرة قنوات مباراة'),
     _Destination('مركز المباريات', 'البطولات والنتائج وشعارات الأندية', Icons.scoreboard_rounded, () => const MatchCenterPage(), 'نتائج دوري جدول'),
     _Destination('مركز الألعاب', 'تحديات وأسئلة وألعاب متنوعة', Icons.sports_esports_rounded, () => const GameCenterPage(), 'لعبة مسابقة أسئلة'),
+    _Destination('مكتبة Mobile Legends وPUBG', 'أبطال وعدادات وإيمبلم ومعدات وإعدادات لعب', Icons.shield_rounded, () => const V28GamingLibraryPage(), 'Mobile Legends PUBG موبايل ليجند ببجي ميتا أبطال عدادات ايمبلم معدات حساسية'),
     _Destination('الفعاليات والمسابقات', 'أنشطة الملتقى والتسجيل', Icons.event_available_rounded, () => const CommunityEventsPage(), 'فعالية حدث بطولة'),
     _Destination('بطولات الأصدقاء', 'إنشاء بطولة وتحديات بين أعضاء الملتقى', Icons.emoji_events_rounded, () => const V12CompanionCenterPage(), 'بطولة تحدي أصدقاء مسابقة'),
     _Destination('الإنجازات والأوسمة', 'النقاط وسلاسل النشاط والشارات', Icons.military_tech_rounded, () => const AchievementHubPage(), 'إنجاز شارة نقاط'),
