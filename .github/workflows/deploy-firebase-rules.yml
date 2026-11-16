@@ -22,11 +22,10 @@ jobs:
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
-      - name: Validate Firebase project configuration
+      - name: Validate Firestore configuration
         run: |
           test -f firebase.json
           test -f firestore.rules
-          test -f storage.rules
 
-      - name: Deploy Firestore and Storage rules
-        run: firebase deploy --only firestore:rules,storage --project futureyouth-69f8a --non-interactive
+      - name: Deploy Firestore rules only (Spark-compatible)
+        run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
