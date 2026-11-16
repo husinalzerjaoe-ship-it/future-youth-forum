@@ -32,7 +32,9 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   ];
   @override Widget build(BuildContext context) {
     final isMl=game=='Mobile Legends';
-    final items=isMl?mlbb:pubg;
+    final List<List<String>> items=isMl
+      ? mlbb.map((e)=>[e.$1,e.$2,e.$3,e.$4,e.$5]).toList()
+      : pubg.map((e)=>[e.$1,e.$2]).toList();
     final filtered=items.where((e)=>query.isEmpty||e.join(' ').toLowerCase().contains(query.toLowerCase())).toList();
     return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
       appBar:AppBar(title:const Text('مكتبة الألعاب الاحترافية')),
@@ -51,11 +53,11 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
           if(section=='المعدات'||section=='الكل') const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('عدادات المعدات: ضد العلاج اختر عنصر الجرح العميق المناسب لنوع الضرر؛ ضد الدروع زِد الاختراق؛ ضد الانفجار اشترِ دفاعاً جسدياً أو سحرياً حسب مصدر الضرر؛ ضد سرعة الهجوم استخدم عناصر تقليل سرعة الهجوم. لا تشتري بناءً ثابتاً—راقب تشكيلة الخصم أولاً.'))),
           if(section=='الأبطال والعدادات'||section=='الكل') ...[
             const Text('الأدوار والأبطال المضادون',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-            ...filtered.map((e)=>Card(child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(e.$1,style:const TextStyle(fontWeight:FontWeight.w900,fontSize:16)),Text('أمثلة: '+e.$2),Text('الخطة: '+e.$3),Text('العداد: '+e.$4),Text('المعدات: '+e.$5)])))),
+            ...filtered.map((e)=>Card(child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(e[0],style:const TextStyle(fontWeight:FontWeight.w900,fontSize:16)),Text('أمثلة: '+e[1]),Text('الخطة: '+e[2]),Text('العداد: '+e[3]),Text('المعدات: '+e[4])])))),
           ],
         ] else ...[
           const Text('دليل PUBG Mobile',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-          ...filtered.map((e)=>Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.tune)),title:Text(e.$1),subtitle:Text(e.$2)))),
+          ...filtered.map((e)=>Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.tune)),title:Text(e[0]),subtitle:Text(e[1])))),
         ],
         const SizedBox(height:10),
         const Text('تنبيه: أسماء الأبطال والأمثلة إرشادية وليست ترتيب ميتا لحظياً. قد تتغير القوة والبناء بعد كل تحديث؛ قارنها برقعة اللعبة الحالية قبل اعتمادها.',style:TextStyle(color:Colors.grey,fontSize:12)),
