@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -194,6 +195,128 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
           ]);
         },
       ),
+    ),
+  );
+}
+
+
+class FriendWorldLobbyPage extends StatefulWidget {
+  const FriendWorldLobbyPage({super.key});
+  @override State<FriendWorldLobbyPage> createState() => _FriendWorldLobbyPageState();
+}
+
+class _FriendWorldLobbyPageState extends State<FriendWorldLobbyPage> {
+  final _db = FirebaseFirestore.instance;
+  final _code = TextEditingController();
+  bool _busy = false;
+  String? _roomId;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  String get _name => FirebaseAuth.instance.currentUser?.displayName ?? 'لاعب';
+
+  @override
+  void dispose() { _code.dispose(); super.dispose(); }
+
+  Future<void> _create() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final ref = _db.collection('arcadeRooms').doc();
+      final code = (100000 + Random.secure().nextInt(900000)).toString();
+      await ref.set({
+        'hostId': _uid, 'gameId': 'arcade_friend_world',
+        'members': [_uid], 'memberNames': {_uid: _name},
+        'roomCode': code, 'status': 'waiting', 'visibility': 'private',
+        'state': {'mode': 'cooperative_2d', 'players': {}, 'stars': [], 'score': 0, 'moves': 0, 'wave': 1, 'finished': false},
+        'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(),
+      });
+      if (mounted) setState(() => _roomId = ref.id);
+      await Clipboard.setData(ClipboardData(text: code));
+    } catch (e) { _message('تعذر إنشاء الغرفة: $e'); }
+    finally { if (mounted) setState(() => _busy = false); }
+  }
+
+  Future<void> _join() async {
+    final code = _code.text.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(code) || _busy) {
+      _message('أدخل رمز غرفة صحيحاً من 6 أرقام.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final result = await _db.collection('arcadeRooms').where('roomCode', isEqualTo: code).limit(1).get();
+      if (result.docs.isEmpty) throw StateError('الغرفة غير موجودة.');
+      final ref = result.docs.first.reference;
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        final data = snap.data() ?? {};
+        final members = List<String>.from(data['members'] ?? const []);
+        if (data['gameId'] != 'arcade_friend_world') throw StateError('هذا الرمز ليس لعالم الأصدقاء.');
+        if (members.contains(_uid)) return;
+        if (data['status'] != 'waiting' || members.length >= 4) throw StateError('الغرفة بدأت أو اكتمل عدد اللاعبين.');
+        tx.update(ref, {'members': [...members, _uid], 'updatedAt': FieldValue.serverTimestamp()});
+      });
+      if (mounted) setState(() => _roomId = ref.id);
+      _code.clear();
+    } catch (e) { _message(e.toString().replaceFirst('Bad state: ', '')); }
+    finally { if (mounted) setState(() => _busy = false); }
+  }
+
+  Future<void> _start() async {
+    try {
+      await _db.runTransaction((tx) async {
+        final ref = _db.collection('arcadeRooms').doc(_roomId);
+        final snap = await tx.get(ref);
+        final data = snap.data() ?? {};
+        if (data['hostId'] != _uid) throw StateError('بدء الجولة للمضيف فقط.');
+        if (List<String>.from(data['members'] ?? const []).length < 2) throw StateError('تحتاجون لاعبين اثنين على الأقل.');
+        tx.update(ref, {'status': 'playing', 'updatedAt': FieldValue.serverTimestamp()});
+      });
+      if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => FriendWorldGamePage(roomId: _roomId!, title: 'عالم الأصدقاء')));
+    } catch (e) { _message(e.toString().replaceFirst('Bad state: ', '')); }
+  }
+
+  void _message(String value) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+  }
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('عالم الأصدقاء 2D')),
+      body: _roomId == null
+        ? ListView(padding: const EdgeInsets.all(16), children: [
+            const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('استكشفوا خريطة مشتركة، تحركوا بالتناوب، واجمعوا النجوم كفريق. الغرفة تدعم حتى 4 لاعبين مع دردشة وصوت.'))),
+            FilledButton.icon(onPressed: _busy ? null : _create, icon: const Icon(Icons.add), label: const Text('إنشاء غرفة ونسخ الرمز')),
+            const SizedBox(height: 18),
+            TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6, decoration: const InputDecoration(labelText: 'رمز غرفة صديقك')),
+            FilledButton.tonalIcon(onPressed: _busy ? null : _join, icon: const Icon(Icons.login), label: const Text('انضم للغرفة')),
+            if (_busy) const Center(child: CircularProgressIndicator()),
+          ])
+        : StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _db.collection('arcadeRooms').doc(_roomId).snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              final room = snapshot.data?.data();
+              if (room == null) return const Center(child: Text('الغرفة غير موجودة.'));
+              final members = List<String>.from(room['members'] ?? const []);
+              final names = Map<String, dynamic>.from(room['memberNames'] ?? const {});
+              final code = (room['roomCode'] ?? '').toString();
+              return ListView(padding: const EdgeInsets.all(16), children: [
+                Card(child: ListTile(
+                  title: const Text('رمز الغرفة'),
+                  subtitle: Text(code, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 3)),
+                  trailing: IconButton(icon: const Icon(Icons.copy), onPressed: () async { await Clipboard.setData(ClipboardData(text: code)); _message('تم نسخ الرمز'); }),
+                )),
+                Text('اللاعبون ' + members.length.toString() + '/4', style: const TextStyle(fontWeight: FontWeight.bold)),
+                ...members.map((id) => ListTile(leading: const Icon(Icons.person), title: Text(id == _uid ? 'أنت' : (names[id] ?? 'صديق').toString()))),
+                if (room['status'] == 'waiting')
+                  FilledButton.icon(onPressed: room['hostId'] == _uid ? _start : null, icon: const Icon(Icons.play_arrow), label: const Text('ابدأ المغامرة (لاعبان على الأقل)')),
+                if (room['status'] == 'playing')
+                  FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FriendWorldGamePage(roomId: _roomId!, title: 'عالم الأصدقاء'))), icon: const Icon(Icons.map), label: const Text('دخول عالم اللعبة')),
+              ]);
+            },
+          ),
     ),
   );
 }
