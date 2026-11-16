@@ -34,7 +34,9 @@ jobs:
         run: |
           test -f firebase.json
           test -f firestore.rules
-          test -f storage.rules
 
-      - name: Deploy Firestore and Storage rules
-        run: firebase deploy --only firestore:rules,storage --project futureyouth-69f8a --non-interactive
+      # This Firebase project has no Storage bucket provisioned yet.
+      # Deploy Firestore rules independently; keep storage.rules in source control
+      # and deploy it only after Firebase Storage is initialized in the console.
+      - name: Deploy Firestore security rules
+        run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
