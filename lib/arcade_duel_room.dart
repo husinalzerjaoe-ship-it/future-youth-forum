@@ -82,14 +82,9 @@ class _ArcadeDuelLobbyPageState extends State<ArcadeDuelLobbyPage> {
         if (data['status'] != 'waiting' || members.length >= 4) throw StateError('الغرفة بدأت أو اكتمل عدد اللاعبين.');
         final names = Map<String, dynamic>.from(data['memberNames'] ?? const {});
         names[_uid] = _name;
-        final scores = Map<String, dynamic>.from(data['state']?['scores'] ?? const {});
-        scores[_uid] = 0;
-        final taps = Map<String, dynamic>.from(data['state']?['taps'] ?? const {});
-        taps[_uid] = 0;
         tx.update(ref, {
           'members': [...members, _uid],
           'memberNames': names,
-          'state': {...Map<String, dynamic>.from(data['state'] ?? const {}), 'scores': scores, 'taps': taps},
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
