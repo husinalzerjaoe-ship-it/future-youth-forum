@@ -571,7 +571,7 @@ class _ArcadeHubGamePageState extends State<ArcadeHubGamePage> {
     if (widget.mode == 'tap') return const Center(child: Text('كل لاعب يضغط على زره بالأسفل\\nأول من يصل 10 نقاط يفوز', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20)));
     if (widget.mode == 'reaction') return GestureDetector(onTap: () => _react('اللاعب'), child: Container(color: green ? Colors.green : Colors.red.shade900, alignment: Alignment.center, child: Text(green ? 'اضغط الآن!' : 'انتظر اللون الأخضر', style: const TextStyle(color: Colors.white, fontSize: 24))));
     if (widget.mode == 'code') return const Center(child: Text('خمّن الرقم السري من 4 خانات', style: TextStyle(color: Colors.white, fontSize: 20)));
-    if (widget.mode == 'snake') return Center(child: Text('🐍\\n' + '■ ' * (score + 3), style: const TextStyle(color: Colors.lightGreenAccent, fontSize: 26)));
+    if (widget.mode == 'snake') return Center(child: Text('🐍\\n' + List.filled(score + 3, '■').join(' ' ), style: const TextStyle(color: Colors.lightGreenAccent, fontSize: 26)));
     if (widget.mode == '2048') return GestureDetector(onHorizontalDragEnd: (_) => setState(() => score += 2), child: Center(child: Text('2048\\n' + score.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold))));
     return GestureDetector(onTap: hit, onHorizontalDragEnd: (_) => hit(), child: Stack(children: [
       Positioned.fill(child: CustomPaint(painter: _ArcadeHubPainter(widget.mode))),
