@@ -12,6 +12,7 @@ import 'inspiration_hub.dart';
 import 'match_center.dart';
 import 'v12_companion_center.dart';
 import 'v18_discovery_hub.dart';
+import 'v22_cinema_discovery.dart';
 
 const _v21Accent = Color(0xFF8B72FF);
 
@@ -35,7 +36,8 @@ class _V21UltimateHubPageState extends State<V21UltimateHubPage> {
     _V21Place('فعاليات الملتقى', 'المواعيد والتسجيل', Icons.event_rounded, const CommunityEventsPage(), 'فعاليات مسابقات'),
     _V21Place('تصويتات المجتمع', 'شارك برأيك', Icons.poll_rounded, const CommunityPollsPage(), 'تصويت استطلاع'),
     _V21Place('بطولات الأصدقاء', 'منافسات وتحديات', Icons.emoji_events_rounded, const V12CompanionCenterPage(), 'بطولات أصدقاء'),
-    _V21Place('السينما', 'الأفلام والمسلسلات', Icons.movie_rounded, const CinemaHubPage(), 'أفلام مسلسلات'),
+    _V21Place('السينما', 'الأفلام والمسلسلات وغرف السينما', Icons.movie_rounded, const CinemaHubPage(), 'أفلام مسلسلات'),
+    _V21Place('مكتبة أفلام 2025 و2026', 'اكتشاف الأفلام والمسلسلات الحديثة مع معلومات عربية', Icons.local_movies_rounded, const V22CinemaDiscoveryPage(), 'أفلام 2025 2026 مسلسلات حديثة سينما'),
     _V21Place('مركز الكرة', 'المباريات والنتائج', Icons.sports_soccer_rounded, const FootballLiveCenterPage(), 'كرة قدم رياضة'),
     _V21Place('عالم الأنمي', 'الخلفيات وقائمة المشاهدة', Icons.animation_rounded, const AnimeExperiencePage(), 'أنمي اوتاكو'),
     _V21Place('ديوان الإلهام', 'الشعر والاقتباسات', Icons.menu_book_rounded, const InspirationHubPage(), 'شعر اقتباسات'),
