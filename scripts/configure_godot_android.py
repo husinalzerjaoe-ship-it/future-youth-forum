@@ -3,6 +3,10 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 
+# Preserve Android namespace prefixes expected by Flutter tooling.
+ET.register_namespace("android", "http://schemas.android.com/apk/res/android")
+ET.register_namespace("tools", "http://schemas.android.com/tools")
+
 ROOT = Path(".")
 ANDROID = ROOT / "android" / "app"
 GRADLE = ANDROID / "build.gradle.kts"
@@ -18,11 +22,11 @@ dep_lines = [
     'implementation("androidx.fragment:fragment:1.9.1")',
 ]
 if "org.godotengine:godot:4.7.2.stable" not in text:
-    match = re.search(r"dependencies\\s*\\{", text)
-    additions = "\\n".join("    " + line for line in dep_lines) + "\\n"
+    match = re.search(r"dependencies\s*\{", text)
+    additions = "\n".join("    " + line for line in dep_lines) + "\n"
     if not match:
         # New Flutter Kotlin DSL templates may omit a dependencies block.
-        text = text.rstrip() + "\\n\\ndependencies {\\n" + additions + "}\\n"
+        text = text.rstrip() + "\n\ndependencies {\n" + additions + "}\n"
     else:
         start_block = match.end()
         depth, end_block = 1, start_block
@@ -113,6 +117,17 @@ if not any(a.get(ns + "name") == ".GodotGameActivity" for a in app.findall("acti
     })
 ET.indent(tree, space="    ")
 tree.write(manifest, encoding="utf-8", xml_declaration=True)
+
+# Verify the namespace-qualified marker Flutter reads before invoking Gradle.
+written_root = ET.parse(manifest).getroot()
+written_app = written_root.find("application")
+written_embedding = next(
+    (node for node in written_app.findall("meta-data")
+     if node.get(ns + "name") == "flutterEmbedding"),
+    None,
+) if written_app is not None else None
+if written_embedding is None or written_embedding.get(ns + "value") != "2":
+    raise SystemExit("Android manifest does not expose Flutter embedding v2 correctly")
 
 kotlin_dir = ANDROID / "src" / "main" / "kotlin" / "com" / "futureyouth" / "forum"
 kotlin_dir.mkdir(parents=True, exist_ok=True)
