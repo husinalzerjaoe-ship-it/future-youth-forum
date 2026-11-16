@@ -46,16 +46,28 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
     final q = series
         ? 'collection:classic_tv AND mediatype:movies'
         : 'collection:opensource_movies AND mediatype:movies';
-    final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
-    final response = await http.get(uri).timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) throw Exception('archive unavailable');
-    final root = jsonDecode(response.body) as Map<String, dynamic>;
-    final docs = ((root['response'] as Map<String, dynamic>)['docs'] as List<dynamic>);
-    return docs.map((v) {
-      final d = v as Map<String, dynamic>;
-      return _Film((d['identifier'] ?? '').toString(), (d['title'] ?? 'عمل سينمائي').toString(),
-        (d['year'] ?? '').toString(), (d['description'] ?? '').toString());
-    }).where((f) => f.id.isNotEmpty).toList();
+    // Load up to 900 catalogue records in pages; actual playback is checked per title.
+    final pages = await Future.wait(List.generate(9, (index) async {
+      final uri = Uri.https('archive.org', '/advancedsearch.php', {
+        'q': q,
+        'fl[]': 'identifier,title,year,description',
+        'rows': '100',
+        'page': '${index + 1}',
+        'output': 'json',
+        'sort[]': 'downloads desc',
+      });
+      final response = await http.get(uri).timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) throw Exception('archive unavailable');
+      final root = jsonDecode(response.body) as Map<String, dynamic>;
+      final responseData = root['response'] as Map<String, dynamic>;
+      return (responseData['docs'] as List<dynamic>? ?? const <dynamic>[]);
+    }));
+    final seen = <String>{};
+    return pages.expand((page) => page).whereType<Map<String, dynamic>>().map((d) {
+      final id = (d['identifier'] ?? '').toString();
+      return _Film(id, (d['title'] ?? 'عمل سينمائي').toString(),
+        (d['year'] ?? '').toString(), (d['description'] ?? '').toString(), isSeries: series);
+    }).where((film) => film.id.isNotEmpty && seen.add(film.id)).toList();
   }
 
   List<_Film> _filter(List<_Film> films) {
@@ -71,8 +83,8 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         'خيال علمي' => RegExp(r'science fiction|sci.fi|space|alien').hasMatch(t),
         'مغامرة' => RegExp(r'adventure|western|war').hasMatch(t),
         'أفلام صامتة' => (int.tryParse(f.year) ?? 9999) < 1930,
-        'الأفلام' => true,
-        'المسلسلات' => true,
+        'الأفلام' => !f.isSeries,
+        'المسلسلات' => f.isSeries,
         'مفضلاتي' => _favorites.contains(f.id),
         'مسلسلات كلاسيكية' => true,
         _ => true,
@@ -168,8 +180,9 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
 }
 
 class _Film {
-  const _Film(this.id, this.title, this.year, this.description);
+  const _Film(this.id, this.title, this.year, this.description, {this.isSeries = false});
   final String id, title, year, description;
+  final bool isSeries;
 }
 
 class _FilmCard extends StatelessWidget {
@@ -231,7 +244,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
       initialUrl: url, initialName: widget.film.title, cinemaMode: true)));
   }
   @override Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl,
-    child: SafeArea(child: Padding(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min,
+    child: SafeArea(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ClipRRect(borderRadius: BorderRadius.circular(16), child: AspectRatio(aspectRatio: 16/8,
           child: Image.network('https://archive.org/services/img/${widget.film.id}', fit: BoxFit.cover,
@@ -262,7 +275,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
           label: const Text('ابحث عن النسخة العربية على المنصات الرسمية'),
         ),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
-      ]))));
+      ])))));
 }
 
 class CinemaRoomsPage extends StatelessWidget {
