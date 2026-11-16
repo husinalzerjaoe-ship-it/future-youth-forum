@@ -18,6 +18,7 @@ class LiveKitCallsPage extends StatefulWidget {
 
 class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   static const _endpointKey = 'livekit_token_endpoint';
+  static const _defaultEndpoint = 'https://future-youth-forum-livekit-token.husinalzerjaoe.workers.dev';
   static const _serverUrl = 'wss://youth-forum-future-lu43byvc.livekit.cloud';
   final _roomController = TextEditingController();
   final _endpointController = TextEditingController();
@@ -41,7 +42,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   Future<void> _loadEndpoint() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_endpointKey) ?? '';
+    final saved = prefs.getString(_endpointKey) ?? _defaultEndpoint;
+    if (!prefs.containsKey(_endpointKey)) await prefs.setString(_endpointKey, saved);
     if (!mounted) return;
     setState(() {
       _endpoint = saved;
