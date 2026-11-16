@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/v10-jitsi-backup-calls
+      - feature/v22-cinema-2025-2026-discovery
     paths:
       - 'firestore.rules'
       - 'storage.rules'
