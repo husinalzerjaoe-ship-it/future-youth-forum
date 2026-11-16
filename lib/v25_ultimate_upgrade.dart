@@ -103,6 +103,20 @@ class _V25DuoXoRoomPageState extends State<V25DuoXoRoomPage>{
    msg('تم إرسال دعوة اللعبة.');
   }on FirebaseException catch(e){msg('تعذر إرسال الدعوة: '+e.code);}
  }
+
+ Future<void> inviteFriend()async{
+  try{
+   final profiles=await db.collection('publicProfiles').limit(100).get();if(!mounted)return;
+   final target=await showModalBottomSheet<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:ListView(shrinkWrap:true,children:[
+    const Padding(padding:EdgeInsets.all(16),child:Text('اختَر صديقاً لدعوته')),
+    ...profiles.docs.where((p)=>p.id!=uid).map((p)=>ListTile(title:Text((p.data()['name']??'عضو').toString()),onTap:()=>Navigator.pop(c,p.id))),
+   ])));
+   if(target==null)return;
+   final me=await db.collection('publicProfiles').doc(uid).get();
+   await db.collection('gameInvites').add({'from':uid,'to':target,'fromName':me.data()?['name']??'صديق','game':'xo','roomId':widget.roomId,'roomCode':widget.roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});
+   msg('تم إرسال دعوة اللعبة.');
+  }on FirebaseException catch(e){msg('تعذر إرسال الدعوة: '+e.code);}
+ }
  Future<void> reset(String host)async{if(uid==host&&!busy)await room.update({'board':List<String>.filled(9,''),'winner':'','turn':host,'status':'playing','updatedAt':FieldValue.serverTimestamp()});}
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text('XO نيون • '+widget.roomId)),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:room.snapshots(),builder:(c,s){
   if(s.hasError)return const Center(child:Text('تعذر الاتصال بالغرفة.'));if(!s.hasData)return const Center(child:CircularProgressIndicator());if(!s.data!.exists)return const Center(child:Text('الغرفة غير موجودة.'));
@@ -111,6 +125,7 @@ class _V25DuoXoRoomPageState extends State<V25DuoXoRoomPage>{
   return ListView(padding:const EdgeInsets.all(14),children:[
    Card(child:Padding(padding:const EdgeInsets.all(12),child:Row(mainAxisAlignment:MainAxisAlignment.spaceAround,children:[Text('✕ '+(names[ps.isNotEmpty?ps.first:'']??'المضيف').toString(),style:const TextStyle(color:Colors.cyan,fontWeight:FontWeight.bold)),Text('◯ '+(names[ps.length>1?ps[1]:'']??'بانتظار صديق').toString(),style:const TextStyle(color:Colors.pinkAccent,fontWeight:FontWeight.bold))]))),
    Card(child:Padding(padding:const EdgeInsets.all(12),child:Text(status=='waiting'?'شارك الرمز '+widget.roomId+' أو ادعُ صديقاً.':status=='finished'?result:mine?'دورك! اختَر خانة.':'انتظر حركة صديقك…',textAlign:TextAlign.center,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)))),
+   if(status=='waiting'&&uid==host)FilledButton.icon(onPressed:inviteFriend,icon:const Icon(Icons.person_add),label:const Text('دعوة صديق')),
    AspectRatio(aspectRatio:1,child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:9,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:9,mainAxisSpacing:9),itemBuilder:(c,i){final m=b[i],color=m=='X'?Colors.cyanAccent:Colors.pinkAccent;return InkWell(onTap:status=='playing'&&mine&&m.isEmpty&&!busy?()=>move(i):null,child:Container(decoration:BoxDecoration(color:_n25,borderRadius:BorderRadius.circular(17),border:Border.all(color:m.isEmpty?Colors.white24:color,width:2)),child:Center(child:Text(m=='X'?'✕':m=='O'?'◯':'',style:TextStyle(fontSize:58,color:color,fontWeight:FontWeight.w900)))));})),
    if(status=='waiting'&&uid==host)FilledButton.icon(onPressed:inviteFriend,icon:const Icon(Icons.person_add),label:const Text('دعوة صديق')),
    if(status=='finished'&&uid==host)FilledButton(onPressed:()=>reset(host),child:const Text('جولة جديدة')),
