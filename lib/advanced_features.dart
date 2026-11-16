@@ -18,75 +18,168 @@ String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
 String _chatId(String a, String b) => a.compareTo(b) < 0 ? '${a}_${b}' : '${b}_${a}';
 
-class DirectMessagesPage extends StatelessWidget {
+class DirectMessagesPage extends StatefulWidget {
   const DirectMessagesPage({super.key});
+  @override
+  State<DirectMessagesPage> createState() => _DirectMessagesPageState();
+}
+
+class _DirectMessagesPageState extends State<DirectMessagesPage> {
+  final searchController = TextEditingController();
+  String query = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  String _timeLabel(dynamic value) {
+    if (value is! Timestamp) return 'محادثة';
+    final diff = DateTime.now().difference(value.toDate());
+    if (diff.inMinutes < 1) return 'الآن';
+    if (diff.inHours < 1) return 'قبل ${diff.inMinutes} د';
+    if (diff.inDays < 1) return 'قبل ${diff.inHours} س';
+    if (diff.inDays < 7) return 'قبل ${diff.inDays} ي';
+    final date = value.toDate();
+    return '${date.day}/${date.month}';
+  }
 
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: const Text('الرسائل الخاصة')),
+      appBar: AppBar(
+        title: const Text('الرسائل الخاصة'),
+        actions: [
+          IconButton(
+            tooltip: 'تحديث القائمة',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => setState(() {}),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: _brand, foregroundColor: Colors.white,
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StartDirectMessagePage())),
         icon: const Icon(Icons.edit), label: const Text('محادثة جديدة'),
       ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
-        builder: (context, s) {
-          if (s.hasError) {
-            final error = s.error;
-            final code = error is FirebaseException ? error.code : 'unknown';
-            return Center(child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.mark_email_unread_outlined, size: 42),
-                const SizedBox(height: 10),
-                const Text('تعذر تحميل الرسائل الخاصة'),
-                const SizedBox(height: 6),
-                Text('رمز الخطأ: $code', style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                const SizedBox(height: 8),
-                const Text('تحقق من اتصال الإنترنت وصلاحيات Firestore، ثم أعد المحاولة.', textAlign: TextAlign.center),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const DirectMessagesPage())),
-                  icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
-              ]),
-            ));
-          }
-          if (!s.hasData) return const Center(child: CircularProgressIndicator());
-          if (s.data!.docs.isEmpty) return const Center(child: Text('ما عندك محادثات بعد. ابدأ محادثة جديدة.'));
-          final conversations = [...s.data!.docs]..sort((a, b) {
-            final av = a.data()['updatedAt'];
-            final bv = b.data()['updatedAt'];
-            final at = av is Timestamp ? av : Timestamp(0, 0);
-            final bt = bv is Timestamp ? bv : Timestamp(0, 0);
-            return bt.compareTo(at);
-          });
-          return ListView(children: conversations.map((doc) {
-            final d = doc.data();
-            final members = List<String>.from(d['members'] ?? []);
-            final other = members.firstWhere((x) => x != _uid, orElse: () => '');
-            final names = Map<String, dynamic>.from(d['memberNames'] ?? {});
-            final name = names[other] as String? ?? 'عضو';
-            return ListTile(
-              leading: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: _db.collection('publicProfiles').doc(other).snapshots(),
-                builder: (context, profile) {
-                  final photo = profile.data?.data()?['photoUrl'] as String?;
-                  return CircleAvatar(
-                    backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
-                    child: photo == null || !photo.startsWith('https://') ? Text(name.isNotEmpty ? name.characters.first : '؟') : null,
-                  );
-                },
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+          child: TextField(
+            controller: searchController,
+            onChanged: (value) => setState(() => query = value.trim().toLowerCase()),
+            decoration: InputDecoration(
+              hintText: 'ابحث باسم العضو أو نص آخر رسالة',
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: query.isEmpty ? null : IconButton(
+                tooltip: 'مسح البحث',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () { searchController.clear(); setState(() => query = ''); },
               ),
-              title: Text(name),
-              subtitle: Text(d['lastMessage'] as String? ?? 'ابدأ المحادثة'),
-              trailing: const Icon(Icons.chevron_left),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: doc.id, otherUid: other, otherName: name))),
+              filled: true,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
+          builder: (context, s) {
+            if (s.hasError) {
+              final error = s.error;
+              final code = error is FirebaseException ? error.code : 'unknown';
+              return Center(child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.mark_email_unread_outlined, size: 42),
+                  const SizedBox(height: 10),
+                  const Text('تعذر تحميل الرسائل الخاصة'),
+                  const SizedBox(height: 6),
+                  Text('رمز الخطأ: $code', style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  const Text('تحقق من الاتصال وصلاحيات Firestore ثم اضغط تحديث.', textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(onPressed: () => setState(() {}),
+                    icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة')),
+                ]),
+              ));
+            }
+            if (!s.hasData) return const Center(child: CircularProgressIndicator());
+            final conversations = [...s.data!.docs]..sort((a, b) {
+              final av = a.data()['updatedAt'] ?? a.data()['lastMessageAt'];
+              final bv = b.data()['updatedAt'] ?? b.data()['lastMessageAt'];
+              final at = av is Timestamp ? av : Timestamp(0, 0);
+              final bt = bv is Timestamp ? bv : Timestamp(0, 0);
+              return bt.compareTo(at);
+            });
+            final visible = conversations.where((doc) {
+              final data = doc.data();
+              final members = List<String>.from(data['members'] ?? []);
+              final other = members.firstWhere((x) => x != _uid, orElse: () => '');
+              final names = Map<String, dynamic>.from(data['memberNames'] ?? {});
+              final name = (names[other] ?? 'عضو').toString().toLowerCase();
+              final last = (data['lastMessage'] ?? '').toString().toLowerCase();
+              return query.isEmpty || name.contains(query) || last.contains(query);
+            }).toList();
+            if (conversations.isEmpty) {
+              return Center(child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.forum_outlined, size: 54, color: Colors.white38),
+                  const SizedBox(height: 12),
+                  const Text('ما عندك محادثات بعد', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  const Text('ابدأ محادثة جديدة، وراح تظهر هنا تلقائياً عند إنشاء الرسائل.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white60)),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StartDirectMessagePage())),
+                    icon: const Icon(Icons.person_add_alt_1), label: const Text('اختيار عضو'),
+                  ),
+                ]),
+              ));
+            }
+            if (visible.isEmpty) return const Center(child: Text('ما لقينا محادثات تطابق بحثك.'));
+            return ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 90),
+              itemCount: visible.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+              itemBuilder: (context, index) {
+                final doc = visible[index];
+                final d = doc.data();
+                final members = List<String>.from(d['members'] ?? []);
+                final other = members.firstWhere((x) => x != _uid, orElse: () => '');
+                final names = Map<String, dynamic>.from(d['memberNames'] ?? {});
+                final name = names[other] as String? ?? 'عضو';
+                final last = d['lastMessage'] as String? ?? 'ابدأ المحادثة';
+                final time = _timeLabel(d['updatedAt'] ?? d['lastMessageAt']);
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  leading: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: _db.collection('publicProfiles').doc(other).snapshots(),
+                    builder: (context, profile) {
+                      final photo = profile.data?.data()?['photoUrl'] as String?;
+                      return CircleAvatar(
+                        radius: 25,
+                        backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
+                        child: photo == null || !photo.startsWith('https://') ? Text(name.isNotEmpty ? name.characters.first : '؟') : null,
+                      );
+                    },
+                  ),
+                  title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: Text(last, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Text(time, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                    const SizedBox(height: 4),
+                    const Icon(Icons.chevron_left, size: 18, color: Colors.white38),
+                  ]),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: doc.id, otherUid: other, otherName: name))),
+                );
+              },
             );
-          }).toList());
-        },
-      ),
+          },
+        )),
+      ]),
     ),
   );
 }
