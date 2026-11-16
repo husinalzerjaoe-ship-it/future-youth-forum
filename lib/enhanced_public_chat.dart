@@ -510,7 +510,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         Row(mainAxisSize:MainAxisSize.min,children:[
           GestureDetector(onTap:()=>_showMemberActions(d),child:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
             stream:_chatDb.collection('publicProfiles').doc(sender).snapshots(),
-            builder:(context,profile){final profileData=profile.data?.data()??{};final photo=profileData['photoUrl'] as String? ?? d['senderPhoto'] as String?;final customTitle=(profileData['customTitle']??'').toString().trim();final customTitleColor=profileData['customTitleColor'] is int ? profileData['customTitleColor'] as int : null;return Container(
+            builder:(context,profile){final profileData=profile.data?.data()??{};final photo=profileData['photoUrl'] as String? ?? d['senderPhoto'] as String?;return Container(
               padding:EdgeInsets.all(founder?2:1),decoration:BoxDecoration(shape:BoxShape.circle,border:Border.all(color:founder?const Color(0xFFFFC94A):_chatBrand,width:founder?2:1)),
               child:CircleAvatar(radius:19,backgroundColor:_chatBrand.withValues(alpha:.12),backgroundImage:photo!=null&&photo.startsWith('http')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('http')?Text((d['senderName'] as String? ?? 'ع').characters.first):null));
             }),
@@ -520,7 +520,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
             Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(fontWeight:FontWeight.w900,fontSize:founder?14:13,color:founder?const Color(0xFF7A3E00):(tierColor??const Color(0xFF4532A8)))),
             if(founder)const Text('المؤسس والمالك',style:TextStyle(fontSize:10,color:Color(0xFFB77900),fontWeight:FontWeight.bold)),
             if(!founder && tier.isNotEmpty)Text('عضوية $tierLabel',style:TextStyle(fontSize:10,color:tierColor,fontWeight:FontWeight.w900)),
-            if(customTitle.isNotEmpty)Padding(padding:const EdgeInsets.only(top:3),child:MemberTitleBadge(title:customTitle,colorValue:customTitleColor,compact:true)),
+            StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('publicProfiles').doc(sender).snapshots(),builder:(context,titleProfile){final titleData=titleProfile.data?.data()??{};final customTitle=(titleData['customTitle']??'').toString().trim();final customTitleColor=titleData['customTitleColor'] is int ? titleData['customTitleColor'] as int : null;return customTitle.isEmpty?const SizedBox.shrink():Padding(padding:const EdgeInsets.only(top:3),child:MemberTitleBadge(title:customTitle,colorValue:customTitleColor,compact:true));}),
             if(d['edited']==true)const Text('معدّلة',style:TextStyle(fontSize:10,color:Colors.grey)),
           ]))),
           if(founder)const Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:19),
