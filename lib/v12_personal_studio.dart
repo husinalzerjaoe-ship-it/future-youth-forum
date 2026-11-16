@@ -55,7 +55,7 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
           await ref.set({...payload,'createdAt':FieldValue.serverTimestamp()});
         }
         if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الاسم والنبذة في ملفك العام، والإطار واللقب محلياً.')));
-      }catch(error){
+      }catch(_){
         if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حُفظت المعاينة على الجهاز، لكن تعذرت مزامنة الملف العام. تحقق من قواعد Firestore.')));
       }
     }else if(mounted){
