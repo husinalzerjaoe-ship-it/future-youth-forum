@@ -13,7 +13,7 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   String game = 'Mobile Legends', tab = 'الأبطال', query = '', role = 'الكل';
   bool loading = false, detailLoading = false;
   String? error;
-  List<Map<String,dynamic>> heroes=[], items=[], ranks=[], emblems=[], spells=[], patches=[], counters=[], builds=[];
+  List<Map<String,dynamic>> heroes=[], ranks=[], emblems=[], spells=[], patches=[], counters=[];
   Map<String,dynamic>? selected, selectedRank;
 
   @override void initState(){ super.initState(); load(); }
@@ -51,10 +51,10 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   Future<void> load() async {
     setState(()=>loading=true); error=null;
     try{
-      final r=await Future.wait([getData('/heroes'),getData('/items'),getData('/rankings'),getData('/emblems?locale=en'),getData('/spells?locale=en'),getData('/patches')]);
+      final r=await Future.wait([getData('/heroes'),getData('/rankings'),getData('/emblems?locale=en'),getData('/spells?locale=en'),getData('/patches')]);
       if(!mounted)return;
       setState((){
-        heroes=asList(r[0]);items=asList(r[1]);ranks=asList(r[2]);emblems=asList(r[3]);spells=asList(r[4]);patches=asList(r[5]);loading=false;
+        heroes=asList(r[0]);ranks=asList(r[1]);emblems=asList(r[2]);spells=asList(r[3]);patches=asList(r[4]);loading=false;
       });
     }catch(_){if(mounted)setState(()=>loading=false);error='تعذر تحديث المكتبة من المصدر حالياً. افحص الإنترنت وحاول مرة ثانية.';}
   }
@@ -67,7 +67,7 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
     final slug=field(h,['slug','id'],'');if(slug.isEmpty)return;
     setState(() { selected=h; selectedRank=rankFor(h); detailLoading=true; counters=[]; builds=[]; });
     try{
-      final r=await Future.wait([getData('/heroes/'+slug),getData('/heroes/'+slug+'/counters'),getData('/heroes/'+slug+'/builds')]);
+      final r=await Future.wait([getData('/heroes/'+slug),getData('/heroes/'+slug+'/counters')]);
       if(!mounted)return;
       setState(() { selected=asMap(r[0]).isEmpty?h:asMap(r[0]); counters=asList(r[1]); builds=asList(r[2]); detailLoading=false; });
     }catch(_){if(mounted)setState(()=>detailLoading=false);}
@@ -91,7 +91,7 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
       Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(borderRadius:BorderRadius.circular(22),gradient:const LinearGradient(colors:[Color(0xFF10152E),Color(0xFF5635A0),Color(0xFF087F91)])),child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('GAME COMPANION',style:TextStyle(color:Color(0xFFBEEBFF),letterSpacing:2,fontWeight:FontWeight.bold)),
         SizedBox(height:8),Text('موسوعة الأبطال والتحديثات',style:TextStyle(color:Colors.white,fontSize:21,fontWeight:FontWeight.w900)),
-        SizedBox(height:5),Text('صور • أدوار • ميتا • عدادات • تجهيزات • إيمبلم • تعاويذ',style:TextStyle(color:Colors.white70)),
+        SizedBox(height:5),Text('صور • أدوار • ميتا • عدادات • إيمبلم • تعاويذ • تحديثات',style:TextStyle(color:Colors.white70)),
       ])),
       const SizedBox(height:12),
       SegmentedButton<String>(segments:const [ButtonSegment(value:'Mobile Legends',label:Text('Mobile Legends'),icon:Icon(Icons.shield_moon)),ButtonSegment(value:'PUBG Mobile',label:Text('PUBG'),icon:Icon(Icons.sports_esports))],selected:{game},onSelectionChanged:(v)=>setState(() { game=v.first; selected=null; })),
@@ -109,13 +109,12 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
     if(loading&&heroes.isEmpty)return [const Center(child:CircularProgressIndicator())];
     return [
       if(error!=null)errorCard(),
-      Wrap(spacing:6,children:[chip(heroes.length.toString(),'بطل'),chip(items.length.toString(),'عنصر'),chip(ranks.length.toString(),'إحصائية ميتا'),chip(patches.length.toString(),'تحديث')]),
+      Wrap(spacing:6,children:[chip(heroes.length.toString(),'بطل'),chip(ranks.length.toString(),'إحصائية ميتا'),chip(patches.length.toString(),'تحديث')]),
       const SizedBox(height:10),
-      Wrap(spacing:6,runSpacing:6,children:['الأبطال','الميتا','المعدات','الإيمبلم','التعاويذ','التحديثات'].map((s)=>ChoiceChip(label:Text(s),selected:tab==s,onSelected:(_)=>setState(()=>tab=s))).toList()),
+      Wrap(spacing:6,runSpacing:6,children:['الأبطال','الميتا','الإيمبلم','التعاويذ','التحديثات'].map((s)=>ChoiceChip(label:Text(s),selected:tab==s,onSelected:(_)=>setState(()=>tab=s))).toList()),
       const SizedBox(height:8),
       if(tab=='الأبطال') ...heroesTab(),
       if(tab=='الميتا') ...metaTab(),
-      if(tab=='المعدات') ...itemsTab(),
       if(tab=='الإيمبلم') ...dataCards(emblems,'لا توجد بيانات إيمبلم'),
       if(tab=='التعاويذ') ...dataCards(spells,'لا توجد بيانات تعاويذ'),
       if(tab=='التحديثات') ...dataCards(patches.take(30).toList(),'لا توجد تحديثات'),
@@ -143,7 +142,6 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
     return [const Text('الميتا حسب بيانات الإحصاءات المنشورة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:17)),const Text('تتغير القوة حسب الرتبة والمنطقة والتحديث. هذه مؤشرات وليست ضماناً.',style:TextStyle(color:Colors.black54,fontSize:12)),...sorted.map((r)=>Card(child:ListTile(leading:Text(field(r,['tier','rank'])),title:Text(field(r,['name','hero','title'],'Hero')),subtitle:Text('فوز: '+field(r,['winRate','win_rate'])+' • اختيار: '+field(r,['pickRate','pick_rate'])+' • حظر: '+field(r,['banRate','ban_rate'])))))];
   }
   int tierOrder(String t){final s=t.toUpperCase();if(s.contains('S'))return 0;if(s.contains('A'))return 1;if(s.contains('B'))return 2;if(s.contains('C'))return 3;return 4;}
-  List<Widget> itemsTab()=>[Text('عدد العناصر: '+items.length.toString(),style:const TextStyle(fontWeight:FontWeight.bold)),...items.map((m)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.inventory_2)),title:Text(field(m,['name','title'],'عنصر')),subtitle:Text(field(m,['category','type'])+' • '+field(m,['price','cost'])),children:[Padding(padding:const EdgeInsets.all(14),child:Text(flatten(m).join('\n')))])))];
   List<Widget> dataCards(List<Map<String,dynamic>> data,String empty)=>data.isEmpty?[Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(empty)))]:data.map((m)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.auto_awesome)),title:Text(field(m,['name','title','version'],'تفصيل')),subtitle:Text(field(m,['role','category','date'],'')),children:[Padding(padding:const EdgeInsets.all(14),child:Text(flatten(m).join('\n')))]))).toList();
 
   Widget heroDetail(){
@@ -161,7 +159,6 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
       if(detailLoading)const LinearProgressIndicator(),
       detailCard('المهارات والخصائص',h),
       listCard('العدادات المقاسة',counters),
-      listCard('التجهيزات الشائعة',builds),
       listCard('المظاهر والصور',asList(h['skins'])),
     ]);
   }
