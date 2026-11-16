@@ -37,6 +37,7 @@ import 'community_polls.dart';
 import 'future_arcade.dart';
 import 'knowledge_corner.dart';
 import 'future_dashboard.dart';
+import 'v11_premium_hub.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -436,6 +437,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v11':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V11PremiumHubPage()));
+                  break;
                 case 'media':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage()));
                   break;
@@ -506,6 +510,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v11', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V11 الفخمة – كل المميزات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'media', child: ListTile(leading: Icon(Icons.library_music_rounded), title: Text('مكتبة ومشغّل المستقبل'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dashboard', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('بوابة المستقبل – لوحة يومي'), contentPadding: EdgeInsets.zero)),
