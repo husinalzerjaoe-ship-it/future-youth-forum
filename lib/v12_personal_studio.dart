@@ -71,7 +71,7 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
     try{
       await FirebaseFirestore.instance.collection('posts').add({
         'authorId':user.uid,
-        'authorName':user.displayName??_name.text.trim().isNotEmpty?_name.text.trim():'عضو',
+        'authorName':user.displayName??(_name.text.trim().isNotEmpty?_name.text.trim():'عضو'),
         'text':value,
         'createdAt':FieldValue.serverTimestamp(),
       });
