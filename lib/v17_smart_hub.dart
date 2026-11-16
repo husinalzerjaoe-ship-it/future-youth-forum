@@ -230,7 +230,7 @@ class _V17QuizPlayPageState extends State<V17QuizPlayPage> {
     }
     setState(() => _finished = true);
     final prefs = await SharedPreferences.getInstance();
-    final key = 'v17_best_${widget.quiz.title.hashCode}';
+    final key = 'v17_best_${widget.quiz.title}';
     if (_score > (prefs.getInt(key) ?? 0)) await prefs.setInt(key, _score);
   }
 
@@ -333,7 +333,10 @@ class _V17DeviceSettingsPageState extends State<V17DeviceSettingsPage> {
     v17ReduceMotionNotifier.value = _reduceMotion;
     v17CompactCardsNotifier.value = _compactCards;
     PaintingBinding.instance.imageCache.maximumSize = _performance == 'high' ? 600 : _performance == 'battery' ? 160 : 320;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = _performance == 'high' ? 120 * 1024 * 1024 : _performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    final baseCacheBytes = _performance == 'high' ? 120 * 1024 * 1024 : _performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = _quality == 'data'
+        ? baseCacheBytes ~/ 2
+        : _quality == 'high' ? baseCacheBytes : (baseCacheBytes * 3) ~/ 4;
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تفضيلات V17 على هذا الجهاز.')));
   }
 
