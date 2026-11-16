@@ -48,14 +48,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         : 'collection:opensource_movies AND mediatype:movies';
     // Load up to 900 catalogue records in pages; actual playback is checked per title.
     final pages = await Future.wait(List.generate(9, (index) async {
-      final uri = Uri.https('archive.org', '/advancedsearch.php', {
-        'q': q,
-        'fl[]': 'identifier,title,year,description',
-        'rows': '100',
-        'page': '${index + 1}',
-        'output': 'json',
-        'sort[]': 'downloads desc',
-      });
+      final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=${index + 1}&output=json&sort%5B%5D=downloads%20desc');
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) throw Exception('archive unavailable');
       final root = jsonDecode(response.body) as Map<String, dynamic>;
