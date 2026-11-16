@@ -112,6 +112,34 @@ test('only the founder can assign memberships', async () => {
   }));
 });
 
+test('founder can assign and remove custom member titles with an audit record', async () => {
+  await seed('publicProfiles/alice', {
+    name: 'Alice', bio: '', photoUrl: '', createdAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'))
+  });
+
+  await assertSucceeds(updateDoc(doc(founder(), 'publicProfiles/alice'), {
+    customTitle: 'نجم الملتقى',
+    customTitleColor: 0xFF6554D9,
+    customTitleEndColor: 0xFF13A89E,
+    customTitleFont: 'default',
+    customTitleGradient: true,
+    customTitleGlow: true,
+    customTitleIcon: '⭐',
+    customTitleExpiresAt: null,
+    customTitleUpdatedAt: serverTimestamp()
+  }));
+
+  await assertSucceeds(setDoc(doc(founder(), 'adminLogs/title-grant-1'), {
+    actorId: 'founder-uid', targetId: 'alice', targetName: 'Alice',
+    action: 'set_custom_title', createdAt: serverTimestamp()
+  }));
+
+  await assertFails(updateDoc(doc(user('alice'), 'publicProfiles/alice'), {
+    customTitle: 'لقب مزيف',
+    customTitleUpdatedAt: serverTimestamp()
+  }));
+});
+
 test('members may spend coins but cannot mint or increase their own balance', async () => {
   await seed('coinWallets/alice', {
     coins: 50, updatedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
