@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'v34_friend_world.dart';
+import 'godot_game_launcher.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,6 +34,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
   final TextEditingController _search = TextEditingController();
   String _filter = 'الكل';
   late final List<_GameEntry> _games = [
+    _GameEntry('مغامرات Godot 3D','محرك Godot داخل التطبيق • ثلاث تجارب ثلاثية الأبعاد','3D',Icons.view_in_ar_rounded,const GodotGameLauncherPage(),const Color(0xFF6554D9)),
     _GameEntry('صالة ألعاب 2D + 3D','10 ألعاب جديدة • تحديات فردية وثنائية','جديد',Icons.videogame_asset_rounded,const ArcadeGamesHubV2Screen(),const Color(0xFF38D9E6)),
     _GameEntry('Future Arcade','14 لعبة جديدة • تحديات • ألعاب 2D','جديد',Icons.sports_esports_rounded,const FutureArcadePage(),const Color(0xFF13A89E)),
     _GameEntry('كنز الأصدقاء 2D','خريطة مباشرة • جواهر • غرف ودعوات','2D أونلاين',Icons.map_rounded,const TreasureLobbyPage(),const Color(0xFF13A89E)),
