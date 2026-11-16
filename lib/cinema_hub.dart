@@ -307,7 +307,16 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
     if (!_hasNext) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final query = _search.text.trim();
+      final rawQuery = _search.text.trim();
+      const arabicAliases = <String, String>{
+        'ون بيس': 'One Piece', 'لوفي': 'One Piece', 'ناروتو': 'Naruto',
+        'بليتش': 'Bleach', 'دراغون بول': 'Dragon Ball', 'المحقق كونان': 'Detective Conan',
+        'هجوم العمالقة': 'Attack on Titan', 'قاتل الشياطين': 'Demon Slayer',
+        'جوجوتسو كايسن': 'Jujutsu Kaisen', 'مذكرة الموت': 'Death Note',
+        'هنتر': 'Hunter x Hunter', 'هنتر x هنتر': 'Hunter x Hunter',
+        'أكاديمية بطلي': 'My Hero Academia', 'هايكيو': 'Haikyu',
+      };
+      final query = arabicAliases[rawQuery] ?? rawQuery;
       final uri = query.isEmpty
         ? Uri.https('api.jikan.moe', '/v4/top/anime', {'page': '$_page', 'limit': '25', 'sfw': 'true'})
         : Uri.https('api.jikan.moe', '/v4/anime', {'page': '$_page', 'limit': '25', 'q': query, 'sfw': 'true'});
@@ -325,6 +334,45 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
     } catch (e) {
       if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally { if (mounted) setState(() => _loading = false); }
+  }
+
+  void _showAnimeDetails(Map<String, dynamic> anime) {
+    final title = (anime['title_english'] ?? anime['title'] ?? 'Anime').toString();
+    final synopsis = (anime['synopsis'] ?? 'لا يوجد ملخص متاح حالياً.').toString();
+    final episodes = anime['episodes']?.toString() ?? 'غير محدد';
+    final score = anime['score']?.toString() ?? '—';
+    final image = ((anime['images'] as Map?)?['jpg'] as Map?)?['large_image_url']?.toString();
+    showModalBottomSheet<void>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (image != null) ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(image, height: 190, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox(height: 90, child: Icon(Icons.animation))),
+            ),
+            const SizedBox(height: 12),
+            Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [
+              Chip(avatar: const Icon(Icons.video_library, size: 16), label: Text('$episodes حلقة')),
+              Chip(avatar: const Icon(Icons.star, size: 16), label: Text('التقييم $score')),
+              Chip(label: Text((anime['status'] ?? 'الحالة غير محددة').toString())),
+            ]),
+            const SizedBox(height: 8),
+            Text(synopsis, style: const TextStyle(height: 1.6)),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () { Navigator.pop(sheetContext); _checkArabic(anime); },
+              icon: const Icon(Icons.translate), label: const Text('خيارات الترجمة العربية والمشاهدة'),
+            ),
+          ]),
+        )),
+      ),
+    );
   }
 
   Future<void> _checkArabic(Map<String, dynamic> anime) async {
@@ -414,7 +462,7 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
                   title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text('$year • ${item['type'] ?? 'Anime'} • $genres\nتوفر الترجمة العربية: تحقّق من المنصة الرسمية', maxLines: 3, overflow: TextOverflow.ellipsis),
                   trailing: IconButton(tooltip: 'البحث عن ترجمة عربية', icon: const Icon(Icons.translate, color: _cinemaAccent), onPressed: () => _checkArabic(item)),
-                  onTap: () => _checkArabic(item),
+                  onTap: () => _showAnimeDetails(item),
                 ));
               })),
       ]),
