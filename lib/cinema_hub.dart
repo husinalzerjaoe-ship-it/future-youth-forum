@@ -65,14 +65,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
           // Ignore a damaged local cache and refresh it from the public catalogue.
         }
       }
-      final uri = Uri.https('archive.org', '/advancedsearch.php', {
-        'q': query,
-        'fl[]': 'identifier,title,year,description',
-        'rows': '60',
-        'page': '1',
-        'output': 'json',
-        'sort[]': 'downloads desc',
-      });
+      final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(query)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=60&page=1&output=json&sort%5B%5D=downloads%20desc');
       final response = await http.get(uri, headers: {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 18));
       if (response.statusCode != 200) throw Exception('catalogue request failed');
