@@ -185,10 +185,12 @@ service cloud.firestore {
     }
 
     match /watchRooms/{roomId} {
+      // Rooms created by older app versions have no visibility/invitedUids fields;
+      // treat those legacy rooms as public so the existing group player keeps working.
       function canAccessRoom() {
         let room = get(/databases/$(database)/documents/watchRooms/$(roomId)).data;
         return request.auth != null && (
-          room.visibility != 'private'
+          !('visibility' in room) || room.visibility != 'private'
           || room.hostUid == request.auth.uid
           || (room.invitedUids is list && request.auth.uid in room.invitedUids)
         );
@@ -198,17 +200,37 @@ service cloud.firestore {
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.name is string
         && request.resource.data.url is string
-        && request.resource.data.sourceType in ['youtube', 'direct']
+        && request.resource.data.sourceType in ['youtube', 'direct', 'web']
         && request.resource.data.status == 'paused'
         && request.resource.data.active == true
-        && request.resource.data.visibility in ['public', 'private']
-        && request.resource.data.invitedUids is list
-        && request.resource.data.invitedUids.size() <= 50
-        && (request.resource.data.visibility != 'private' || request.auth.uid in request.resource.data.invitedUids || request.resource.data.invitedUids.size() == 0);
+        && (!('visibility' in request.resource.data) || request.resource.data.visibility in ['public', 'private'])
+        && (!('invitedUids' in request.resource.data) || (request.resource.data.invitedUids is list && request.resource.data.invitedUids.size() <= 50))
+        && (!('visibility' in request.resource.data) || request.resource.data.visibility != 'private'
+          || (request.resource.data.invitedUids is list
+            && (request.auth.uid in request.resource.data.invitedUids || request.resource.data.invitedUids.size() == 0)));
+      // The host retains room-management control. Any authorized room participant
+      // may send playback commands only; they cannot change the video, invitations,
+      // host, visibility, or room lifecycle.
       allow update: if request.auth != null
-        && resource.data.hostUid == request.auth.uid
         && request.resource.data.hostUid == resource.data.hostUid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'positionSeconds', 'updatedAt', 'active']);
+        && (
+          (isFounder() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'status']) && request.resource.data.active == false && request.resource.data.status == 'paused')
+          ||
+          (resource.data.hostUid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'positionSeconds', 'updatedAt', 'active', 'url', 'sourceType', 'videoId', 'controlUid']))
+          ||
+          (canAccessRoom()
+            && accountNotBanned()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['status', 'positionSeconds', 'updatedAt', 'controlUid'])
+            && request.resource.data.controlUid == request.auth.uid
+            && request.resource.data.status in ['playing', 'paused']
+            && request.resource.data.positionSeconds is number
+            && request.resource.data.positionSeconds >= 0
+            && request.resource.data.positionSeconds <= 86400
+            && request.resource.data.updatedAt is timestamp)
+        );
       allow delete: if request.auth != null && (resource.data.hostUid == request.auth.uid || isFounder());
       match /participants/{userId} {
         allow read: if canAccessRoom();
@@ -220,7 +242,17 @@ service cloud.firestore {
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
 
-      // Watch-room chat must follow the same public/private membership rules.
+      function roomChatNotMuted() {
+        let mutePath = /databases/$(database)/documents/watchRooms/$(roomId)/roomMutes/$(request.auth.uid);
+        return !exists(mutePath) || (get(mutePath).data.permanent != true && (!('until' in get(mutePath).data) || get(mutePath).data.until <= request.time));
+      }
+      match /roomMutes/{userId} {
+        allow read: if canAccessRoom();
+        allow create, update: if request.auth != null && (isFounder() || get(/databases/$(database)/documents/watchRooms/$(roomId)).data.hostUid == request.auth.uid)
+          && request.resource.data.uid == userId && request.resource.data.by == request.auth.uid && request.resource.data.permanent is bool;
+        allow delete: if request.auth != null && (isFounder() || get(/databases/$(database)/documents/watchRooms/$(roomId)).data.hostUid == request.auth.uid);
+      }
+      // Watch-room chat supports text, images and voice.
       match /messages/{messageId} {
         allow read: if canAccessRoom();
         allow create: if canAccessRoom()
@@ -228,9 +260,13 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderName is string
           && request.resource.data.senderName.size() <= 60
+          && roomChatNotMuted() && accountNotBanned()
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 500;
+          && request.resource.data.text.size() <= 500
+          && request.resource.data.type in ['text', 'image', 'voice']
+          && ((request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
+            || (request.resource.data.type == 'image' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
+            || (request.resource.data.type == 'voice' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*') && request.resource.data.durationSeconds is int && request.resource.data.durationSeconds >= 1 && request.resource.data.durationSeconds <= 180));
         allow update: if false;
         allow delete: if canAccessRoom()
           && request.auth != null
