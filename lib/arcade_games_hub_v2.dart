@@ -200,24 +200,30 @@ class _ArcadePlayPageState extends State<_ArcadePlayPage> {
 
   void _advance() {
     if (!mounted || _finished) return;
-    setState(() {
-      if (widget.game.mode == 'tunnel') {
-        if (_lane == _obstacle) { _finish('اصطدمت بالعائق!'); return; }
+    if (widget.game.mode == 'tunnel') {
+      if (_lane == _obstacle) { _finish('اصطدمت بالعائق!'); return; }
+      setState(() {
         _score++;
         _obstacle = _random.nextInt(3);
         _message = 'تفاديت العائق!';
+      });
+      return;
+    }
+    final head = _snake.first;
+    final row = head ~/ 8, col = head % 8;
+    var next = -1;
+    if (_direction == 0 && row > 0) next = head - 8;
+    if (_direction == 1 && col < 7) next = head + 1;
+    if (_direction == 2 && row < 7) next = head + 8;
+    if (_direction == 3 && col > 0) next = head - 1;
+    if (next < 0 || _snake.contains(next)) { _finish('انتهت اللعبة!'); return; }
+    setState(() {
+      _snake.insert(0, next);
+      if (next == _food) {
+        _score++;
+        do { _food = _random.nextInt(64); } while (_snake.contains(_food));
       } else {
-        final head = _snake.first;
-        final row = head ~/ 8, col = head % 8;
-        var next = -1;
-        if (_direction == 0 && row > 0) next = head - 8;
-        if (_direction == 1 && col < 7) next = head + 1;
-        if (_direction == 2 && row < 7) next = head + 8;
-        if (_direction == 3 && col > 0) next = head - 1;
-        if (next < 0 || _snake.contains(next)) { _finish('انتهت اللعبة!'); return; }
-        _snake.insert(0, next);
-        if (next == _food) { _score++; do { _food = _random.nextInt(64); } while (_snake.contains(_food)); }
-        else { _snake.removeLast(); }
+        _snake.removeLast();
       }
     });
   }
