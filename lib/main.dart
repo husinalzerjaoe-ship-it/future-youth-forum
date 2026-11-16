@@ -42,6 +42,7 @@ import 'v11_premium_hub.dart';
 import 'v12_futuristic_hub.dart';
 import 'v14_command_center.dart';
 import 'v17_smart_hub.dart';
+import 'v22_cinema_discovery.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -871,6 +872,16 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('مكتبة الأفلام والمسلسلات وغرف المشاهدة مع الأصدقاء'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage())),
+              ),
+            ),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF2A2148), child: Icon(Icons.local_movies_rounded, color: Color(0xFFB68CFF))),
+                title: const Text('مكتبة أفلام ومسلسلات 2025 و2026', style: TextStyle(fontWeight: FontWeight.w900)),
+                subtitle: const Text('إصدارات حديثة • بحث عربي • تصنيفات • إعلانات داخل التطبيق'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const V22CinemaDiscoveryPage())),
               ),
             ),
             Card(
