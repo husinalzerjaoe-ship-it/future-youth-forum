@@ -13,6 +13,7 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'local_audio_handler.dart';
+import 'local_bot.dart';
 import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
@@ -205,6 +206,14 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: darkBrand, foregroundColor: Colors.white,
         title: const Text('ملتقى شباب المستقبل'),
         actions: [
+          IconButton(
+            tooltip: 'مساعد الذكاء الاصطناعي',
+            icon: const Icon(Icons.smart_toy_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LocalHelperBotPage()),
+            ),
+          ),
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
           IconButton(tooltip: 'البحث عن الأعضاء', icon: const Icon(Icons.search),
