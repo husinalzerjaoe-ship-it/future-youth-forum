@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -360,15 +361,20 @@ class _AnimeDiscoverPageState extends State<AnimeDiscoverPage> {
     final title = (anime['title'] ?? anime['title_english'] ?? 'أنمي').toString();
     if (id == null) return;
     try {
-      await _db.collection('users').doc(_uid).collection('animeWatchlist')
-          .doc('mal_$id').set({
-        'title': title,
-        'genre': _genres(anime),
-        'status': 'planned',
-        'externalId': id,
-        'source': 'jikan',
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      final ref = _db.collection('users').doc(_uid).collection('animeWatchlist').doc('mal_$id');
+      final existing = await ref.get();
+      if (existing.exists) {
+        await ref.update({'status': 'planned'});
+      } else {
+        await ref.set({
+          'title': title,
+          'genre': _genres(anime),
+          'status': 'planned',
+          'externalId': id,
+          'source': 'jikan',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('أُضيف $title إلى قائمتك.')));
     } catch (_) {
