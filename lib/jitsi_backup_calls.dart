@@ -8,7 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 /// Browser-based Jitsi fallback. Keeping Jitsi outside the native app avoids
 /// bundling a second incompatible WebRTC engine alongside LiveKit.
 class JitsiBackupCallsPage extends StatefulWidget {
-  const JitsiBackupCallsPage({super.key});
+  final String? initialRoom;
+  const JitsiBackupCallsPage({super.key, this.initialRoom});
 
   @override
   State<JitsiBackupCallsPage> createState() => _JitsiBackupCallsPageState();
@@ -22,7 +23,7 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
   @override
   void initState() {
     super.initState();
-    _roomController.text = _makeRoomCode();
+    _roomController.text = widget.initialRoom ?? _makeRoomCode();
   }
 
   String _makeRoomCode() {
