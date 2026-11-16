@@ -31,6 +31,7 @@ import 'v11_premium_hub.dart';
 import 'v12_futuristic_hub.dart';
 import 'v6_community_suite.dart';
 import 'watch_party.dart';
+import 'v17_smart_hub.dart';
 
 const _v14Purple = Color(0xFF8D7CFF);
 const _v14Navy = Color(0xFF11152D);
@@ -81,6 +82,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
   }
 
   static final List<_V14Tool> _tools = [
+    _V14Tool('الجديد', 'مركز V17 الذكي', 'بحث شامل وست ألعاب جديدة وإعدادات الأداء والتخصيص', Icons.auto_awesome_rounded, () => const V17SmartHubPage()),
     _V14Tool('الدردشة', 'المحادثة العامة', 'الرسائل العامة والوسائط والردود والتفاعلات', Icons.forum_rounded, () => const EnhancedPublicChatPage()),
     _V14Tool('الدردشة', 'الرسائل الخاصة', 'محادثات الأصدقاء والصور والفيديو والصوت', Icons.mark_email_unread_rounded, () => const DirectMessagesPage()),
     _V14Tool('المشاهدة', 'غرف المشاهدة الجماعية', 'YouTube وروابط الفيديو والمزامنة والدردشة', Icons.groups_rounded, () => const WatchPartyLobbyPage()),
