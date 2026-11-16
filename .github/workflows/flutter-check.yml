@@ -51,37 +51,6 @@ jobs:
           else:
               raise SystemExit('Android app Gradle file not found')
           PY
-      - name: Configure Android for the Jitsi Meet SDK
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          candidates = [Path('android/app/build.gradle.kts'), Path('android/app/build.gradle')]
-          for path in candidates:
-              if not path.exists():
-                  continue
-              content = path.read_text()
-              if path.suffix == '.kts':
-                  content = content.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
-              else:
-                  content = content.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 24')
-              path.write_text(content)
-              print(f'Configured minimum Android SDK 24 in {path}')
-              break
-          else:
-              raise SystemExit('Android app Gradle file not found')
-          manifest = Path('android/app/src/main/AndroidManifest.xml')
-          content = manifest.read_text()
-          if 'xmlns:tools=' not in content:
-              content = content.replace(
-                  'xmlns:android="http://schemas.android.com/apk/res/android"',
-                  'xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools"',
-                  1,
-              )
-          if 'tools:replace="android:label"' not in content:
-              content = content.replace('<application', '<application tools:replace="android:label"', 1)
-          manifest.write_text(content)
-          print('Configured Android manifest label override for Jitsi SDK')
-          PY
       - name: Force Android library plugins to compile with SDK 36
         run: |
           mkdir -p "$HOME/.gradle/init.d"
