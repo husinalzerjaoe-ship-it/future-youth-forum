@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'v34_friend_world.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -35,6 +36,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
     _GameEntry('صالة ألعاب 2D + 3D','10 ألعاب جديدة • تحديات فردية وثنائية','جديد',Icons.videogame_asset_rounded,const ArcadeGamesHubV2Screen(),const Color(0xFF38D9E6)),
     _GameEntry('Future Arcade','14 لعبة جديدة • تحديات • ألعاب 2D','جديد',Icons.sports_esports_rounded,const FutureArcadePage(),const Color(0xFF13A89E)),
     _GameEntry('كنز الأصدقاء 2D','خريطة مباشرة • جواهر • غرف ودعوات','2D أونلاين',Icons.map_rounded,const TreasureLobbyPage(),const Color(0xFF13A89E)),
+    _GameEntry('عالم الأصدقاء التعاوني 2D','خريطة مشتركة • حتى 4 لاعبين • دردشة وفويس','2D أونلاين',Icons.explore_rounded,const FriendWorldLobbyPage(),const Color(0xFF38D9E6)),
     _GameEntry('ساحة منافسات الأصدقاء','12 تصنيف أسئلة • نقاط • جولات','تحديات',Icons.emoji_events_rounded,const FriendsBattleArenaPage(),const Color(0xFF6554D9)),
     _GameEntry('مسابقة الأصدقاء المباشرة','2–4 لاعبين • رمز غرفة • ترتيب','أونلاين',Icons.groups_rounded,const FriendsQuizPage(),const Color(0xFF2878C7)),
     _GameEntry('إكس أو أونلاين','تحدّ صديقك بغرفة خاصة','أونلاين',Icons.grid_3x3_rounded,const MultiplayerArcadePage(),const Color(0xFF0C9C8B)),
