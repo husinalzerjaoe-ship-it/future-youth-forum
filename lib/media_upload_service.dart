@@ -107,7 +107,10 @@ Future<String> uploadForumMedia(
 
     // Stream large files in TUS chunks rather than loading the whole video
     // into memory. Persist the upload fingerprint for interruption recovery.
-    final projectRef = Uri.parse(supabase.supabaseUrl).host.split('.').first;
+    // Keep the public project endpoint aligned with Supabase.initialize in main.dart.
+    // This is a publishable client key, not a service-role secret.
+    const projectRef = 'xwfzdiftlzrjsprnbwpf';
+    const publishableKey = 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY';
     final tusEndpoint = Uri.parse(
       'https://$projectRef.storage.supabase.co/storage/v1/upload/resumable',
     );
@@ -115,25 +118,25 @@ Future<String> uploadForumMedia(
     final tusStoreDir = Directory('${supportDir.path}/forum_tus_uploads');
     await tusStoreDir.create(recursive: true);
     final tusClient = TusClient(
-      tusEndpoint,
       file,
       store: TusFileStore(tusStoreDir),
-      headers: {
-        'apikey': supabase.supabaseKey,
-        'Authorization': 'Bearer $token',
-        'x-upsert': 'false',
-      },
-      metadata: {
-        'bucketName': 'forum-media',
-        'objectName': path,
-        'contentType': contentType,
-        'cacheControl': '3600',
-      },
       maxChunkSize: 6 * 1024 * 1024,
     );
     try {
       await tusClient.upload(
-        onProgress: (progress, estimate, client) {
+        uri: tusEndpoint,
+        headers: {
+          'apikey': publishableKey,
+          'Authorization': 'Bearer $token',
+          'x-upsert': 'false',
+        },
+        metadata: {
+          'bucketName': 'forum-media',
+          'objectName': path,
+          'contentType': contentType,
+          'cacheControl': '3600',
+        },
+        onProgress: (progress, estimate) {
           onProgress?.call(progress.clamp(0.0, 1.0).toDouble());
         },
       );

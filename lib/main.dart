@@ -36,6 +36,7 @@ import 'community_events.dart';
 import 'community_polls.dart';
 import 'future_arcade.dart';
 import 'knowledge_corner.dart';
+import 'future_dashboard.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -441,6 +442,9 @@ class _HomePageState extends State<HomePage> {
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
+                case 'dashboard':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureDashboardPage()));
+                  break;
                 case 'knowledge':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeCornerPage()));
                   break;
@@ -504,6 +508,7 @@ class _HomePageState extends State<HomePage> {
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'media', child: ListTile(leading: Icon(Icons.library_music_rounded), title: Text('مكتبة ومشغّل المستقبل'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'dashboard', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('بوابة المستقبل – لوحة يومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'knowledge', child: ListTile(leading: Icon(Icons.lightbulb_outline_rounded), title: Text('ركن المعرفة والاكتشاف اليومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
