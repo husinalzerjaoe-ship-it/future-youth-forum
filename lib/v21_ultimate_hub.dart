@@ -15,6 +15,7 @@ import 'v18_discovery_hub.dart';
 import 'v22_cinema_discovery.dart';
 import 'v23_creative_lab.dart';
 import 'v25_ultimate_upgrade.dart';
+import 'v26_gaming_world.dart';
 
 const _v21Accent = Color(0xFF8B72FF);
 
@@ -28,6 +29,7 @@ class _V21UltimateHubPageState extends State<V21UltimateHubPage> {
   int _xp = 0;
   bool _loaded = false;
   static final _places = <_V21Place>[
+    _V21Place('عالم الألعاب V26', 'أدلة موبايل ليجند وهونر أوف كينغ وeFootball وPUBG وأخبار ألعاب الهاتف والكمبيوتر', Icons.sports_esports_rounded, const V26GamingWorldPage(), 'موبايل ليجند MLBB هونر أوف كينغ eFootball PUBG حساسية بيلد شعارات أخبار ألعاب Android PC'),
     _V21Place('عالم المستقبل V25', 'ألعاب ثنائية أونلاين، متجر عملات وتخصيص، مزايا العضويات وملفات أداء الأجهزة', Icons.auto_awesome_rounded, const V25UltimateUpgradePage(), 'V25 ألعاب ثنائية XO عملات متجر ألقاب إطارات فقاعات أداء قوي'),
     _V21Place('مختبر الإبداع اليومي', 'أفكار وتحديات كتابة وتصميم وتفكير مع حفظ المفضلة', Icons.lightbulb_circle_rounded, const V23CreativeLabPage(), 'تحديات إبداع كتابة تصميم تفكير يومي'),
     _V21Place('المكتبة الثقافية', 'قراءة ومقالات ورف محفوظ', Icons.auto_stories_rounded, const V21LibraryPage(), 'كتب قراءة ثقافة مقالات معرفة'),
