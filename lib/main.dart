@@ -43,6 +43,7 @@ import 'v12_futuristic_hub.dart';
 import 'v14_command_center.dart';
 import 'v17_smart_hub.dart';
 import 'v31_member_titles.dart';
+import 'v32_future_growth.dart';
 import 'v22_cinema_discovery.dart';
 
 const brand = Color(0xFF6554D9);
@@ -547,6 +548,9 @@ class _HomePageState extends State<HomePage> {
                 case 'friendsArena':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsBattleArenaPage()));
                   break;
+                case 'growth':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureGrowthPage()));
+                  break;
                 case 'achievements':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementHubPage()));
                   break;
@@ -611,6 +615,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'friendsArena', child: ListTile(leading: Icon(Icons.people_alt_rounded), title: Text('منافسات الأصدقاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'growth', child: ListTile(leading: Icon(Icons.track_changes_rounded), title: Text('مسار تطوري والأهداف اليومية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('الإنجازات والأوسمة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'engagement', child: ListTile(leading: Icon(Icons.emoji_events_rounded), title: Text('النشاط والنقاط ولوحة الصدارة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'expansion', child: ListTile(leading: Icon(Icons.event_available_rounded), title: Text('الفعاليات وغرف المشاهدة والمجتمعات'), contentPadding: EdgeInsets.zero)),
