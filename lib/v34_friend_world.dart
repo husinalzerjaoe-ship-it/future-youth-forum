@@ -154,7 +154,8 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
                 itemCount: _side * _side,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _side, crossAxisSpacing: 3, mainAxisSpacing: 3),
                 itemBuilder: (context, cell) {
-                  final player = players.entries.where((e) => (e.value as num).toInt() == cell).map((e) => e.key).firstOrNull;
+                  final playerEntries = players.entries.where((e) => (e.value as num).toInt() == cell).toList();
+                  final player = playerEntries.isEmpty ? null : playerEntries.first.key;
                   final isMe = player == _uid;
                   final star = stars.contains(cell);
                   final wall = _walls.contains(cell);
