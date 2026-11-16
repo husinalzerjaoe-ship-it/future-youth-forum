@@ -1,10 +1,11 @@
--- Forum media bucket: public media only (avatars, stories, chats, regional rooms, backgrounds).
+-- Forum media bucket: 4GB bucket-level ceiling for large watch-room videos.
+-- Supabase global/project plan limits still take precedence (Free projects are capped at 50MB).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'forum-media',
   'forum-media',
   true,
-  104857600,
+  4294967296,
   array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/quicktime','audio/mp4','audio/aac','audio/mpeg','audio/wav','audio/ogg','audio/flac','application/vnd.android.package-archive','application/octet-stream','application/zip','application/pdf']
 )
 on conflict (id) do update set
