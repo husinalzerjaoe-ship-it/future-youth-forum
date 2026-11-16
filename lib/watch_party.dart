@@ -407,7 +407,17 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         final controller = YoutubePlayerController.fromVideoId(
           videoId: id,
           autoPlay: false,
-          params: const YoutubePlayerParams(showControls: true, showFullscreenButton: true, strictRelatedVideos: true),
+          params: const YoutubePlayerParams(
+            showControls: true,
+            showFullscreenButton: true,
+            strictRelatedVideos: true,
+            interfaceLanguage: 'ar',
+            captionLanguage: 'ar',
+            enableCaption: true,
+            showVideoAnnotations: false,
+            playsInline: true,
+            privacyEnhancedMode: true,
+          ),
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
