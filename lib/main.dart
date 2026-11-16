@@ -16,6 +16,7 @@ import 'media_upload_service.dart';
 import 'creative_library.dart';
 import 'extra_community_features.dart';
 import 'local_audio_handler.dart';
+import 'premium_media_hub.dart';
 import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
@@ -434,6 +435,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'media':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage()));
+                  break;
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
@@ -498,6 +502,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'media', child: ListTile(leading: Icon(Icons.library_music_rounded), title: Text('مكتبة ومشغّل المستقبل'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'knowledge', child: ListTile(leading: Icon(Icons.lightbulb_outline_rounded), title: Text('ركن المعرفة والاكتشاف اليومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
@@ -770,6 +775,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('مكتبة الأفلام والمسلسلات وغرف المشاهدة مع الأصدقاء'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF25204B), child: Icon(Icons.library_music_rounded, color: Color(0xFFBDAEFF))),
+                title: const Text('مكتبة ومشغّل المستقبل', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('ملفاتك الصوتية والفيديو والتنزيلات ومشغّل الخلفية'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage())),
               ),
             ),
             Card(
