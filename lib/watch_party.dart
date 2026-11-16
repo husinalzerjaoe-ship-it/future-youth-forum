@@ -6,7 +6,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -915,49 +915,79 @@ class _WatchPartyFullscreenPageState extends State<_WatchPartyFullscreenPage> {
 class _RoomCodeJoinCard extends StatefulWidget {
   const _RoomCodeJoinCard({required this.onJoin});
   final Future<void> Function(String code) onJoin;
-  @override State<_RoomCodeJoinCard> createState() => _RoomCodeJoinCardState();
+
+  @override
+  State<_RoomCodeJoinCard> createState() => _RoomCodeJoinCardState();
 }
+
 class _RoomCodeJoinCardState extends State<_RoomCodeJoinCard> {
   final _code = TextEditingController();
   bool _busy = false;
-  @override void dispose() { _code.dispose(); super.dispose(); }
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
+
   Future<void> _join() async {
     final code = _code.text.trim();
-    if (!RegExp(r'^\d{6}.hasMatch(code)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')));
+    if (!RegExp(r'^\\d{6}$').hasMatch(code)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')),
+      );
       return;
     }
+
     setState(() => _busy = true);
-    try { await widget.onJoin(code); } finally { if (mounted) setState(() => _busy = false); }
-  }
-  @override Widget build(BuildContext context) => Card(
-    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('عندك رمز غرفة؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(child: TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6,
-          decoration: const InputDecoration(hintText: 'أدخل الرمز المكوّن من 6 أرقام', counterText: '', border: OutlineInputBorder()))),
-        const SizedBox(width: 8),
-        FilledButton(onPressed: _busy ? null : _join, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('دخول')),
-      ]),
-    ])));
-}
-).hasMatch(code)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')));
-      return;
+    try {
+      await widget.onJoin(code);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
-    setState(() => _busy = true);
-    try { await widget.onJoin(code); } finally { if (mounted) setState(() => _busy = false); }
   }
-  @override Widget build(BuildContext context) => Card(
-    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('عندك رمز غرفة؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-      const SizedBox(height: 8),
-      Row(children: [
-        Expanded(child: TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6,
-          decoration: const InputDecoration(hintText: 'أدخل الرمز المكوّن من 6 أرقام', counterText: '', border: OutlineInputBorder()))),
-        const SizedBox(width: 8),
-        FilledButton(onPressed: _busy ? null : _join, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('دخول')),
-      ]),
-    ])));
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'عندك رمز غرفة؟',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _code,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      decoration: const InputDecoration(
+                        hintText: 'أدخل الرمز المكوّن من 6 أرقام',
+                        counterText: '',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _busy ? null : _join,
+                    child: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('دخول'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
 }
