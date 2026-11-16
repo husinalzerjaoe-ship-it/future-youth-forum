@@ -88,9 +88,10 @@ Future<String> uploadForumMedia(
 
   final bytes = await file.readAsBytes();
   if (bytes.isEmpty) throw StateError('الملف فارغ ولا يمكن رفعه.');
-  final maxBytes = folder == 'shared-files' ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
+  final largeUpload = folder == 'shared-files' || folder == 'watch-rooms';
+  final maxBytes = largeUpload ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
   if (bytes.length > maxBytes) {
-    throw StateError('حجم الملف أكبر من الحد المسموح (' + (folder == 'shared-files' ? '100' : '50') + ' ميغابايت).');
+    throw StateError('حجم الملف أكبر من الحد المسموح (' + (largeUpload ? '100' : '50') + ' ميغابايت).');
   }
 
   final path = '$prefix${DateTime.now().microsecondsSinceEpoch}.$ext';
