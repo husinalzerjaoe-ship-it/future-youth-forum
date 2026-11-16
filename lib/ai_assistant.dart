@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'local_bot.dart';
 
 /// Set FUTURE_AI_WEBHOOK_URL after deploying the shared n8n workflow.
 /// Gemini and Telegram credentials must stay in n8n, not in this app.
@@ -202,6 +203,31 @@ class _AiAssistantPageState extends State<AiAssistantPage> {
           colors: [Color(0xFF11152B), Color(0xFF171936), Color(0xFF211B45)],
         )),
         child: Column(children: [
+          if (futureAiWebhookUrl.trim().isEmpty)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5B4825).withOpacity(.35),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFFFFD28A).withOpacity(.35)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.cloud_off_rounded, color: Color(0xFFFFD28A)),
+                const SizedBox(width: 9),
+                const Expanded(child: Text(
+                  'الربط السحابي مع Gemini وTelegram غير مفعّل بعد. لا ترسل بيانات خاصة هنا.',
+                  style: TextStyle(color: Colors.white, fontSize: 11, height: 1.4),
+                )),
+                TextButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const LocalHelperBotPage(),
+                  )),
+                  child: const Text('المساعد المحلي'),
+                ),
+              ]),
+            ),
           Expanded(child: ListView.builder(
             controller: _scroll,
             padding: const EdgeInsets.fromLTRB(14, 18, 14, 12),
