@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
+import 'advanced_features.dart';
 import 'anime_experience.dart';
 import 'cinema_hub.dart';
 import 'community_events.dart';
@@ -35,6 +36,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('بطولات الأصدقاء', 'إنشاء بطولة وتحديات بين أعضاء الملتقى', Icons.emoji_events_rounded, () => const V12CompanionCenterPage(), 'بطولة تحدي أصدقاء مسابقة'),
     _Destination('الإنجازات والأوسمة', 'النقاط وسلاسل النشاط والشارات', Icons.military_tech_rounded, () => const AchievementHubPage(), 'إنجاز شارة نقاط'),
     _Destination('التصويتات', 'استطلاعات المجتمع', Icons.poll_rounded, () => const CommunityPollsPage(), 'تصويت استطلاع'),
+    _Destination('مركز الإشعارات', 'تنبيهات المنشن والتفاعلات والأحداث', Icons.notifications_active_rounded, () => const NotificationsPage(), 'إشعار تنبيه منشن رسالة'),
     _Destination('عالم الأنمي', 'قائمة المشاهدة وخلفيات الأنمي', Icons.animation_rounded, () => const AnimeExperiencePage(), 'أنمي اوتاكو'),
     _Destination('مكتبة الإلهام', 'الشعر والاقتباسات والخواطر', Icons.auto_stories_rounded, () => const InspirationHubPage(), 'شعر اقتباس خواطر'),
     _Destination('المساعد المحلي', 'مساعدة وأفكار داخل التطبيق', Icons.smart_toy_rounded, () => const LocalHelperBotPage(), 'مساعد ذكاء مساعدة'),
