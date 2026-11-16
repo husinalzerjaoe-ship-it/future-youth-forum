@@ -32,7 +32,6 @@ dependencies:
   audio_service: ^0.18.17
   crypto: ^3.0.6
   livekit_client: ^2.13.2
-  jitsi_meet_flutter_sdk: ^13.3.0
   shared_preferences: ^2.5.4
 
 dev_dependencies:
