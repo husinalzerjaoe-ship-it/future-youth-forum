@@ -23,6 +23,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
   static const _key = 'future_youth_media_library_v1';
   final List<_MediaEntry> _items = [];
   bool _loading = true;
+  bool _audioReady = false;
   bool _busy = false;
   double? _progress;
   String? _busyLabel;
@@ -31,7 +32,20 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
   bool _video(String path) => RegExp(r'\.(mp4|m4v|mov|webm|mkv)$', caseSensitive: false).hasMatch(path);
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _load();
+    _prepareAudio();
+  }
+
+  Future<void> _prepareAudio() async {
+    try {
+      await initializeLocalAudioService();
+      if (mounted) setState(() => _audioReady = true);
+    } catch (error) {
+      debugPrint('Media hub audio initialization failed: $error');
+    }
+  }
 
   Future<void> _load() async {
     try {
@@ -220,6 +234,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     if (index < 0) return;
     try {
       await initializeLocalAudioService();
+      if (mounted && !_audioReady) setState(() => _audioReady = true);
       await appAudioHandler.loadLocalQueue([
         for (final e in tracks) MediaItem(id: e.path, title: e.title, album: 'مكتبة ملتقى شباب المستقبل')
       ], initialIndex: index);
@@ -349,7 +364,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
   Widget _nowPlaying() {
     // AudioService is initialized asynchronously after the home screen appears.
     // Never dereference the late handler until initialization has completed.
-    if (!isAudioServiceInitialized) return const SizedBox.shrink();
+    if (!_audioReady || !isAudioServiceInitialized) return const SizedBox.shrink();
     return StreamBuilder<MediaItem?>(
     stream: appAudioHandler.mediaItem,
     builder: (context, media) {
