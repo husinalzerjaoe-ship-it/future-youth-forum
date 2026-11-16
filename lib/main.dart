@@ -79,6 +79,44 @@ Future<void> _notifyContentMentions({
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Keep release builds from showing an unexplained blank/white screen when a
+  // widget throws during build. The real exception is still written to logs.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Future Youth Forum Flutter error: ${details.exceptionAsString()}');
+    if (details.stack != null) debugPrintStack(stackTrace: details.stack);
+  };
+  ErrorWidget.builder = (details) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: ColoredBox(
+      color: const Color(0xFF111321),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Color(0xFFFFC857), size: 48),
+              const SizedBox(height: 14),
+              const Text('صار خطأ أثناء عرض هذه الصفحة',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('ارجع للصفحة السابقة وحاول مرة ثانية. تم تسجيل الخطأ للمراجعة.',
+                textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+  ui.PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Future Youth Forum uncaught error: $error');
+    debugPrintStack(stackTrace: stack);
+    return true;
+  };
+
   // Render a Flutter-owned loading/error screen immediately. A slow network
   // service must never leave Android's native splash covering the whole app.
   runApp(const FutureYouthBootstrap());
