@@ -75,7 +75,7 @@ class _FounderMemberTitlesPageState extends State<FounderMemberTitlesPage> {
       builder: (dialogContext) => StatefulBuilder(builder: (context, setDialogState) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: Text(oldTitle.isEmpty ? 'منح لقب لـ $name' : 'تعديل لقب $name'),
+          title: Text((profile['customTitle'] ?? '').toString().isEmpty ? 'منح لقب لـ $name' : 'تعديل لقب $name'),
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             TextField(controller: controller, autofocus: true, maxLength: 32,
               decoration: const InputDecoration(labelText: 'اللقب المخصص', hintText: 'مثلاً: نجم الملتقى', border: OutlineInputBorder())),
