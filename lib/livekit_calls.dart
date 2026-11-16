@@ -9,7 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class LiveKitCallsPage extends StatefulWidget {
   final String? initialRoom;
-  const LiveKitCallsPage({super.key, this.initialRoom});
+  final VoidCallback? onContinue;
+  const LiveKitCallsPage({super.key, this.initialRoom, this.onContinue});
 
   @override
   State<LiveKitCallsPage> createState() => _LiveKitCallsPageState();
@@ -29,6 +30,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   int _videoFilter = 0;
   String? _error;
   String? _endpoint;
+  OverlayEntry? _miniCallOverlay;
+  bool _miniMode = false;
 
   @override
   void initState() {
@@ -168,6 +171,80 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   void _onRoomChanged() {
     if (mounted) setState(() {});
+    _miniCallOverlay?.markNeedsBuild();
+  }
+
+  void _removeMiniCallOverlay() {
+    _miniCallOverlay?.remove();
+    _miniCallOverlay?.dispose();
+    _miniCallOverlay = null;
+  }
+
+  void _continueInApp() {
+    if (_room == null || _miniCallOverlay != null) return;
+    setState(() => _miniMode = true);
+    _miniCallOverlay = OverlayEntry(
+      builder: (overlayContext) => Positioned(
+        top: MediaQuery.paddingOf(overlayContext).top + 8,
+        left: 12,
+        right: 12,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF24204F), Color(0xFF5142A8), Color(0xFF167F91)],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withValues(alpha: .22)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .28), blurRadius: 18, offset: const Offset(0, 7))],
+            ),
+            child: Row(children: [
+              const Icon(Icons.call_rounded, color: Colors.white, size: 19),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: _returnToCall,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('المكالمة مستمرة ❤️', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                      Text('الغرفة: ${_room?.name ?? ''} • اضغط للرجوع', maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: _microphoneEnabled ? 'كتم المايك' : 'تشغيل المايك',
+                onPressed: _toggleMicrophone,
+                icon: Icon(_microphoneEnabled ? Icons.mic_rounded : Icons.mic_off_rounded, color: Colors.white),
+              ),
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                tooltip: 'إنهاء المكالمة',
+                onPressed: _leaveRoom,
+                icon: const Icon(Icons.call_end_rounded, color: Colors.white),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context, rootOverlay: true).insert(_miniCallOverlay!);
+    widget.onContinue?.call();
+  }
+
+  void _returnToCall() {
+    final callRoute = ModalRoute.of(context);
+    _removeMiniCallOverlay();
+    if (callRoute != null) {
+      Navigator.of(context, rootNavigator: true).popUntil((route) => route == callRoute);
+    }
+    if (mounted) setState(() => _miniMode = false);
   }
 
   Future<void> _toggleMicrophone() async {
@@ -177,6 +254,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     try {
       await room.localParticipant?.setMicrophoneEnabled(next);
       if (mounted) setState(() => _microphoneEnabled = next);
+      _miniCallOverlay?.markNeedsBuild();
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر تغيير المايكروفون: $error');
     }
@@ -197,9 +275,11 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   Future<void> _leaveRoom() async {
     final room = _room;
     final listener = _listener;
+    _removeMiniCallOverlay();
     setState(() {
       _room = null;
       _listener = null;
+      _miniMode = false;
     });
     if (room != null) {
       room.removeListener(_onRoomChanged);
@@ -293,6 +373,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   @override
   void dispose() {
+    _removeMiniCallOverlay();
     _room?.removeListener(_onRoomChanged);
     _room?.disconnect();
     _room?.dispose();
@@ -396,6 +477,14 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
                         ),
                       ],
                     ),
+                    if (widget.onContinue != null) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: _continueInApp,
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('تصغير المكالمة ومتابعة استخدام التطبيق'),
+                      ),
+                    ],
                   ],
                 )
               : ListView(
