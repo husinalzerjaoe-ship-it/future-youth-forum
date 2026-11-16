@@ -1,8 +1,7 @@
 name: future_youth_forum
 description: Future Youth Forum - ملتقى شباب المستقبل
 publish_to: 'none'
-version: 4.47.0+59
-
+version: 4.48.0+60
 environment:
   sdk: '>=3.10.0 <4.0.0'
 
