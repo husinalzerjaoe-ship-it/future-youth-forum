@@ -416,7 +416,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             enableCaption: true,
             showVideoAnnotations: false,
             playsInline: true,
-            privacyEnhancedMode: true,
           ),
         );
         _youtube = controller;
