@@ -1051,7 +1051,7 @@ class PostsPage extends StatelessWidget {
                     final p = profile.data?.data() ?? {}; final title = (p['customTitle'] ?? '').toString().trim();
                     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge(title: title, colorValue: p['customTitleColor'] is int ? p['customTitleColor'] as int : null, compact: true)),
+                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge.fromProfile(title: title, profile: p, compact: true)),
                     ]);
                   }),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
@@ -1277,7 +1277,7 @@ class MyProfilePage extends StatelessWidget {
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
           if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
+            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
@@ -1490,7 +1490,7 @@ class MemberProfilePage extends StatelessWidget {
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
+              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
             if (uid != FirebaseAuth.instance.currentUser!.uid)
