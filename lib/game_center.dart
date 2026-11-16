@@ -320,17 +320,20 @@ class _QuizGameState extends State<_QuizGame> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(widget.category == 'football'
-              ? 'تحدي كرة القدم'
-              : widget.category == 'player'
-                  ? 'من هو اللاعب؟'
-                  : widget.category == 'flags'
-                      ? 'تحدي الأعلام'
-                      : widget.category == 'anime'
-                          ? 'تحدي الأنمي'
-                          : widget.category == 'clubs'
-                              ? 'شعارات الأندية'
-                              : 'تحدي المعلومات'),
+          title: Text(switch (widget.category) {
+            'football' => 'تحدي كرة القدم',
+            'player' => 'من هو اللاعب؟',
+            'flags' => 'تحدي الأعلام',
+            'anime' => 'تحدي الأنمي',
+            'clubs' => 'شعارات الأندية',
+            'science' => 'تحدي العلوم',
+            'iraq' => 'ذاكرة العراق',
+            'geography' => 'رحلة حول العالم',
+            'technology' => 'تحدي التقنية',
+            'animals' => 'مملكة الحيوانات',
+            'space' => 'أسرار الفضاء',
+            _ => 'تحدي المعلومات',
+          }),
         ),
         body: Padding(
           padding: const EdgeInsets.all(18),
