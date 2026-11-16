@@ -130,16 +130,18 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
       'gold' => const Color(0xFFFFC857),
       _ => const Color(0xFF806BFF),
     };
-    final reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
+    final performance = prefs.getString('v25_profile') ?? prefs.getString('v17_performance') ?? 'balanced';
+    final mediaQuality = prefs.getString('v25_media') ?? prefs.getString('v17_media_quality') ?? 'auto';
+    final v25Motion = prefs.getBool('v25_motion') ?? true;
+    final reduceMotion = (prefs.getBool('v17_reduce_motion') ?? false) || !v25Motion;
     final compactCards = prefs.getBool('v17_compact_cards') ?? false;
     v17AccentNotifier.value = accent;
     v17ReduceMotionNotifier.value = reduceMotion;
     v17CompactCardsNotifier.value = compactCards;
-    final performance = prefs.getString('v17_performance') ?? 'balanced';
-    final mediaQuality = prefs.getString('v17_media_quality') ?? 'auto';
-    PaintingBinding.instance.imageCache.maximumSize = performance == 'high' ? 600 : performance == 'battery' ? 160 : 320;
-    final baseCacheBytes = performance == 'high' ? 120 * 1024 * 1024 : performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = mediaQuality == 'data'
+    final cache = PaintingBinding.instance.imageCache;
+    cache.maximumSize = performance == 'high' ? 700 : performance == 'battery' ? 120 : 320;
+    final baseCacheBytes = performance == 'high' ? 128 * 1024 * 1024 : performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    cache.maximumSizeBytes = mediaQuality == 'data'
         ? baseCacheBytes ~/ 2
         : mediaQuality == 'high' ? baseCacheBytes : (baseCacheBytes * 3) ~/ 4;
     if (!mounted) return;
