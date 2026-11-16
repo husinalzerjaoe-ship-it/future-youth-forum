@@ -18,7 +18,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   String _category = 'الكل';
   late Future<List<_Film>> _catalog;
   final Set<String> _favorites = {};
-  static const _categories = ['الكل','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة','مسلسلات كلاسيكية'];
+  static const _categories = ['الكل','مسلسلات كلاسيكية','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة'];
 
   @override void initState() { super.initState(); _catalog = _load(); _loadFavorites(); }
   @override void dispose() { _search.dispose(); super.dispose(); }
@@ -71,7 +71,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         'خيال علمي' => RegExp(r'science fiction|sci.fi|space|alien').hasMatch(t),
         'مغامرة' => RegExp(r'adventure|western|war').hasMatch(t),
         'أفلام صامتة' => (int.tryParse(f.year) ?? 9999) < 1930,
-        'مسلسلات كلاسيكية' => RegExp(r'episode|serial|chapter|season|series').hasMatch(t),
+        'مسلسلات كلاسيكية' => true,
         _ => true,
       };
       return searchOk && categoryOk;
@@ -116,11 +116,21 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArabicAnimeCatalogPage())),
-                    icon: const Icon(Icons.auto_awesome), label: const Text('دليل الأنمي • تصفّح 500+ عنوان'),
+                    icon: const Icon(Icons.auto_awesome), label: const Text('عالم الأنمي • أكثر من 1000 عنوان'),
                   ),
                   const SizedBox(height: 12),
-                  FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaRoomsPage())),
-                    icon: const Icon(Icons.meeting_room), label: const Text('غرف السينما')),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaRoomsPage())),
+                      icon: const Icon(Icons.meeting_room), label: const Text('غرف السينما')),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
+                      onPressed: () { setState(() { _category = 'مسلسلات كلاسيكية'; _catalog = _load(series: true); }); },
+                      icon: const Icon(Icons.live_tv), label: const Text('المسلسلات')),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
+                      onPressed: () { setState(() { _category = 'الكل'; _catalog = _load(); }); },
+                      icon: const Icon(Icons.local_movies), label: const Text('الأفلام')),
+                  ]),
                 ]))),
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                 child: TextField(controller: _search, onChanged: (_) => setState(() {}),
@@ -309,7 +319,7 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
       final pagination = root['pagination'] as Map<String, dynamic>? ?? {};
       if (mounted) setState(() {
         _items.addAll(rows);
-        _hasNext = (pagination['has_next_page'] == true) && rows.isNotEmpty && _page < 20;
+        _hasNext = (pagination['has_next_page'] == true) && rows.isNotEmpty && _page < 40;
         _page++;
       });
     } catch (e) {
@@ -330,17 +340,22 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text('خيارات مشاهدة $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('افتح صفحة المنصة الرسمية وتأكد من وجود الترجمة العربية للحلقة والموسم وبلدك قبل التشغيل. ما نعرض علامة «مترجم» إلا إذا كانت المنصة نفسها تؤكدها.'),
+            const Text('اختر منصة وافحص صفحة العنوان. الترجمة والدبلجة تختلف حسب الموسم والحلقة وبلدك؛ هذه روابط بحث رسمية وليست تأكيداً بأن العنوان متاح أو مترجم.'),
             const SizedBox(height: 14),
             FilledButton.icon(
               icon: const Icon(Icons.subtitles),
-              label: const Text('البحث في كرانشي رول العربي'),
-              onPressed: () => launchUrl(Uri.https('www.crunchyroll.com', '/ar/search', {'q': title}), mode: LaunchMode.externalApplication),
+              label: const Text('Crunchyroll • كرانشي رول'),
+              onPressed: () => launchUrl(Uri.https('www.crunchyroll.com', '/search', {'q': title}), mode: LaunchMode.externalApplication),
             ),
             OutlinedButton.icon(
               icon: const Icon(Icons.movie_outlined),
-              label: const Text('البحث في نتفلكس العراق'),
+              label: const Text('Netflix • نتفلكس'),
               onPressed: () => launchUrl(Uri.https('www.netflix.com', '/iq-en/search', {'q': title}), mode: LaunchMode.externalApplication),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.play_circle_outline),
+              label: const Text('Prime Video • برايم فيديو'),
+              onPressed: () => launchUrl(Uri.https('www.primevideo.com', '/search/ref=atv_nb_sr?phrase=$title'), mode: LaunchMode.externalApplication),
             ),
           ]),
         ),
@@ -355,12 +370,12 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
       body: Column(children: [
         Container(width: double.infinity, margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF34205B), Color(0xFF17182E)])),
-          child: const Text('تصفّح مئات عناوين الأنمي وابحث عن النسخ ذات الترجمة أو الدبلجة العربية عبر المنصات الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
+          child: const Text('تصفّح أكثر من 1000 عنوان أنمي، وابحث عن الترجمة أو الدبلجة العربية عبر منصات العرض الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
             style: TextStyle(color: Colors.white, height: 1.6))),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
           child: Wrap(spacing: 7, runSpacing: 6, children: [
-            for (final title in ['One Piece', 'Naruto', 'Attack on Titan', 'Jujutsu Kaisen', 'My Hero Academia'])
+            for (final title in ['One Piece', 'Naruto', 'Bleach', 'Dragon Ball', 'Detective Conan', 'Attack on Titan', 'Jujutsu Kaisen', 'Demon Slayer', 'My Hero Academia', 'Death Note', 'Hunter x Hunter', 'Haikyu!!'])
               ActionChip(
                 label: Text(title),
                 onPressed: () { _search.text = title; _load(reset: true); },
@@ -385,7 +400,7 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
                 if (index >= _items.length) return Padding(
                   padding: const EdgeInsets.all(16),
                   child: Center(child: _loading ? const CircularProgressIndicator() : OutlinedButton.icon(
-                    onPressed: _load, icon: const Icon(Icons.expand_more), label: const Text('عرض 25 عنواناً إضافياً'))));
+                    onPressed: _load, icon: const Icon(Icons.expand_more), label: const Text('تحميل 25 أنمي إضافياً'))));
                 final item = _items[index];
                 final title = (item['title_english'] ?? item['title'] ?? 'Anime').toString();
                 final image = ((item['images'] as Map?)?['jpg'] as Map?)?['large_image_url']?.toString();
