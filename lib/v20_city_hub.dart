@@ -58,7 +58,7 @@ class _V20CityHubPageState extends State<V20CityHubPage> {
     if (!mounted) return;
     setState(() {
       _xp = prefs.getInt('v20_city_xp') ?? 0;
-      _theme = (prefs.getInt('v20_city_theme') ?? 0).clamp(0, _themes.length - 1);
+      _theme = (prefs.getInt('v20_city_theme') ?? 0).clamp(0, _themes.length - 1).toInt();
       _claimedToday = prefs.getBool(_dayKey) ?? false;
       _loaded = true;
     });
