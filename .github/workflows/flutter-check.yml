@@ -67,6 +67,8 @@ jobs:
           GRADLE
       - name: Configure Android background audio
         run: python scripts/configure_android_audio.py
+      - name: Configure embedded Godot Android runtime
+        run: python scripts/configure_godot_android.py
       - name: Set Android app display name
         run: sed -i 's/android:label="forum"/android:label="ملتقى شباب المستقبل"/' android/app/src/main/AndroidManifest.xml
       - name: Configure Future Youth Forum launcher icon
