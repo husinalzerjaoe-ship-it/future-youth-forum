@@ -13,11 +13,6 @@ const _onlineGames = <String, String>{
   'penalty': 'ضربات الجزاء',
   'pingpong': 'بينج بونج',
   'math': 'سباق الحساب',
-  'hearts': 'صائد القلوب',
-  'memory': 'تحدي الذاكرة',
-  'snake': 'الثعبان النيون',
-  'code': 'كاسر الشفرة',
-  'reaction': 'رد الفعل',
 };
 
 class ArcadeDuelLobbyPage extends StatefulWidget {
@@ -219,14 +214,6 @@ class _ArcadeDuelRoomPageState extends State<ArcadeDuelRoomPage> {
               state['mathB'] = 2 + random.nextInt(12);
             }
             break;
-          case 'reaction':
-            points = 1;
-            break;
-          case 'memory':
-          case 'snake':
-          case 'code':
-            points = 1;
-            break;
           default:
             points = 1;
         }
@@ -377,6 +364,7 @@ class _ArcadeDuelRoomPageState extends State<ArcadeDuelRoomPage> {
 
   Widget _controls(String mode, int target, int hazard, int a, int b) {
     if (mode == 'tap') return SizedBox(height: 190, child: FilledButton.icon(onPressed: _busy ? null : () => _act('ضغطة'), icon: const Icon(Icons.touch_app, size: 38), label: const Text('اضغط بأسرع ما يمكن — أول لاعب يصل 20 يفوز')));
+    if (mode == 'pingpong') return SizedBox(height: 170, child: FilledButton.icon(onPressed: _busy ? null : () => _act('إرجاع الكرة'), icon: const Icon(Icons.sports_tennis_rounded, size: 36), label: const Text('اضغط لإرجاع الكرة وجمع نقطة')));
     if (mode == 'math') return Column(children: [
       Text('$a + $b = ؟', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
       Wrap(spacing: 8, children: [a + b, a + b + 1, a + b - 1].map((v) => FilledButton(onPressed: _busy ? null : () => _act('إجابة $v', correct: v == a + b), child: Text('$v'))).toList()),
