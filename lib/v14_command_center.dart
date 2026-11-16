@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'achievement_hub.dart';
+import 'anime_experience.dart';
+import 'daily_world.dart';
+import 'inspiration_hub.dart';
+import 'local_bot.dart';
 import 'advanced_features.dart';
 import 'arcade_hub.dart';
 import 'cinema_hub.dart';
@@ -40,6 +45,40 @@ class V14CommandCenterPage extends StatefulWidget {
 class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
   final _search = TextEditingController();
   String _category = 'الكل';
+  Set<String> _favorites = <String>{};
+  List<String> _recent = <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersonalization();
+  }
+
+  Future<void> _loadPersonalization() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _favorites = (prefs.getStringList('v15_favorite_tools') ?? <String>[]).toSet();
+      _recent = prefs.getStringList('v15_recent_tools') ?? <String>[];
+    });
+  }
+
+  Future<void> _toggleFavorite(String title) async {
+    final next = Set<String>.from(_favorites);
+    if (next.contains(title)) { next.remove(title); } else { next.add(title); }
+    setState(() => _favorites = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('v15_favorite_tools', next.toList());
+  }
+
+  Future<void> _rememberAndOpen(_V14Tool tool) async {
+    final next = <String>[tool.title, ..._recent.where((item) => item != tool.title)].take(8).toList();
+    setState(() => _recent = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('v15_recent_tools', next);
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => tool.page()));
+  }
 
   static final List<_V14Tool> _tools = [
     _V14Tool('الدردشة', 'المحادثة العامة', 'الرسائل العامة والوسائط والردود والتفاعلات', Icons.forum_rounded, () => const EnhancedPublicChatPage()),
@@ -68,6 +107,16 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
     _V14Tool('الإبداع والمعرفة', 'مكتبة العبارات والأدعية', 'اقتباسات وشعر وأذكار وعبارات', Icons.auto_stories_rounded, () => const CreativeLibraryPage()),
     _V14Tool('الإبداع والمعرفة', 'ركن المعرفة', 'اكتشافات ومعلومات وتحديات معرفية', Icons.lightbulb_rounded, () => const KnowledgeCornerPage()),
     _V14Tool('الإبداع والمعرفة', 'لوحة يومي', 'المهام والتنظيم الشخصي', Icons.today_rounded, () => const FutureDashboardPage()),
+    _V14Tool('التواصل', 'مركز الإشعارات', 'تنبيهات المنشن والتفاعلات والأحداث الجديدة', Icons.notifications_active_rounded, () => const NotificationsPage()),
+    _V14Tool('المجتمع', 'دليل الأعضاء', 'اكتشف مجتمعات وأعضاء الملتقى', Icons.people_alt_rounded, () => const CommunityDirectoryPage()),
+    _V14Tool('المجتمع', 'مساحات المشاهدة', 'استكشف غرف ومجموعات المشاهدة', Icons.live_tv_rounded, () => const WatchPartiesPage()),
+    _V14Tool('المجتمع', 'مجتمعات الاهتمام', 'انضم إلى نقاشات حسب اهتماماتك', Icons.diversity_2_rounded, () => const InterestCommunityPage()),
+    _V14Tool('الترفيه', 'عالم الأنمي', 'خلفيات الأنمي وقائمة المشاهدة والاختبارات', Icons.animation_rounded, () => const AnimeExperiencePage()),
+    _V14Tool('الإبداع والمعرفة', 'عالمك اليومي', 'تحديات ومحتوى وأدوات يومية', Icons.today_rounded, () => const DailyWorldPage()),
+    _V14Tool('الإبداع والمعرفة', 'إلهام يومي', 'اقتباسات وأفكار ومساحات كتابة', Icons.lightbulb_rounded, () => const InspirationHubPage()),
+    _V14Tool('الإبداع والمعرفة', 'المساعد المحلي', 'مساعدة وأفكار داخل التطبيق دون خدمة مدفوعة', Icons.smart_toy_rounded, () => const LocalHelperBotPage()),
+    _V14Tool('الحساب والأمان', 'المنشورات المحفوظة', 'ارجع إلى المنشورات التي احتفظت بها', Icons.bookmark_rounded, () => const SavedPostsPage()),
+    _V14Tool('الحساب والأمان', 'الأمان والخصوصية', 'أدوات الحظر وإرشادات سلامة المجتمع', Icons.shield_rounded, () => const MemberSafetyPage()),
   ];
 
   @override
@@ -80,7 +129,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
   Widget build(BuildContext context) {
     final q = _search.text.trim().toLowerCase();
     final visible = _tools.where((tool) {
-      final matchesCategory = _category == 'الكل' || tool.category == _category;
+      final matchesCategory = _category == 'الكل' || (_category == 'المفضلة' ? _favorites.contains(tool.title) : tool.category == _category);
       final matchesSearch = q.isEmpty || ('${tool.title} ${tool.subtitle} ${tool.category}').toLowerCase().contains(q);
       return matchesCategory && matchesSearch;
     }).toList();
@@ -89,7 +138,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('مركز الملتقى V14'),
+          title: const Text('مركز الملتقى V15'),
           actions: [
             IconButton(
               tooltip: 'مسح البحث',
@@ -130,14 +179,14 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(20)),
-                        child: const Text('V14', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        child: const Text('V15', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                     ]),
                     const SizedBox(height: 9),
                     const Text('اختصر الطريق إلى الدردشة والمشاهدة والألعاب والرياضة والإبداع. كل الاختصارات تفتح ميزات نسختك الحالية دون استبدالها أو حذفها.',
                       style: TextStyle(color: Colors.white70, height: 1.55)),
                     const SizedBox(height: 13),
-                    Text('${_tools.length} خدمة مجمّعة • ابحث أو اختر التصنيف', style: const TextStyle(color: Color(0xFFE4DCFF), fontSize: 12, fontWeight: FontWeight.w700)),
+                    Text('${_tools.length} خدمة • مفضلاتك وآخر أقسامك محفوظة على جهازك', style: const TextStyle(color: Color(0xFFE4DCFF), fontSize: 12, fontWeight: FontWeight.w700)),
                   ]),
                 ),
               ),
@@ -165,7 +214,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
                     scrollDirection: Axis.horizontal,
                     children: [
-                      'الكل', 'الدردشة', 'المشاهدة', 'الوسائط', 'الرياضة', 'الألعاب', 'المجتمع', 'الإبداع والمعرفة',
+                      'الكل', 'المفضلة', 'الدردشة', 'المشاهدة', 'الوسائط', 'الرياضة', 'الألعاب', 'المجتمع', 'الترفيه', 'الإبداع والمعرفة', 'الحساب والأمان',
                     ].map((category) => Padding(
                       padding: const EdgeInsetsDirectional.only(start: 7),
                       child: ChoiceChip(
@@ -189,7 +238,7 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final tool = visible[index];
-                        return _V14ToolCard(tool: tool);
+                        return _V14ToolCard(tool: tool, isFavorite: _favorites.contains(tool.title), onToggleFavorite: () => _toggleFavorite(tool.title), onOpen: () => _rememberAndOpen(tool));
                       },
                       childCount: visible.length,
                     ),
@@ -220,7 +269,10 @@ class _V14Tool {
 
 class _V14ToolCard extends StatelessWidget {
   final _V14Tool tool;
-  const _V14ToolCard({required this.tool});
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
+  final VoidCallback onOpen;
+  const _V14ToolCard({required this.tool, required this.isFavorite, required this.onToggleFavorite, required this.onOpen});
 
   @override
   Widget build(BuildContext context) => Material(
@@ -228,7 +280,7 @@ class _V14ToolCard extends StatelessWidget {
     borderRadius: BorderRadius.circular(18),
     child: InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => tool.page())),
+      onTap: onOpen,
       child: Container(
         padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
@@ -236,7 +288,8 @@ class _V14ToolCard extends StatelessWidget {
           border: Border.all(color: _v14Purple.withValues(alpha: .24)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
+          Row(children: [
+            Container(
             width: 42, height: 42,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(13),
@@ -244,6 +297,9 @@ class _V14ToolCard extends StatelessWidget {
             ),
             child: Icon(tool.icon, color: Colors.white, size: 23),
           ),
+            const Spacer(),
+            IconButton(visualDensity: VisualDensity.compact, tooltip: isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة', onPressed: onToggleFavorite, icon: Icon(isFavorite ? Icons.star_rounded : Icons.star_border_rounded, color: isFavorite ? const Color(0xFFFFD66B) : Colors.white54)),
+          ]),
           const Spacer(),
           Text(tool.title, maxLines: 2, overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
