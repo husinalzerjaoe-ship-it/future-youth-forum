@@ -65,11 +65,11 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   }
   Future<void> openHero(Map<String,dynamic> h) async {
     final slug=field(h,['slug','id'],'');if(slug.isEmpty)return;
-    setState(()=>{selected=h,selectedRank=rankFor(h),detailLoading=true,counters=[],builds=[]});
+    setState(() { selected=h; selectedRank=rankFor(h); detailLoading=true; counters=[]; builds=[]; });
     try{
       final r=await Future.wait([getData('/heroes/'+slug),getData('/heroes/'+slug+'/counters'),getData('/heroes/'+slug+'/builds')]);
       if(!mounted)return;
-      setState(()=>{selected=asMap(r[0]).isEmpty?h:asMap(r[0]),counters=asList(r[1]),builds=asList(r[2]),detailLoading=false});
+      setState(() { selected=asMap(r[0]).isEmpty?h:asMap(r[0]); counters=asList(r[1]); builds=asList(r[2]); detailLoading=false; });
     }catch(_){if(mounted)setState(()=>detailLoading=false);}
   }
   List<String> flatten(dynamic v,[int depth=0]){
@@ -94,7 +94,7 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
         SizedBox(height:5),Text('صور • أدوار • ميتا • عدادات • تجهيزات • إيمبلم • تعاويذ',style:TextStyle(color:Colors.white70)),
       ])),
       const SizedBox(height:12),
-      SegmentedButton<String>(segments:const [ButtonSegment(value:'Mobile Legends',label:Text('Mobile Legends'),icon:Icon(Icons.shield_moon)),ButtonSegment(value:'PUBG Mobile',label:Text('PUBG'),icon:Icon(Icons.sports_esports))],selected:{game},onSelectionChanged:(v)=>setState(()=>{game=v.first,selected=null})),
+      SegmentedButton<String>(segments:const [ButtonSegment(value:'Mobile Legends',label:Text('Mobile Legends'),icon:Icon(Icons.shield_moon)),ButtonSegment(value:'PUBG Mobile',label:Text('PUBG'),icon:Icon(Icons.sports_esports))],selected:{game},onSelectionChanged:(v)=>setState(() { game=v.first; selected=null; })),
       const SizedBox(height:10),
       if(game=='Mobile Legends') ...mlbbWidgets() else ...pubgWidgets(),
       const SizedBox(height:14),
