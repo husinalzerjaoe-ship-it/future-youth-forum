@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 const _botColor = Color(0xFF6554D9);
-const _assistantWebhookUrl =
-    'https://cloud.activepieces.com/api/v1/webhooks/YQruwrsE0xEvTlbBdcNsy/sync';
+const _assistantWebhookUrl = String.fromEnvironment('ACTIVEPIECES_WEBHOOK_URL');
 
 class LocalHelperBotPage extends StatefulWidget {
   const LocalHelperBotPage({super.key});
@@ -73,6 +72,9 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
     String question,
     List<Map<String, String>> history,
   ) async {
+    if (_assistantWebhookUrl.isEmpty) {
+      throw StateError('رابط المساعد غير مضبوط في إعدادات البناء.');
+    }
     final user = FirebaseAuth.instance.currentUser;
     final response = await http
         .post(
