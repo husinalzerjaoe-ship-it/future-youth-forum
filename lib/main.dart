@@ -48,6 +48,7 @@ import 'v33_future_universe.dart';
 import 'v22_cinema_discovery.dart';
 import 'ai_assistant.dart';
 import 'local_bot.dart';
+import 'godot_game_launcher.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -728,6 +729,9 @@ class _HomePageState extends State<HomePage> {
                 case 'friendsArena':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsBattleArenaPage()));
                   break;
+                case 'godotLauncher':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const GodotGameLauncherPage()));
+                  break;
                 case 'growth':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureGrowthPage()));
                   break;
@@ -820,6 +824,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'friendsArena', child: ListTile(leading: Icon(Icons.people_alt_rounded), title: Text('منافسات الأصدقاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'godotLauncher', child: ListTile(leading: Icon(Icons.view_in_ar_rounded), title: Text('مغامرات Godot ثلاثية الأبعاد'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'growth', child: ListTile(leading: Icon(Icons.track_changes_rounded), title: Text('مسار تطوري والأهداف اليومية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'universe', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('كون المستقبل V33 – مركز التخصيص'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('الإنجازات والأوسمة'), contentPadding: EdgeInsets.zero)),
