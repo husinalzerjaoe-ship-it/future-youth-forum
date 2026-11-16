@@ -169,13 +169,13 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   Widget listCard(String title,List<Map<String,dynamic>> data)=>Card(child:ExpansionTile(title:Text(title+' ('+data.length.toString()+')',style:const TextStyle(fontWeight:FontWeight.bold)),children:data.isEmpty?[const Padding(padding:EdgeInsets.all(14),child:Text('لا توجد بيانات تفصيلية منشورة لهذا البطل حالياً.'))]:data.map((m)=>ListTile(title:Text(field(m,['name','hero','title'],'تفصيل')),subtitle:Text(flatten(m).join(' • '),maxLines:5,overflow:TextOverflow.ellipsis))).toList()));
 
   List<Widget> pubgWidgets()=>[
-    const Text('مركز إعدادات وتجربة اللعب',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-    const Text('نصائح لراحة الاستخدام وأداء الهاتف والخصوصية وإعدادات التحكم.',style:TextStyle(color:Colors.black54)),
-    guide('تخصيص أزرار التحكم','رتّب أماكن الأزرار بما يناسب حجم الشاشة وراحة اليد. اترك مسافة بين الأزرار المتكررة واحفظ نسخة من التخطيط قبل تغييره.'),
-    guide('إعدادات الحساسية','ابدأ بالإعدادات الافتراضية، غيّر خياراً واحداً كل مرة، واختبره في وضع التدريب. لا تنسخ إعدادات لاعب آخر حرفياً لأن الهواتف تختلف.'),
-    guide('السلاسة والحرارة','اختر معدل إطارات يناسب جهازك، خفّض المؤثرات البصرية عند التقطيع، أغلق التطبيقات غير الضرورية وتوقف إذا ارتفعت حرارة الهاتف.'),
-    guide('الصوت وإمكانية الوصول','اضبط الصوت بمستوى مريح، وخذ استراحة إذا شعرت بإجهاد السمع أو العين.'),
-    guide('الشبكة والخصوصية','استخدم اتصالاً مستقراً، لا تشارك كلمة مرورك أو رموز التحقق، واستعمل أدوات الحظر والإبلاغ عند الإزعاج.'),
+    const Text('مركز تجربة اللعبة والهاتف',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
+    const Text('محتوى عام لتحسين راحة الشاشة وأداء الجهاز وحماية الحساب، من دون إرشادات قتالية أو توجيهات لاستخدام الأسلحة.',style:TextStyle(color:Colors.black54)),
+    guide('وضوح الشاشة','اضبط السطوع وحجم الواجهة بما يريح العين، وفعّل خيارات تقليل الوهج إذا كانت متاحة على هاتفك.'),
+    guide('السلاسة والحرارة','اختر إعدادات رسومية تناسب قدرة جهازك، أغلق التطبيقات غير الضرورية، واترك الهاتف يبرد إذا ارتفعت حرارته.'),
+    guide('البطارية والتخزين','حافظ على مساحة تخزين كافية، وتجنب اللعب أثناء شحن الهاتف إذا كان يسبب ارتفاع حرارته.'),
+    guide('الصوت والراحة','اضبط الصوت بمستوى مريح وخذ استراحة إذا شعرت بإجهاد العين أو السمع.'),
+    guide('الشبكة والخصوصية','استخدم اتصالاً مستقراً، لا تشارك كلمة مرورك أو رموز التحقق، ولا تفتح روابط مجهولة.'),
     guide('توازن اللعب','خذ استراحة بين الجولات ولا تجعل اللعب يؤثر على النوم أو الدراسة أو نشاطك اليومي.'),
   ];
   Widget guide(String title,String body)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.tips_and_updates)),title:Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),children:[Padding(padding:const EdgeInsets.all(14),child:Text(body))]));
