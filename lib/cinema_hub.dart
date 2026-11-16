@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'watch_party.dart';
 
@@ -43,33 +44,73 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   }
 
   Future<List<_Film>> _load({bool? series}) async {
+    // Load a small first page from each catalogue. The old implementation fired
+    // up to 18 requests at once, so a single slow page could fail the whole screen.
+    final prefs = await SharedPreferences.getInstance();
     Future<List<_Film>> loadCollection(String query, bool isSeries) async {
-      final pages = await Future.wait(List.generate(9, (index) async {
-        final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(query)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=${index + 1}&output=json&sort%5B%5D=downloads%20desc');
-        final response = await http.get(uri).timeout(const Duration(seconds: 25));
-        if (response.statusCode != 200) throw Exception('archive unavailable');
-        final root = jsonDecode(response.body) as Map<String, dynamic>;
-        final responseData = root['response'] as Map<String, dynamic>;
-        return (responseData['docs'] as List<dynamic>? ?? const <dynamic>[]);
-      }));
+      final cacheKey = 'v18_cinema_${isSeries ? 'series' : 'movies'}';
+      final cached = prefs.getString(cacheKey);
+      if (cached != null) {
+        try {
+          final decoded = jsonDecode(cached) as List<dynamic>;
+          final savedAt = prefs.getInt('${cacheKey}_at') ?? 0;
+          if (DateTime.now().millisecondsSinceEpoch - savedAt < const Duration(hours: 8).inMilliseconds) {
+            return decoded.whereType<Map<String, dynamic>>().map((d) => _Film(
+              (d['id'] ?? '').toString(), (d['title'] ?? 'عمل سينمائي').toString(),
+              (d['year'] ?? '').toString(), (d['description'] ?? '').toString(),
+              isSeries: isSeries,
+            )).where((f) => f.id.isNotEmpty).toList();
+          }
+        } catch (_) {
+          // Ignore a damaged local cache and refresh it from the public catalogue.
+        }
+      }
+      final uri = Uri.https('archive.org', '/advancedsearch.php', {
+        'q': query,
+        'fl[]': 'identifier,title,year,description',
+        'rows': '60',
+        'page': '1',
+        'output': 'json',
+        'sort[]': 'downloads desc',
+      });
+      final response = await http.get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 18));
+      if (response.statusCode != 200) throw Exception('catalogue request failed');
+      final root = jsonDecode(response.body) as Map<String, dynamic>;
+      final responseData = root['response'] as Map<String, dynamic>? ?? {};
+      final docs = (responseData['docs'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>().toList();
       final seen = <String>{};
-      return pages.expand((page) => page).whereType<Map<String, dynamic>>().map((d) {
-        final id = (d['identifier'] ?? '').toString();
-        return _Film(id, (d['title'] ?? 'عمل سينمائي').toString(),
-          (d['year'] ?? '').toString(), (d['description'] ?? '').toString(), isSeries: isSeries);
-      }).where((film) => film.id.isNotEmpty && seen.add(film.id)).toList();
+      final films = docs.map((d) => _Film(
+        (d['identifier'] ?? '').toString(),
+        (d['title'] ?? 'عمل سينمائي').toString(),
+        (d['year'] ?? '').toString(),
+        (d['description'] ?? '').toString(),
+        isSeries: isSeries,
+      )).where((f) => f.id.isNotEmpty && seen.add(f.id)).toList();
+      await prefs.setString(cacheKey, jsonEncode(films.map((f) => {
+        'id': f.id, 'title': f.title, 'year': f.year, 'description': f.description,
+      }).toList()));
+      await prefs.setInt('${cacheKey}_at', DateTime.now().millisecondsSinceEpoch);
+      return films;
     }
 
-    final collections = <Future<List<_Film>>>[];
+    final jobs = <Future<List<_Film>>>[];
     if (series == null || series == false) {
-      collections.add(loadCollection('collection:opensource_movies AND mediatype:movies', false));
+      jobs.add(loadCollection('collection:opensource_movies AND mediatype:movies', false)
+          .catchError((_) => <_Film>[]));
     }
     if (series == null || series == true) {
-      collections.add(loadCollection('collection:classic_tv AND mediatype:movies', true));
+      jobs.add(loadCollection('collection:classic_tv AND mediatype:movies', true)
+          .catchError((_) => <_Film>[]));
     }
-    final loaded = await Future.wait(collections);
+    final loaded = await Future.wait(jobs);
     final unique = <String>{};
-    return loaded.expand((items) => items).where((film) => unique.add(film.id)).toList();
+    final result = loaded.expand((items) => items).where((f) => unique.add(f.id)).toList();
+    if (result.isEmpty) {
+      throw Exception('تعذر الاتصال بالمكتبة حالياً. تحقق من الإنترنت ثم أعد المحاولة.');
+    }
+    return result;
   }
 
   List<_Film> _filter(List<_Film> films) {
@@ -111,7 +152,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
           if (snap.hasError) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('تعذر تحميل المكتبة المفتوحة.'),
+            const Text('تعذر تحميل المكتبة الآن. جرّب إعادة المحاولة أو تحقق من الاتصال.'),
             TextButton(onPressed: () => setState(() => _catalog = _load()), child: const Text('إعادة المحاولة')),
           ]));
           final films = _filter(snap.data ?? []);
@@ -172,7 +213,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 }, childCount: films.length),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .68, crossAxisSpacing: 12, mainAxisSpacing: 12))),
               const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Text(
-                'المكتبة تجلب أعمالاً من مجموعة Open Source Movies في Internet Archive. التوفر والترخيص يختلفان حسب العمل؛ راجع صفحة المصدر قبل المشاركة.',
+                'المكتبة تجلب دفعة أولى خفيفة من مجموعات الأفلام والتلفزيون المفتوحة في Internet Archive، وتحتفظ بها محلياً مؤقتاً لتسريع الفتح وتقليل استهلاك الشبكة. التوفر والترخيص يختلفان حسب العمل؛ راجع صفحة المصدر قبل المشاركة.',
                 style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.6)))),
             ]));
         },
