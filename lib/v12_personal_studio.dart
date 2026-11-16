@@ -14,7 +14,7 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
   bool _dailyDigest=true,_eventAlerts=true,_socialAlerts=true,_ready=false;
   int _frame=0;
   static const _frames=[Color(0xFF927CFF),Color(0xFF42D9E8),Color(0xFFFFC56E),Color(0xFFFF83B5)];
-  @override void initState(){super.initState();_tabs=TabController(length:3,vsync:this);_load();}
+  @override void initState(){super.initState();_tabs=TabController(length:4,vsync:this);_load();}
   @override void dispose(){_tabs.dispose();_name.dispose();_bio.dispose();_title.dispose();_draft.dispose();_diary.dispose();super.dispose();}
   Future<void> _load()async{
     final p=await SharedPreferences.getInstance();if(!mounted)return;
@@ -59,8 +59,8 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
   }
   @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
     backgroundColor:_v12Ink,
-    appBar:AppBar(title:const Text('استوديو المستقبل'),backgroundColor:_v12Ink,foregroundColor:Colors.white,bottom:TabBar(controller:_tabs,indicatorColor:_v12Aqua,labelColor:Colors.white,unselectedLabelColor:Colors.white54,tabs:const[Tab(text:'هويتي',icon:Icon(Icons.person_outline)),Tab(text:'صناعة المحتوى',icon:Icon(Icons.create)),Tab(text:'يومياتي',icon:Icon(Icons.book_outlined))])),
-    body:!_ready?const Center(child:CircularProgressIndicator()):TabBarView(controller:_tabs,children:[_profileTab(),_creatorTab(),_diaryTab()]),
+    appBar:AppBar(title:const Text('استوديو المستقبل'),backgroundColor:_v12Ink,foregroundColor:Colors.white,bottom:TabBar(controller:_tabs,indicatorColor:_v12Aqua,labelColor:Colors.white,unselectedLabelColor:Colors.white54,tabs:const[Tab(text:'هويتي',icon:Icon(Icons.person_outline)),Tab(text:'المحتوى',icon:Icon(Icons.create)),Tab(text:'يومياتي',icon:Icon(Icons.book_outlined)),Tab(text:'التنبيهات',icon:Icon(Icons.notifications_outlined))])),
+    body:!_ready?const Center(child:CircularProgressIndicator()):TabBarView(controller:_tabs,children:[_profileTab(),_creatorTab(),_diaryTab(),_notificationsTab()]),
   ));
   Widget _profileTab()=>ListView(padding:const EdgeInsets.all(16),children:[
     const Text('صمّم بطاقة هويتك',style:TextStyle(color:Colors.white,fontSize:19,fontWeight:FontWeight.w900)),
@@ -84,6 +84,15 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
     const SizedBox(height:14),TextField(controller:_draft,maxLines:4,style:const TextStyle(color:Colors.white),decoration:InputDecoration(hintText:'اكتب فكرتك هنا...',hintStyle:const TextStyle(color:Colors.white38),filled:true,fillColor:const Color(0xFF1B223E),border:OutlineInputBorder(borderRadius:BorderRadius.circular(16)))),
     const SizedBox(height:10),FilledButton.icon(onPressed:_addDraft,icon:const Icon(Icons.add),label:const Text('حفظ المسودة')),
     const SizedBox(height:16),..._drafts.asMap().entries.map((e)=>Card(color:const Color(0xFF1B223E),child:ListTile(title:Text(e.value,style:const TextStyle(color:Colors.white)),leading:const Icon(Icons.lightbulb_outline,color:_v12Aqua),trailing:IconButton(icon:const Icon(Icons.delete_outline,color:Colors.white54),onPressed:()async{setState(()=>_drafts.removeAt(e.key));final p=await SharedPreferences.getInstance();await p.setStringList('v12_creator_drafts',_drafts);}))))
+  ]);
+
+  Widget _notificationsTab()=>ListView(padding:const EdgeInsets.all(16),children:[
+    const Text('تفضيلات التنبيهات',style:TextStyle(color:Colors.white,fontSize:19,fontWeight:FontWeight.w900)),
+    const Text('احفظ اختياراتك لتجربة تنبيهات أكثر ملاءمة. هذه مفاتيح تفضيل محلية حالياً وليست نظام إشعارات دفع.',style:TextStyle(color:Colors.white60)),
+    const SizedBox(height:12),
+    SwitchListTile(value:_dailyDigest,onChanged:(v)=>_setPref('v12_daily_digest',v),title:const Text('ملخص النشاط اليومي',style:TextStyle(color:Colors.white)),activeColor:_v12Aqua),
+    SwitchListTile(value:_eventAlerts,onChanged:(v)=>_setPref('v12_event_alerts',v),title:const Text('تذكيرات الفعاليات',style:TextStyle(color:Colors.white)),activeColor:_v12Aqua),
+    SwitchListTile(value:_socialAlerts,onChanged:(v)=>_setPref('v12_social_alerts',v),title:const Text('تنبيهات التفاعل الاجتماعي',style:TextStyle(color:Colors.white)),activeColor:_v12Aqua),
   ]);
   Widget _diaryTab()=>ListView(padding:const EdgeInsets.all(16),children:[
     const Text('دفتر ذكرياتي الخاص',style:TextStyle(color:Colors.white,fontSize:19,fontWeight:FontWeight.w900)),
