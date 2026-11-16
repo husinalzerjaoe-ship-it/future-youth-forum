@@ -289,7 +289,25 @@ class _AuthPageState extends State<AuthPage> {
   final password = TextEditingController();
   bool registering = true;
   bool busy = false;
+  bool _obscurePassword = true;
+  bool _rememberEmail = false;
   String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedEmail();
+  }
+
+  Future<void> _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('auth_saved_email');
+    if (!mounted || saved == null || saved.isEmpty) return;
+    setState(() {
+      email.text = saved;
+      _rememberEmail = true;
+    });
+  }
 
   @override
   void dispose() { name.dispose(); email.dispose(); password.dispose(); super.dispose(); }
@@ -313,6 +331,13 @@ class _AuthPageState extends State<AuthPage> {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: email.text.trim(), password: password.text);
       }
+      final prefs = await SharedPreferences.getInstance();
+      if (_rememberEmail) {
+        await prefs.setString('auth_saved_email', email.text.trim());
+      } else {
+        await prefs.remove('auth_saved_email');
+      }
+      TextInput.finishAutofillContext();
     } on FirebaseAuthException catch (e) {
       setState(() => error = switch (e.code) {
         'email-already-in-use' => 'هذا البريد مسجل مسبقاً. سجّل دخولك.',
