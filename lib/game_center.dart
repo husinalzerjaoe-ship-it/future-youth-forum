@@ -46,6 +46,12 @@ class _GameCenterPageState extends State<GameCenterPage> {
     _GameEntry('تحدي الأعلام','اعرف الدولة من علمها','أسئلة',Icons.flag_rounded,const _QuizGame(category:'flags'),const Color(0xFF0C9C8B)),
     _GameEntry('عالم الأنمي','شخصيات وأحداث وأنميات','أسئلة',Icons.animation_rounded,const _QuizGame(category:'anime'),const Color(0xFFB65BC8)),
     _GameEntry('شعارات الأندية','الألوان والألقاب والفرق','أسئلة',Icons.shield_rounded,const _QuizGame(category:'clubs'),const Color(0xFF2878C7)),
+    _GameEntry('تحدي العلوم','فيزياء • كيمياء • أحياء','أسئلة',Icons.science_rounded,const _QuizGame(category:'science'),const Color(0xFF4779B8)),
+    _GameEntry('ذاكرة العراق','حضارات • مدن • تاريخ','أسئلة',Icons.account_balance_rounded,const _QuizGame(category:'iraq'),const Color(0xFFB77A32)),
+    _GameEntry('رحلة حول العالم','عواصم • جغرافيا • معالم','أسئلة',Icons.public_rounded,const _QuizGame(category:'geography'),const Color(0xFF0C9C8B)),
+    _GameEntry('تحدي التقنية','إنترنت • برمجة • أمان رقمي','أسئلة',Icons.memory_rounded,const _QuizGame(category:'technology'),const Color(0xFF2878C7)),
+    _GameEntry('مملكة الحيوانات','كائنات • بيئات • عجائب','أسئلة',Icons.pets_rounded,const _QuizGame(category:'animals'),const Color(0xFF27956C)),
+    _GameEntry('أسرار الفضاء','كواكب • نجوم • مجرات','أسئلة',Icons.rocket_launch_rounded,const _QuizGame(category:'space'),const Color(0xFF6554D9)),
   ];
   @override void dispose() { _search.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) {
@@ -72,7 +78,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
             const SizedBox(height:5),
             const Text('تحديات، ألعاب جماعية، أسئلة ومغامرات ثنائية الأبعاد',style:TextStyle(color:Colors.white70,height:1.5)),
             const SizedBox(height:16),
-            Row(children:[_HeroStat(value:_games.length.toString(),label:'لعبة'),const SizedBox(width:9),const _HeroStat(value:'18',label:'تصنيف أسئلة'),const SizedBox(width:9),const _HeroStat(value:'2D',label:'مغامرات')]),
+            Row(children:[_HeroStat(value:_games.length.toString(),label:'لعبة'),const SizedBox(width:9),const _HeroStat(value:'24',label:'تصنيف أسئلة'),const SizedBox(width:9),const _HeroStat(value:'2D',label:'مغامرات')]),
             const SizedBox(height:16),
             SizedBox(width:double.infinity,child:FilledButton.icon(style:FilledButton.styleFrom(backgroundColor:Colors.white,foregroundColor:gameInk,padding:const EdgeInsets.symmetric(vertical:13)),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const TreasureLobbyPage())),icon:const Icon(Icons.map_rounded),label:const Text('ابدأ مغامرة الكنز 2D',style:TextStyle(fontWeight:FontWeight.w900)))),
           ]),
@@ -142,6 +148,54 @@ const _general=[
  _Question('أي معدن سائل بدرجة حرارة الغرفة؟',['الحديد','الزئبق','النحاس','الذهب'],1,'الزئبق معدن سائل في الظروف المعتادة.'),
  _Question('ما عاصمة فرنسا؟',['روما','مدريد','باريس','برلين'],2,'باريس عاصمة فرنسا.'),
  _Question('كم عدد حروف اللغة العربية؟',['26','27','28','29'],2,'حروف العربية 28 حرفاً.'),
+];
+const _science=[
+ _Question('ما وحدة قياس القوة؟',['الجول','النيوتن','الواط','الأمبير'],1,'تقاس القوة بالنيوتن.'),
+ _Question('أي جزء من الخلية يحمل معظم المادة الوراثية؟',['النواة','الغشاء','السيتوبلازم','الجدار'],0,'توجد معظم المادة الوراثية في النواة.'),
+ _Question('ما الرمز الكيميائي للأوكسجين؟',['Ox','O','Og','On'],1,'رمز الأوكسجين O.'),
+ _Question('ما اسم تحول السائل إلى غاز؟',['التجمد','التكاثف','التبخر','الترسب'],2,'يسمى التحول إلى غاز بالتبخر.'),
+ _Question('أي عضو يضخ الدم في جسم الإنسان؟',['الرئة','القلب','الكبد','الكلى'],1,'القلب يضخ الدم عبر الأوعية.'),
+ _Question('ما أقرب كوكب إلى الشمس؟',['الأرض','الزهرة','عطارد','المريخ'],2,'عطارد أقرب الكواكب إلى الشمس.')
+];
+const _iraq=[
+ _Question('ما النهران الرئيسيان في العراق؟',['النيل والفرات','دجلة والفرات','دجلة والأردن','الفرات والكارون'],1,'دجلة والفرات هما النهران الرئيسيان.'),
+ _Question('ما اسم ملحمة بلاد الرافدين الشهيرة؟',['الإلياذة','جلجامش','الشاهنامة','الأوديسة'],1,'ملحمة جلجامش من أشهر النصوص القديمة.'),
+ _Question('أي مدينة عراقية ارتبطت بالزقورة الشهيرة؟',['أور','البصرة','دهوك','كربلاء'],0,'زقورة أور من أبرز آثار المدينة القديمة.'),
+ _Question('ما عاصمة الدولة العباسية في أوجها؟',['دمشق','بغداد','القاهرة','سامراء'],1,'كانت بغداد مركز الخلافة العباسية.'),
+ _Question('أي خط استُخدم في الكتابة القديمة على ألواح الطين؟',['النسخي','المسماري','الديواني','الثلث'],1,'الكتابة المسمارية سجلت على ألواح طينية.'),
+ _Question('في أي محافظة تقع مدينة بابل الأثرية؟',['نينوى','بابل','الأنبار','ميسان'],1,'تقع آثار بابل في محافظة بابل.')
+];
+const _geography=[
+ _Question('ما أكبر قارة من حيث المساحة؟',['أفريقيا','آسيا','أوروبا','أستراليا'],1,'آسيا أكبر القارات مساحة.'),
+ _Question('ما عاصمة اليابان؟',['سيول','طوكيو','بكين','بانكوك'],1,'طوكيو عاصمة اليابان.'),
+ _Question('أي نهر يمر في مصر؟',['الأمازون','النيل','الدانوب','الراين'],1,'نهر النيل يمر في مصر.'),
+ _Question('ما أعلى سلسلة جبلية في العالم؟',['الألب','الأنديز','الهيمالايا','الأطلس'],2,'تضم الهيمالايا أعلى قمم العالم.'),
+ _Question('أي محيط يقع شرق أفريقيا؟',['الأطلسي','الهندي','الهادئ','المتجمد الشمالي'],1,'المحيط الهندي يقع شرق أفريقيا.'),
+ _Question('ما عاصمة أستراليا؟',['سيدني','ملبورن','كانبيرا','بيرث'],2,'كانبيرا هي العاصمة.')
+];
+const _technology=[
+ _Question('ماذا تعني CPU؟',['وحدة المعالجة المركزية','ذاكرة التخزين','بطاقة الرسوميات','مزود الطاقة'],0,'CPU هي وحدة المعالجة المركزية.'),
+ _Question('ما وظيفة المصادقة الثنائية؟',['تسريع الإنترنت','إضافة طبقة تحقق','زيادة سعة التخزين','ضغط الصور'],1,'تضيف طبقة تحقق ثانية للحساب.'),
+ _Question('أي لغة تُستخدم أساساً لتنسيق صفحات الويب؟',['HTML','CSS','SQL','Bash'],1,'CSS مسؤولة عن تنسيق مظهر الصفحات.'),
+ _Question('ما المقصود بالنسخ الاحتياطي؟',['حذف الملفات','إنشاء نسخة لاستعادتها','تشفير الشاشة','تحديث المتصفح'],1,'النسخة الاحتياطية تساعد على استعادة البيانات.'),
+ _Question('ما وظيفة نظام GPS؟',['قياس الصوت','تحديد الموقع','ضغط الملفات','تعديل الصور'],1,'GPS يساعد على تحديد الموقع الجغرافي.'),
+ _Question('أي كلمة مرور أقوى عادة؟',['12345678','اسمك فقط','عبارة طويلة وفريدة','تاريخ ميلادك'],2,'العبارة الطويلة والفريدة أكثر أماناً.')
+];
+const _animals=[
+ _Question('ما أكبر حيوان معروف على الأرض؟',['الفيل الأفريقي','الحوت الأزرق','الزرافة','وحيد القرن'],1,'الحوت الأزرق أكبر الحيوانات المعروفة.'),
+ _Question('أي حيوان يُعرف بسفينة الصحراء؟',['الجمل','الحصان','اللاما','الغزال'],0,'الجمل متكيف مع البيئات الصحراوية.'),
+ _Question('ما الثديي الذي يستطيع الطيران الحقيقي؟',['السنجاب','الخفاش','البطريق','النعامة'],1,'الخفافيش هي الثدييات القادرة على الطيران.'),
+ _Question('ماذا يسمى صغير الضفدع؟',['يرقة','شرغوف','جرو','فرخ'],1,'يسمى صغير الضفدع شرغوفاً.'),
+ _Question('أي طائر لا يستطيع الطيران ويعيش في القطب الجنوبي؟',['النسر','البطريق','الصقر','اللقلق'],1,'البطريق طائر لا يطير.'),
+ _Question('كم عدد أرجل العنكبوت؟',['6','8','10','12'],1,'للعنكبوت ثماني أرجل.')
+];
+const _space=[
+ _Question('ما الكوكب المعروف بالكوكب الأحمر؟',['المريخ','المشتري','الزهرة','نبتون'],0,'المريخ يبدو أحمر بسبب أكاسيد الحديد.'),
+ _Question('ما اسم مجرتنا؟',['أندروميدا','درب التبانة','السحابة الكبرى','العين السوداء'],1,'مجموعتنا الشمسية ضمن درب التبانة.'),
+ _Question('أي كوكب هو الأكبر في المجموعة الشمسية؟',['زحل','الأرض','المشتري','أورانوس'],2,'المشتري أكبر كواكب المجموعة الشمسية.'),
+ _Question('ما النجم الأقرب إلى الأرض؟',['الشعرى','الشمس','النسر الواقع','سهيل'],1,'الشمس أقرب النجوم إلى الأرض.'),
+ _Question('ما اسم القمر الطبيعي للأرض؟',['فوبوس','تيتان','القمر','أوروبا'],2,'القمر هو التابع الطبيعي للأرض.'),
+ _Question('لماذا نرى النجوم تلمع؟',['لأنها مصابيح','بسبب اضطراب الغلاف الجوي','لأنها قريبة جداً','لأنها تعكس القمر فقط'],1,'اضطراب الغلاف الجوي يغير مسار الضوء الواصل إلينا.')
 ];
 const _football=[
  _Question('كم لاعباً يبدأ به الفريق مباراة كرة القدم داخل الملعب؟',['9','10','11','12'],2,'الفريق يبدأ بأحد عشر لاعباً.'),
@@ -224,17 +278,20 @@ class _QuizGameState extends State<_QuizGame> {
   @override
   void initState() {
     super.initState();
-    final source = widget.category == 'football'
-        ? _football
-        : widget.category == 'player'
-            ? _players
-            : widget.category == 'flags'
-                ? _flags
-                : widget.category == 'anime'
-                    ? _anime
-                    : widget.category == 'clubs'
-                        ? _clubs
-                        : _general;
+    final source = switch (widget.category) {
+      'football' => _football,
+      'player' => _players,
+      'flags' => _flags,
+      'anime' => _anime,
+      'clubs' => _clubs,
+      'science' => _science,
+      'iraq' => _iraq,
+      'geography' => _geography,
+      'technology' => _technology,
+      'animals' => _animals,
+      'space' => _space,
+      _ => _general,
+    };
     qs = List<_Question>.from(source)..shuffle(Random());
     if (widget.category == 'speed') qs = qs.take(10).toList();
   }
