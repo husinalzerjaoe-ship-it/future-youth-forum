@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'livekit_calls.dart';
+import 'jitsi_backup_calls.dart';
 import 'local_bot.dart';
 
 const _v12Ink = Color(0xFF10162E);
@@ -68,7 +68,7 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
       return;
     }
     await Navigator.push(context, MaterialPageRoute(
-      builder: (_) => LiveKitCallsPage(initialRoom: code),
+      builder: (_) => JitsiBackupCallsPage(initialRoom: code),
     ));
   }
 
@@ -284,7 +284,7 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
   );
 
   Widget _voiceTab() => ListView(padding: const EdgeInsets.all(16), children: [
-    _banner(Icons.graphic_eq, 'صالات صوتية للأصدقاء', 'استخدم غرفة LiveKit نفسها حتى يجتمع الأصدقاء بالصوت، مع أدوات المايك والكاميرا ومكبر الصوت داخل المكالمة.'),
+    _banner(Icons.graphic_eq, 'صالات صوتية للأصدقاء', 'استخدم اتصال Jitsi الاحتياطي الذي يعمل عندك. أرسل الرمز لأصدقائك حتى يدخلون نفس الغرفة من المتصفح.'),
     const SizedBox(height: 16),
     TextField(
       controller: _room,
@@ -305,7 +305,7 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
     const SizedBox(height: 8),
     FilledButton.icon(onPressed: _joinVoiceRoom, icon: const Icon(Icons.mic), label: const Text('دخول الصالة الصوتية')),
     const SizedBox(height: 14),
-    const _InfoTile(icon: Icons.people_alt, title: 'شلون يدخلون أصدقاؤك؟', body: 'يروحون إلى مركز المستقبل، يكتبون نفس الرمز، ثم يضغطون دخول. لازم يكون رابط خادم LiveKit مضبوطاً ويعمل.'),
+    const _InfoTile(icon: Icons.people_alt, title: 'شلون يدخلون أصدقاؤك؟', body: 'يروحون إلى مركز المستقبل، يكتبون نفس الرمز، ثم يضغطون دخول. تحتاج إنترنت، وتُفتح المكالمة خارج التطبيق في Jitsi.'),
     const _InfoTile(icon: Icons.privacy_tip_outlined, title: 'الخصوصية', body: 'لا تشارك رمز الغرفة إلا مع الأشخاص الذين تريدهم. رمز الغرفة وحده ليس بديلاً عن إعدادات وصول آمنة على الخادم.'),
   ]);
 
