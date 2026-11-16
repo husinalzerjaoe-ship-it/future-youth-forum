@@ -319,8 +319,33 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
 
   Future<void> _checkArabic(Map<String, dynamic> anime) async {
     final title = (anime['title_english'] ?? anime['title'] ?? '').toString();
-    final uri = Uri.https('www.google.com', '/search', {'q': '$title ترجمة عربية رسمي Crunchyroll Netflix'});
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('خيارات مشاهدة $title', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('افتح صفحة المنصة الرسمية وتأكد من وجود الترجمة العربية للحلقة والموسم وبلدك قبل التشغيل. ما نعرض علامة «مترجم» إلا إذا كانت المنصة نفسها تؤكدها.'),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              icon: const Icon(Icons.subtitles),
+              label: const Text('البحث في كرانشي رول العربي'),
+              onPressed: () => launchUrl(Uri.https('www.crunchyroll.com', '/ar/search', {'q': title}), mode: LaunchMode.externalApplication),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.movie_outlined),
+              label: const Text('البحث في نتفلكس العراق'),
+              onPressed: () => launchUrl(Uri.https('www.netflix.com', '/iq-en/search', {'q': title}), mode: LaunchMode.externalApplication),
+            ),
+          ]),
+        ),
+      ),
+    );
   }
 
   @override Widget build(BuildContext context) => Directionality(
@@ -332,6 +357,16 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF34205B), Color(0xFF17182E)])),
           child: const Text('تصفّح مئات عناوين الأنمي وابحث عن النسخ ذات الترجمة أو الدبلجة العربية عبر المنصات الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
             style: TextStyle(color: Colors.white, height: 1.6))),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
+          child: Wrap(spacing: 7, runSpacing: 6, children: [
+            for (final title in ['One Piece', 'Naruto', 'Attack on Titan', 'Jujutsu Kaisen', 'My Hero Academia'])
+              ActionChip(
+                label: Text(title),
+                onPressed: () { _search.text = title; _load(reset: true); },
+              ),
+          ]),
+        ),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextField(
           controller: _search,
           onSubmitted: (_) => _load(reset: true),
