@@ -54,3 +54,6 @@ jobs:
       # and deploy it only after Firebase Storage is initialized in the console.
       - name: Deploy Firestore security rules
         run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
+
+      - name: Deploy Firebase Storage security rules
+        run: firebase deploy --only storage --project futureyouth-69f8a --non-interactive
