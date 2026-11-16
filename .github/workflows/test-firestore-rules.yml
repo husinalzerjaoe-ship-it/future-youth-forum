@@ -1,0 +1,35 @@
+name: Validate Firestore Rules (No Deploy)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/v27-firestore-rules-audit
+    paths:
+      - 'firestore.rules'
+      - 'rules-tests/**'
+      - 'firebase.json'
+      - '.github/workflows/test-firestore-rules.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  rules-emulator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Firebase CLI and test dependencies
+        run: |
+          npm install --global firebase-tools
+          npm --prefix rules-tests install --no-audit --no-fund
+
+      - name: Run Firestore Emulator security tests
+        run: firebase emulators:exec --only firestore --project demo-futureyouth-rules "npm --prefix rules-tests test"
