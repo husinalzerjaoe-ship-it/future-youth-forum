@@ -12,6 +12,7 @@ import 'package:video_player/video_player.dart';
 import 'advanced_features.dart';
 import 'media_upload_service.dart';
 import 'v31_member_titles.dart';
+import 'local_bot.dart';
 
 const _chatBrand = Color(0xFF6554D9);
 const _founderEmail = 'husinalzerjaoe@gmail.com';
@@ -579,6 +580,15 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
                 const SizedBox(width: 4),
                 Text('${s.data?.docs.length ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
               ]),
+            ),
+            IconButton(
+              tooltip: 'اسأل مساعد المستقبل',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => const LocalHelperBotPage(),
+              )),
+              icon: const Icon(Icons.smart_toy_rounded, color: Color(0xFFD9D1FF), size: 21),
             ),
             IconButton(
               tooltip: _showSearchBar ? 'إغلاق البحث' : 'بحث في الدردشة',
