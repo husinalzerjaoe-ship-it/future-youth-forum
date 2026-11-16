@@ -337,7 +337,6 @@ class _AuthPageState extends State<AuthPage> {
       } else {
         await prefs.remove('auth_saved_email');
       }
-      TextInput.finishAutofillContext();
     } on FirebaseAuthException catch (e) {
       setState(() => error = switch (e.code) {
         'email-already-in-use' => 'هذا البريد مسجل مسبقاً. سجّل دخولك.',
@@ -429,8 +428,24 @@ class _AuthPageState extends State<AuthPage> {
                       validator: (v) => v == null || !v.contains('@') ? 'اكتب بريد صحيح' : null),
                     const SizedBox(height: 14),
                     _authField(password, 'كلمة المرور', Icons.lock_outline,
-                      obscureText: true,
+                      obscureText: _obscurePassword,
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword ? 'إظهار كلمة المرور' : 'إخفاء كلمة المرور',
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          color: const Color(0xFFB7AEFF)),
+                      ),
                       validator: (v) => v == null || v.length < 6 ? 'اكتب 6 أحرف على الأقل' : null),
+                    if (!registering)
+                      CheckboxListTile(
+                        value: _rememberEmail,
+                        onChanged: busy ? null : (value) => setState(() => _rememberEmail = value ?? false),
+                        dense: true, contentPadding: EdgeInsets.zero,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        activeColor: const Color(0xFF8878F2),
+                        title: const Text('تذكّر البريد الإلكتروني',
+                          style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      ),
                     if (error != null) ...[
                       const SizedBox(height: 12),
                       Container(padding: const EdgeInsets.all(11),
@@ -466,13 +481,21 @@ class _AuthPageState extends State<AuthPage> {
                       child: const Text('نسيت كلمة المرور؟', style: TextStyle(color: Color(0xFFC9C2FF))),
                     ),
                     const SizedBox(height: 6),
-                    OutlinedButton(
-                      onPressed: busy ? null : () => setState(() { registering = !registering; error = null; }),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white, side: BorderSide(color: Colors.white.withOpacity(.28)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.all(14),
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(.16),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withOpacity(.13)),
                       ),
-                      child: Text(registering ? 'عندي حساب — تسجيل الدخول' : 'مستخدم جديد — إنشاء حساب'),
+                      child: Row(children: [
+                        Expanded(child: _authModeButton('تسجيل الدخول', !registering, () {
+                          setState(() { registering = false; error = null; });
+                        })),
+                        Expanded(child: _authModeButton('حساب جديد', registering, () {
+                          setState(() { registering = true; error = null; });
+                        })),
+                      ]),
                     ),
                   ])),
                     ),
@@ -494,19 +517,43 @@ class _AuthPageState extends State<AuthPage> {
       boxShadow: [BoxShadow(color: color, blurRadius: 55, spreadRadius: 18)]),
   );
 
+  Widget _authModeButton(String label, bool selected, VoidCallback onTap) => AnimatedContainer(
+    duration: const Duration(milliseconds: 220), curve: Curves.easeOut,
+    decoration: BoxDecoration(
+      color: selected ? const Color(0xFF7566DE) : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: TextButton(
+      onPressed: busy ? null : onTap,
+      style: TextButton.styleFrom(foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      child: Text(label, style: TextStyle(fontWeight: selected ? FontWeight.w800 : FontWeight.w500)),
+    ),
+  );
+
   Widget _authField(TextEditingController controller, String label, IconData icon, {
-    TextInputType? keyboardType, bool obscureText = false, String? Function(String?)? validator,
+    TextInputType? keyboardType, bool obscureText = false, Widget? suffixIcon,
+    String? Function(String?)? validator,
   }) => TextFormField(
     controller: controller, keyboardType: keyboardType, obscureText: obscureText, validator: validator,
+    autofillHints: label == 'البريد الإلكتروني'
+      ? const [AutofillHints.email]
+      : label == 'كلمة المرور' ? const [AutofillHints.password] : const [AutofillHints.name],
+    textInputAction: label == 'كلمة المرور' ? TextInputAction.done : TextInputAction.next,
     style: const TextStyle(color: Colors.white),
     decoration: InputDecoration(
       labelText: label, prefixIcon: Icon(icon, color: const Color(0xFFB7AEFF)),
+      suffixIcon: suffixIcon,
       labelStyle: TextStyle(color: Colors.white.withOpacity(.66)),
       filled: true, fillColor: Colors.white.withOpacity(.07),
       contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 17),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF9B8FFF), width: 1.5)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15),
+        borderSide: BorderSide(color: Colors.white.withOpacity(.12))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Color(0xFF9B8FFF), width: 1.5)),
     ),
   );
 
