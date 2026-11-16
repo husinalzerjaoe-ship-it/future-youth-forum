@@ -20,6 +20,7 @@ import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
+import 'cinema_hub.dart';
 import 'match_center.dart';
 import 'game_center.dart';
 import 'community_expansion.dart' hide CommunityEventsPage;
@@ -432,6 +433,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'cinema':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage()));
+                  break;
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
@@ -746,6 +750,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('يوتيوب وروابط فيديو وأفلام ومسلسلات متاحة للتضمين مع مزامنة ودردشة'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF211A35), child: Icon(Icons.movie_filter_rounded, color: Color(0xFFB68CFF))),
+                title: const Text('سينما الملتقى', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('كتالوج مستقل للأفلام والمسلسلات، تصنيفات ومفضلة وغرف مشاهدة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage())),
               ),
             ),
             Card(
