@@ -27,8 +27,8 @@ beforeEach(async () => {
 function user(uid) {
   return env.authenticatedContext(uid).firestore();
 }
-function founder() {
-  return env.authenticatedContext('founder-uid', { email: 'husinalzerjaoe@gmail.com' }).firestore();
+function founder(email = 'husinalzerjaoe@gmail.com') {
+  return env.authenticatedContext('founder-uid', { email }).firestore();
 }
 async function seed(path, data) {
   await env.withSecurityRulesDisabled(async (context) => {
@@ -117,7 +117,8 @@ test('founder can assign and remove custom member titles with an audit record', 
     name: 'Alice', bio: '', photoUrl: '', createdAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'))
   });
 
-  await assertSucceeds(updateDoc(doc(founder(), 'publicProfiles/alice'), {
+  // The founder check must match the case-insensitive check used by the app UI.
+  await assertSucceeds(updateDoc(doc(founder('HUSINALZERJAOE@GMAIL.COM'), 'publicProfiles/alice'), {
     customTitle: 'نجم الملتقى',
     customTitleColor: 0xFF6554D9,
     customTitleEndColor: 0xFF13A89E,
