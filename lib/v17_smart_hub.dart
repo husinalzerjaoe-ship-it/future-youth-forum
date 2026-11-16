@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'v18_discovery_hub.dart';
 import 'v19_interactive_hub.dart';
 import 'v20_city_hub.dart';
+import 'v21_ultimate_hub.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
 import 'advanced_features.dart';
@@ -45,6 +46,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('المساعد المحلي', 'مساعدة وأفكار داخل التطبيق', Icons.smart_toy_rounded, () => const LocalHelperBotPage(), 'مساعد ذكاء مساعدة'),
     _Destination('مركز V19 التفاعلي', 'اختصارات ذكية ومساحة شخصية ومتابعة أقسام الملتقى', Icons.hub_rounded, () => const V19InteractiveHubPage(), 'V19 مركز تفاعلي اختصارات ملاحظات مهمة امتنان'),
     _Destination('مدينة الملتقى V20', 'خريطة الأحياء والمستويات والمهام اليومية وتخصيص المدينة', Icons.location_city_rounded, () => const V20CityHubPage(), 'V20 مدينة خريطة أحياء مستوى نقاط مهمة يومية'),
+    _Destination('عالم الملتقى V21', 'المكتبة الثقافية والأكاديمية واستوديو الإبداع ومخطط الإنجاز والتحديات', Icons.auto_awesome_rounded, () => const V21UltimateHubPage(), 'V21 عالم مكتبة أكاديمية إبداع مهام امتنان تحدي يومي'),
     _Destination('مكتبة V18 الشاملة', 'ديوان وأذكار وأكاديمية وعلوم ومطبخ وثقافة وبودكاست', Icons.auto_awesome_rounded, () => const V18DiscoveryHubPage(), 'شعر دعاء ذكر قرآن تعليم علوم فضاء مطبخ العراق بودكاست ثقافة'),
   ];
 
