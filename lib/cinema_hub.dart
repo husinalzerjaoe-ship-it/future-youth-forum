@@ -44,7 +44,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
 
   Future<List<_Film>> _load({bool series = false}) async {
     final q = series
-        ? 'collection:opensource_movies AND mediatype:movies AND (title:episode OR title:serial OR title:season OR title:series)'
+        ? 'collection:classic_tv AND mediatype:movies'
         : 'collection:opensource_movies AND mediatype:movies';
     final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
     final response = await http.get(uri).timeout(const Duration(seconds: 20));
@@ -239,6 +239,15 @@ class _FilmDetailsState extends State<_FilmDetails> {
           label: Text(_busy ? 'جارٍ فحص الفيديو...' : _directUrl == null ? 'فحص التشغيل وإنشاء غرفة' : 'شاهد مع الأصدقاء')),
         TextButton.icon(onPressed: () => launchUrl(Uri.https('archive.org', '/details/${widget.film.id}'), mode: LaunchMode.externalApplication),
           icon: const Icon(Icons.open_in_new), label: const Text('صفحة المصدر')),
+        TextButton.icon(
+          onPressed: () {
+            final title = widget.film.title;
+            final uri = Uri.https('www.google.com', '/search', {'q': '$title ترجمة عربية مدبلج منصة رسمية'});
+            launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          icon: const Icon(Icons.translate),
+          label: const Text('ابحث عن النسخة العربية على المنصات الرسمية'),
+        ),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
       ]))));
 }
