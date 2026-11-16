@@ -923,7 +923,26 @@ class _RoomCodeJoinCardState extends State<_RoomCodeJoinCard> {
   @override void dispose() { _code.dispose(); super.dispose(); }
   Future<void> _join() async {
     final code = _code.text.trim();
-    if (!RegExp(r'^\\d{6}$').hasMatch(code)) {
+    if (!RegExp(r'^\d{6}.hasMatch(code)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')));
+      return;
+    }
+    setState(() => _busy = true);
+    try { await widget.onJoin(code); } finally { if (mounted) setState(() => _busy = false); }
+  }
+  @override Widget build(BuildContext context) => Card(
+    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('عندك رمز غرفة؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6,
+          decoration: const InputDecoration(hintText: 'أدخل الرمز المكوّن من 6 أرقام', counterText: '', border: OutlineInputBorder()))),
+        const SizedBox(width: 8),
+        FilledButton(onPressed: _busy ? null : _join, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('دخول')),
+      ]),
+    ])));
+}
+).hasMatch(code)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')));
       return;
     }
