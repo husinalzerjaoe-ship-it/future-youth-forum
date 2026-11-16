@@ -10,7 +10,6 @@ import 'engagement_features.dart';
 import 'extra_community_features.dart';
 import 'football_live_center.dart';
 import 'friends_battle_arena.dart';
-import 'future_arcade.dart';
 import 'future_dashboard.dart';
 import 'game_center.dart';
 import 'knowledge_corner.dart';
