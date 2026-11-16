@@ -4,6 +4,7 @@ import 'v19_interactive_hub.dart';
 import 'v20_city_hub.dart';
 import 'v21_ultimate_hub.dart';
 import 'v28_gaming_library.dart';
+import 'v30_future_academy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
 import 'advanced_features.dart';
@@ -50,6 +51,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('مدينة الملتقى V20', 'خريطة الأحياء والمستويات والمهام اليومية وتخصيص المدينة', Icons.location_city_rounded, () => const V20CityHubPage(), 'V20 مدينة خريطة أحياء مستوى نقاط مهمة يومية'),
     _Destination('عالم الملتقى V21', 'المكتبة الثقافية والأكاديمية واستوديو الإبداع ومخطط الإنجاز والتحديات', Icons.auto_awesome_rounded, () => const V21UltimateHubPage(), 'V21 عالم مكتبة أكاديمية إبداع مهام امتنان تحدي يومي'),
     _Destination('مكتبة V18 الشاملة', 'ديوان وأذكار وأكاديمية وعلوم ومطبخ وثقافة وبودكاست', Icons.auto_awesome_rounded, () => const V18DiscoveryHubPage(), 'شعر دعاء ذكر قرآن تعليم علوم فضاء مطبخ العراق بودكاست ثقافة'),
+    _Destination('أكاديمية المستقبل', 'مسارات مهارات ومخطط مهام ودفتر أفكار ومشاريع', Icons.school_rounded, () => const V30FutureAcademyPage(), 'أكاديمية تعلم مهارات برمجة تصميم لغة تفكير سلامة رقمية مشاريع مهام أفكار'),
   ];
 
   @override
