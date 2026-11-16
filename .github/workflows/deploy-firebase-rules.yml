@@ -49,11 +49,7 @@ jobs:
 
       # V27 is manual-dispatch only: pushing this branch never changes live rules.
       # The selected branch is checked out, emulator tests run, then only Firestore rules deploy.
-      # This Firebase project has no Storage bucket provisioned yet.
-      # Deploy Firestore rules independently; keep storage.rules in source control
-      # and deploy it only after Firebase Storage is initialized in the console.
+      # Firebase Storage has not been initialized for this project. Deploy Firestore
+      # rules now; deploy storage.rules only after a bucket is provisioned.
       - name: Deploy Firestore security rules
         run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
-
-      - name: Deploy Firebase Storage security rules
-        run: firebase deploy --only storage --project futureyouth-69f8a --non-interactive
