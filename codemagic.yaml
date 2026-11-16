@@ -1,13 +1,15 @@
 workflows:
   android-apk:
     name: ملتقى شباب المستقبل - Android APK
-    max_build_duration: 60
+    max_build_duration: 90
     environment:
-      flutter: stable
+      # Pin the last stable Flutter line before the 3.50 Android toolchain
+      # transition so CI does not silently change the generated AGP/Gradle stack.
+      flutter: 3.47.9
     scripts:
       - name: Generate Android platform files
         script: flutter create --platforms=android --org com.futureyouth --project-name forum .
-      - name: Set Arabic app name and new icon
+      - name: Set Arabic app name and launcher icon
         script: |
           mkdir -p android/app/src/main/res/drawable
           cat > android/app/src/main/res/drawable/ic_launcher_ar.xml <<'EOF'
@@ -31,9 +33,17 @@ workflows:
           s = s.replace('android:roundIcon="@mipmap/ic_launcher_round"', 'android:roundIcon="@drawable/ic_launcher_ar"')
           p.write_text(s)
           PY
-      - name: Get dependencies
+      - name: Print toolchain versions
+        script: |
+          flutter --version
+          java -version
+      - name: Resolve dependencies
         script: flutter pub get
       - name: Build release APK
-        script: cd android && ./gradlew assembleRelease -x lintVitalAnalyzeRelease
+        script: cd android && ./gradlew assembleRelease -x lintVitalAnalyzeRelease --stacktrace
+      - name: Verify APK artifact
+        script: |
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          ls -lh build/app/outputs/flutter-apk/app-release.apk
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
