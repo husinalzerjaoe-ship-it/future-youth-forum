@@ -1,67 +1,182 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class V28GamingLibraryPage extends StatefulWidget {
   const V28GamingLibraryPage({super.key});
-  @override State<V28GamingLibraryPage> createState()=>_V28GamingLibraryPageState();
+  @override State<V28GamingLibraryPage> createState() => _V28GamingLibraryPageState();
 }
+
 class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
-  String game='Mobile Legends', section='الكل', query='';
-  static const mlbb=[
-    ('تانك / مبادر','Tigreal • Atlas • Khufra','ابدأ بالتحمل وتقليل وقت الانتظار؛ افتح القتال بعد ظهور فريقك.','واجه المبادرة بالتطهير، التباعد، ومهارات إيقاف الاندفاع.','ضرر مستمر ضد الدروع + اختراق سحري/فيزيائي حسب مصدر الضرر.'),
-    ('مقاتل / خط EXP','Terizla • Yu Zhong • Arlott','وازن بين التحمل والضرر؛ لا تدخل قبل معرفة مواقع الخصوم.','أوقف الاستدامة بالجرح العميق، وابتعد عن مهارات السحب.','جرح عميق ضد العلاج؛ درع/مقاومة حسب نوع ضرر الخصم.'),
-    ('قاتل / غابة','Ling • Hayabusa • Nolan','راقب الخريطة، استهدف الخلفية، واحتفظ بمهارة الهروب.','حماية الخلفية، كشف الرؤية، التحكم الجماعي، والتجمع قرب الأهداف.','دفاع جسدي ضد الانفجار؛ تحكم وإبطاء لكسر الاندفاع.'),
-    ('ساحر / وسط','Lylia • Valentina • Novaria','ادفع الموجة ثم تحرك؛ اختر اختراقاً أو دفاعاً حسب التهديد.','مقاومة سحرية، ضغط مبكر، وتفادي مهارات المنطقة.','اختراق سحري ضد المقاومة؛ درع سحري عند مواجهة انفجار سحري.'),
-    ('رامي / ذهب','Brody • Claude • Beatrix','حافظ على المسافة، اجمع الذهب، ولا تصرف مهارة الهروب بلا داعٍ.','اغلق المسافة بحذر، وخصص حارساً لحماية الرامي.','درع جسدي ضد القتلة؛ جرح عميق ضد الشفاء.'),
-    ('دعم / روامر','Mathilda • Diggie • Angela','راقب زملاءك وافتح الرؤية؛ توقيت الإنقاذ أهم من مطاردة القتل.','أولوية إسكات/تحكم الدعم، ثم فصل الحماية عن المهاجم.','اختيارات دفاعية ومضادة للشفاء وفق تشكيلة الخصم.'),
-  ];
-  static const emblems=[
-    ('اغتيال','سرعة حركة + اختراق + موهبة انفجار','للأبطال الذين يعتمدون على دخول سريع وإنهاء هدف منفرد.'),
-    ('ساحر','اختراق سحري + تقليل انتظار/استدامة + موهبة ضرر','للميد والسحرة؛ عدّلها ضد مقاومة السحر.'),
-    ('رامي','سرعة هجوم/ضرر حرج + اختراق + موهبة قتال طويل','للرامي الذي يستفيد من الضربات المتكررة.'),
-    ('مقاتل','هجوم تكيفي + استدامة + موهبة اشتباك','للقتال الممتد في خط EXP.'),
-    ('دبابة','تحمل + دفاع مناسب + موهبة حماية','للروامر والمبادرين؛ بدّل الدفاع حسب ضرر الخصم.'),
-    ('دعم','تقليل انتظار + حركة/شفاء + موهبة مساندة','للحماية والإنقاذ والتدوير.'),
-  ];
-  static const pubg=[
-    ('إعدادات الحساسية','ابدأ بحساسية متوسطة، جرّب سحب الكاميرا والتتبع في ساحة التدريب، وعدّل تدريجياً لكل منظار. لا توجد قيمة واحدة تناسب كل هاتف.'),
-    ('تخطيط الأزرار','ضع إطلاق النار والقفز والانحناء بمواقع لا تتعارض مع حركة الإبهام؛ جرّب تخطيط 3 أو 4 أصابع فقط إذا كان مريحاً.'),
-    ('اختيار المعدات','للقتال القريب: سلاح سريع مع منظار قصير. للمدى المتوسط: ارتداد سهل التحكم ومنظار مناسب. احمل علاجاً وذخيرة متوازنة.'),
-    ('الهبوط والتمركز','اختر نقطة هبوط تناسب خبرتك، اجمع تجهيزاً سريعاً، تحرك قبل تقلص المنطقة، واستفد من الغطاء بدل الركض المكشوف.'),
-    ('الصوت والخريطة','استخدم مؤشرات الصوت والخريطة المصغرة لتقدير الاتجاه، ولا تكشف موقعك بلا حاجة.'),
-    ('تحسين السلاسة','اخفض الظلال والمؤثرات أولاً إذا حدث تقطيع، واترك مساحة تخزين كافية وأغلق التطبيقات الثقيلة.'),
-  ];
-  @override Widget build(BuildContext context) {
-    final isMl=game=='Mobile Legends';
-    final List<List<String>> items=isMl
-      ? mlbb.map((e)=>[e.$1,e.$2,e.$3,e.$4,e.$5]).toList()
-      : pubg.map((e)=>[e.$1,e.$2]).toList();
-    final filtered=items.where((e)=>query.isEmpty||e.join(' ').toLowerCase().contains(query.toLowerCase())).toList();
-    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-      appBar:AppBar(title:const Text('مكتبة الألعاب الاحترافية')),
-      body:ListView(padding:const EdgeInsets.all(14),children:[
-        Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(borderRadius:BorderRadius.circular(20),gradient:const LinearGradient(colors:[Color(0xFF171936),Color(0xFF5B35B5),Color(0xFF087E91)])),child:const Text('دليل الأبطال والعدادات والتجهيزات\nأدلة عملية قابلة للتعديل حسب التحديثات وطريقة لعبك.',style:TextStyle(color:Colors.white,fontSize:18,fontWeight:FontWeight.w900))),
-        const SizedBox(height:12),
-        SegmentedButton<String>(segments:const [ButtonSegment(value:'Mobile Legends',label:Text('Mobile Legends'),icon:Icon(Icons.shield_moon)),ButtonSegment(value:'PUBG Mobile',label:Text('PUBG'),icon:Icon(Icons.sports_esports))],selected:{game},onSelectionChanged:(v)=>setState(()=>game=v.first)),
-        const SizedBox(height:10),
-        TextField(decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ابحث عن بطل أو دور أو نصيحة'),onChanged:(v)=>setState(()=>query=v)),
-        if(isMl) ...[
-          Wrap(spacing:8,children:['الأبطال والعدادات','الإيمبلم','المعدات'].map((v)=>ChoiceChip(label:Text(v),selected:section==v,onSelected:(_)=>setState(()=>section=v))).toList()),
-          if(section=='الإيمبلم'||section=='الكل') ...[
-            const Text('مكتبة الإيمبلم',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-            ...emblems.map((e)=>Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.workspace_premium)),title:Text(e.$1),subtitle:Text(e.$2+'\n'+e.$3)))),
-          ],
-          if(section=='المعدات'||section=='الكل') const Card(child:Padding(padding:EdgeInsets.all(14),child:Text('عدادات المعدات: ضد العلاج اختر عنصر الجرح العميق المناسب لنوع الضرر؛ ضد الدروع زِد الاختراق؛ ضد الانفجار اشترِ دفاعاً جسدياً أو سحرياً حسب مصدر الضرر؛ ضد سرعة الهجوم استخدم عناصر تقليل سرعة الهجوم. لا تشتري بناءً ثابتاً—راقب تشكيلة الخصم أولاً.'))),
-          if(section=='الأبطال والعدادات'||section=='الكل') ...[
-            const Text('الأدوار والأبطال المضادون',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-            ...filtered.map((e)=>Card(child:Padding(padding:const EdgeInsets.all(13),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(e[0],style:const TextStyle(fontWeight:FontWeight.w900,fontSize:16)),Text('أمثلة: '+e[1]),Text('الخطة: '+e[2]),Text('العداد: '+e[3]),Text('المعدات: '+e[4])])))),
-          ],
-        ] else ...[
-          const Text('دليل PUBG Mobile',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
-          ...filtered.map((e)=>Card(child:ListTile(leading:const CircleAvatar(child:Icon(Icons.tune)),title:Text(e[0]),subtitle:Text(e[1])))),
-        ],
-        const SizedBox(height:10),
-        const Text('تنبيه: أسماء الأبطال والأمثلة إرشادية وليست ترتيب ميتا لحظياً. قد تتغير القوة والبناء بعد كل تحديث؛ قارنها برقعة اللعبة الحالية قبل اعتمادها.',style:TextStyle(color:Colors.grey,fontSize:12)),
-      ]),
-    ));
+  static const base = 'https://mlbbdex.com/api/v1';
+  static const violet = Color(0xFF7047C8);
+  String game = 'Mobile Legends', tab = 'الأبطال', query = '', role = 'الكل';
+  bool loading = false, detailLoading = false;
+  String? error;
+  List<Map<String,dynamic>> heroes=[], items=[], ranks=[], emblems=[], spells=[], patches=[], counters=[], builds=[];
+  Map<String,dynamic>? selected, selectedRank;
+
+  @override void initState(){ super.initState(); load(); }
+
+  Future<dynamic> getData(String path) async {
+    final r=await http.get(Uri.parse(base+path),headers: const {'Accept':'application/json'}).timeout(const Duration(seconds:18));
+    if(r.statusCode!=200) throw Exception('HTTP');
+    return jsonDecode(utf8.decode(r.bodyBytes));
   }
+  List<Map<String,dynamic>> asList(dynamic v){
+    dynamic d=v is Map?v['data']:v;
+    if(d is Map && d['heroes'] is List) d=d['heroes'];
+    if(d is! List) return [];
+    return d.whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).toList();
+  }
+  Map<String,dynamic> asMap(dynamic v){final d=v is Map?v['data']:v; return d is Map?Map<String,dynamic>.from(d):{};}
+  String val(dynamic v){
+    if(v==null)return '';
+    if(v is String||v is num||v is bool)return v.toString();
+    if(v is List)return v.map(val).where((s)=>s.isNotEmpty).join(' • ');
+    if(v is Map){for(final k in ['name','title','label','value','text','en']){final s=val(v[k]);if(s.isNotEmpty)return s;}}
+    return '';
+  }
+  String field(Map<String,dynamic> m,List<String> keys,[String fallback='—']){
+    for(final k in keys){final s=val(m[k]);if(s.isNotEmpty)return s;}return fallback;
+  }
+  String? imageOf(Map<String,dynamic> m){
+    for(final e in m.entries){
+      final k=e.key.toLowerCase(),v=e.value;
+      if((k.contains('image')||k.contains('portrait')||k.contains('art')||k.contains('avatar')||k.contains('icon'))&&v is String&&v.startsWith('http'))return v;
+      if(v is Map){final s=imageOf(Map<String,dynamic>.from(v));if(s!=null)return s;}
+    }
+    return null;
+  }
+  Future<void> load() async {
+    setState(()=>loading=true); error=null;
+    try{
+      final r=await Future.wait([getData('/heroes'),getData('/items'),getData('/rankings'),getData('/emblems?locale=en'),getData('/spells?locale=en'),getData('/patches')]);
+      if(!mounted)return;
+      setState((){
+        heroes=asList(r[0]);items=asList(r[1]);ranks=asList(r[2]);emblems=asList(r[3]);spells=asList(r[4]);patches=asList(r[5]);loading=false;
+      });
+    }catch(_){if(mounted)setState(()=>loading=false);error='تعذر تحديث المكتبة من المصدر حالياً. افحص الإنترنت وحاول مرة ثانية.';}
+  }
+  Map<String,dynamic>? rankFor(Map<String,dynamic> h){
+    final slug=field(h,['slug','id'],'').toLowerCase(),name=field(h,['name','title'],'').toLowerCase();
+    for(final r in ranks){if(field(r,['slug','heroSlug','id'],'').toLowerCase()==slug||field(r,['name','hero','title'],'').toLowerCase()==name)return r;}
+    return null;
+  }
+  Future<void> openHero(Map<String,dynamic> h) async {
+    final slug=field(h,['slug','id'],'');if(slug.isEmpty)return;
+    setState(()=>{selected=h,selectedRank=rankFor(h),detailLoading=true,counters=[],builds=[]});
+    try{
+      final r=await Future.wait([getData('/heroes/'+slug),getData('/heroes/'+slug+'/counters'),getData('/heroes/'+slug+'/builds')]);
+      if(!mounted)return;
+      setState(()=>{selected=asMap(r[0]).isEmpty?h:asMap(r[0]),counters=asList(r[1]),builds=asList(r[2]),detailLoading=false});
+    }catch(_){if(mounted)setState(()=>detailLoading=false);}
+  }
+  List<String> flatten(dynamic v,[int depth=0]){
+    if(depth>2||v==null)return [];
+    if(v is String||v is num||v is bool)return [v.toString()];
+    if(v is List)return v.expand((e)=>flatten(e,depth+1)).take(30).toList();
+    if(v is Map)return v.entries.where((e)=>!['id','slug','url','image','icon','portrait','artwork'].contains(e.key.toLowerCase())).take(18).expand((e)=>[e.key+': '+flatten(e.value,depth+1).join('، ')]).toList();
+    return [];
+  }
+  List<Map<String,dynamic>> get visibleHeroes=>heroes.where((h){
+    final n=field(h,['name','title','slug'],'');
+    final r=field(h,['role','roles','class'],'');
+    return (role=='الكل'||r.toLowerCase().contains(role.toLowerCase()))&&('$n $r '+field(h,['lane','specialty'],'')).toLowerCase().contains(query.toLowerCase());
+  }).toList();
+  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+    backgroundColor:const Color(0xFFF4F5FB),
+    appBar:AppBar(title:const Text('مكتبة الألعاب الاحترافية'),backgroundColor:const Color(0xFF10152E),foregroundColor:Colors.white,actions:[IconButton(onPressed:load,icon:const Icon(Icons.refresh))]),
+    body:ListView(padding:const EdgeInsets.all(14),children:[
+      Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(borderRadius:BorderRadius.circular(22),gradient:const LinearGradient(colors:[Color(0xFF10152E),Color(0xFF5635A0),Color(0xFF087F91)])),child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('GAME COMPANION',style:TextStyle(color:Color(0xFFBEEBFF),letterSpacing:2,fontWeight:FontWeight.bold)),
+        SizedBox(height:8),Text('موسوعة الأبطال والتحديثات',style:TextStyle(color:Colors.white,fontSize:21,fontWeight:FontWeight.w900)),
+        SizedBox(height:5),Text('صور • أدوار • ميتا • عدادات • تجهيزات • إيمبلم • تعاويذ',style:TextStyle(color:Colors.white70)),
+      ])),
+      const SizedBox(height:12),
+      SegmentedButton<String>(segments:const [ButtonSegment(value:'Mobile Legends',label:Text('Mobile Legends'),icon:Icon(Icons.shield_moon)),ButtonSegment(value:'PUBG Mobile',label:Text('PUBG'),icon:Icon(Icons.sports_esports))],selected:{game},onSelectionChanged:(v)=>setState(()=>{game=v.first,selected=null})),
+      const SizedBox(height:10),
+      if(game=='Mobile Legends') ...mlbbWidgets() else ...pubgWidgets(),
+      const SizedBox(height:14),
+      const Text('مصدر بيانات MLBB: MLBBDex وموسوعة Mobile Legends Wiki (CC BY-SA). الإحصاءات مجتمعية وقد تتأخر عن تحديث اللعبة.',style:TextStyle(fontSize:11,color:Colors.black54)),
+    ]),
+  ));
+
+  Widget chip(String n,String label)=>Chip(avatar:const Icon(Icons.auto_awesome,size:16,color:violet),label:Text(n+' '+label),backgroundColor:Colors.white);
+  Widget errorCard()=>Card(child:Padding(padding:const EdgeInsets.all(14),child:Column(children:[Text(error??''),FilledButton.icon(onPressed:load,icon:const Icon(Icons.refresh),label:const Text('إعادة المحاولة'))])));
+  List<Widget> mlbbWidgets(){
+    if(selected!=null)return [heroDetail()];
+    if(loading&&heroes.isEmpty)return [const Center(child:CircularProgressIndicator())];
+    return [
+      if(error!=null)errorCard(),
+      Wrap(spacing:6,children:[chip(heroes.length.toString(),'بطل'),chip(items.length.toString(),'عنصر'),chip(ranks.length.toString(),'إحصائية ميتا'),chip(patches.length.toString(),'تحديث')]),
+      const SizedBox(height:10),
+      Wrap(spacing:6,runSpacing:6,children:['الأبطال','الميتا','المعدات','الإيمبلم','التعاويذ','التحديثات'].map((s)=>ChoiceChip(label:Text(s),selected:tab==s,onSelected:(_)=>setState(()=>tab=s))).toList()),
+      const SizedBox(height:8),
+      if(tab=='الأبطال') ...heroesTab(),
+      if(tab=='الميتا') ...metaTab(),
+      if(tab=='المعدات') ...itemsTab(),
+      if(tab=='الإيمبلم') ...dataCards(emblems,'لا توجد بيانات إيمبلم'),
+      if(tab=='التعاويذ') ...dataCards(spells,'لا توجد بيانات تعاويذ'),
+      if(tab=='التحديثات') ...dataCards(patches.take(30).toList(),'لا توجد تحديثات'),
+      if(loading)const LinearProgressIndicator(),
+    ];
+  }
+  List<Widget> heroesTab()=>[
+    TextField(decoration:InputDecoration(prefixIcon:const Icon(Icons.search),hintText:'ابحث عن أي بطل أو دور...',filled:true,fillColor:Colors.white,border:OutlineInputBorder(borderRadius:BorderRadius.circular(14),borderSide:BorderSide.none)),onChanged:(v)=>setState(()=>query=v)),
+    const SizedBox(height:8),
+    DropdownButtonFormField<String>(value:role,decoration:const InputDecoration(labelText:'الدور',filled:true,fillColor:Colors.white),items:['الكل','Tank','Fighter','Assassin','Mage','Marksman','Support'].map((s)=>DropdownMenuItem(value:s,child:Text(s=='الكل'?'كل الأدوار':s))).toList(),onChanged:(v)=>setState(()=>role=v??'الكل')),
+    const SizedBox(height:8),Text('عرض '+visibleHeroes.length.toString()+' من '+heroes.length.toString()+' بطل',style:const TextStyle(fontWeight:FontWeight.bold)),
+    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:visibleHeroes.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:.9,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(c,i){
+      final h=visibleHeroes[i],img=imageOf(h),rank=rankFor(h);
+      return InkWell(onTap:()=>openHero(h),child:Card(clipBehavior:Clip.antiAlias,margin:EdgeInsets.zero,child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+        Expanded(child:Stack(fit:StackFit.expand,children:[
+          Container(color:const Color(0xFF10152E),child:img==null?const Icon(Icons.shield_moon,color:Colors.white54,size:44):Image.network(img,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Icon(Icons.shield_moon,color:Colors.white54,size:44))),
+          if(rank!=null)Positioned(top:6,left:6,child:Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),decoration:BoxDecoration(color:const Color(0xFFE8CA77),borderRadius:BorderRadius.circular(16)),child:Text(field(rank,['tier','rank']),style:const TextStyle(fontWeight:FontWeight.bold)))),
+        ])),
+        Padding(padding:const EdgeInsets.all(8),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(field(h,['name','title','slug'],'Hero'),maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w900)),Text(field(h,['role','roles','class']),maxLines:1,style:const TextStyle(fontSize:11,color:Colors.black54))])),
+      ])));
+    }),
+  ];
+  List<Widget> metaTab(){
+    final sorted=[...ranks]..sort((a,b)=>tierOrder(field(a,['tier']))-tierOrder(field(b,['tier'])));
+    return [const Text('الميتا حسب بيانات الإحصاءات المنشورة',style:TextStyle(fontWeight:FontWeight.w900,fontSize:17)),const Text('تتغير القوة حسب الرتبة والمنطقة والتحديث. هذه مؤشرات وليست ضماناً.',style:TextStyle(color:Colors.black54,fontSize:12)),...sorted.map((r)=>Card(child:ListTile(leading:Text(field(r,['tier','rank'])),title:Text(field(r,['name','hero','title'],'Hero')),subtitle:Text('فوز: '+field(r,['winRate','win_rate'])+' • اختيار: '+field(r,['pickRate','pick_rate'])+' • حظر: '+field(r,['banRate','ban_rate'])))))];
+  }
+  int tierOrder(String t){final s=t.toUpperCase();if(s.contains('S'))return 0;if(s.contains('A'))return 1;if(s.contains('B'))return 2;if(s.contains('C'))return 3;return 4;}
+  List<Widget> itemsTab()=>[Text('عدد العناصر: '+items.length.toString(),style:const TextStyle(fontWeight:FontWeight.bold)),...items.map((m)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.inventory_2)),title:Text(field(m,['name','title'],'عنصر')),subtitle:Text(field(m,['category','type'])+' • '+field(m,['price','cost'])),children:[Padding(padding:const EdgeInsets.all(14),child:Text(flatten(m).join('\n')))])))];
+  List<Widget> dataCards(List<Map<String,dynamic>> data,String empty)=>data.isEmpty?[Card(child:Padding(padding:const EdgeInsets.all(14),child:Text(empty)))]:data.map((m)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.auto_awesome)),title:Text(field(m,['name','title','version'],'تفصيل')),subtitle:Text(field(m,['role','category','date'],'')),children:[Padding(padding:const EdgeInsets.all(14),child:Text(flatten(m).join('\n')))]))).toList();
+
+  Widget heroDetail(){
+    final h=selected!,img=imageOf(h),r=selectedRank;
+    return Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[
+      TextButton.icon(onPressed:()=>setState(()=>selected=null),icon:const Icon(Icons.arrow_forward),label:const Text('رجوع للأبطال')),
+      Card(clipBehavior:Clip.antiAlias,child:Column(children:[
+        SizedBox(height:190,width:double.infinity,child:Container(color:const Color(0xFF10152E),child:img==null?const Icon(Icons.shield_moon,color:Colors.white70,size:70):Image.network(img,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Icon(Icons.shield_moon,color:Colors.white70,size:70)))),
+        Padding(padding:const EdgeInsets.all(14),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+          Text(field(h,['name','title','slug'],'Hero'),style:const TextStyle(fontSize:22,fontWeight:FontWeight.w900)),
+          Text(field(h,['role','roles'])+' • '+field(h,['lane','lanes'])),
+          if(r!=null)Text('الميتا: '+field(r,['tier'])+' • نسبة الفوز: '+field(r,['winRate','win_rate'])),
+        ])),
+      ])),
+      if(detailLoading)const LinearProgressIndicator(),
+      detailCard('المهارات والخصائص',h),
+      listCard('العدادات المقاسة',counters),
+      listCard('التجهيزات الشائعة',builds),
+      listCard('المظاهر والصور',asList(h['skins'])),
+    ]);
+  }
+  Widget detailCard(String title,Map<String,dynamic> m)=>Card(child:ExpansionTile(initiallyExpanded:true,title:Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),children:[Padding(padding:const EdgeInsets.all(14),child:Text(flatten(m).join('\n')))]));
+  Widget listCard(String title,List<Map<String,dynamic>> data)=>Card(child:ExpansionTile(title:Text(title+' ('+data.length.toString()+')',style:const TextStyle(fontWeight:FontWeight.bold)),children:data.isEmpty?[const Padding(padding:EdgeInsets.all(14),child:Text('لا توجد بيانات تفصيلية منشورة لهذا البطل حالياً.'))]:data.map((m)=>ListTile(title:Text(field(m,['name','hero','title'],'تفصيل')),subtitle:Text(flatten(m).join(' • '),maxLines:5,overflow:TextOverflow.ellipsis))).toList()));
+
+  List<Widget> pubgWidgets()=>[
+    const Text('مركز إعدادات وتجربة اللعب',style:TextStyle(fontWeight:FontWeight.w900,fontSize:18)),
+    const Text('نصائح لراحة الاستخدام وأداء الهاتف والخصوصية وإعدادات التحكم.',style:TextStyle(color:Colors.black54)),
+    guide('تخصيص أزرار التحكم','رتّب أماكن الأزرار بما يناسب حجم الشاشة وراحة اليد. اترك مسافة بين الأزرار المتكررة واحفظ نسخة من التخطيط قبل تغييره.'),
+    guide('إعدادات الحساسية','ابدأ بالإعدادات الافتراضية، غيّر خياراً واحداً كل مرة، واختبره في وضع التدريب. لا تنسخ إعدادات لاعب آخر حرفياً لأن الهواتف تختلف.'),
+    guide('السلاسة والحرارة','اختر معدل إطارات يناسب جهازك، خفّض المؤثرات البصرية عند التقطيع، أغلق التطبيقات غير الضرورية وتوقف إذا ارتفعت حرارة الهاتف.'),
+    guide('الصوت وإمكانية الوصول','اضبط الصوت بمستوى مريح، وخذ استراحة إذا شعرت بإجهاد السمع أو العين.'),
+    guide('الشبكة والخصوصية','استخدم اتصالاً مستقراً، لا تشارك كلمة مرورك أو رموز التحقق، واستعمل أدوات الحظر والإبلاغ عند الإزعاج.'),
+    guide('توازن اللعب','خذ استراحة بين الجولات ولا تجعل اللعب يؤثر على النوم أو الدراسة أو نشاطك اليومي.'),
+  ];
+  Widget guide(String title,String body)=>Card(child:ExpansionTile(leading:const CircleAvatar(child:Icon(Icons.tips_and_updates)),title:Text(title,style:const TextStyle(fontWeight:FontWeight.bold)),children:[Padding(padding:const EdgeInsets.all(14),child:Text(body))]));
 }
