@@ -1264,14 +1264,19 @@ class MemberProfilePage extends StatelessWidget {
                   final me = FirebaseAuth.instance.currentUser!.uid;
                   final id = me.compareTo(uid) < 0 ? '${me}_${uid}' : '${uid}_${me}';
                   final ref = db.collection('conversations').doc(id);
-                  final old = await ref.get();
-                  if (!old.exists) {
-                    final mine = await db.collection('publicProfiles').doc(me).get();
-                    await ref.set({'members': [me, uid], 'memberNames': {
+                  // Avoid a pre-read of a missing conversation. Older deployed
+                  // rules may reject get() on absent documents, blocking first DMs.
+                  // Keep participant order identical to the inbox creation flow.
+                  final mine = await db.collection('publicProfiles').doc(me).get();
+                  final members = <String>[me, uid]..sort();
+                  await ref.set({
+                    'members': members,
+                    'memberNames': {
                       me: mine.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
                       uid: d['name'] ?? fallbackName,
-                    }, 'updatedAt': FieldValue.serverTimestamp()});
-                  }
+                    },
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
                   if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(
                     conversationId: id, otherUid: uid, otherName: d['name'] as String? ?? fallbackName)));
                 },
