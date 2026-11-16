@@ -95,7 +95,6 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
   Color _accent = brand;
   bool _reduceMotion = false;
   bool _compactCards = false;
-  
   @override
   void initState() {
     super.initState();
@@ -140,7 +139,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
       _accent = accent;
       _reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
       _compactCards = prefs.getBool('v17_compact_cards') ?? false;
-      });
+    });
   }
 
   @override
