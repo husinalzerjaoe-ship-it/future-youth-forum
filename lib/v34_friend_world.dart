@@ -1,0 +1,198 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'livekit_calls.dart';
+
+/// A synchronized cooperative 2D grid adventure built on the existing
+/// private arcade room. Every player's move is committed transactionally.
+class FriendWorldGamePage extends StatefulWidget {
+  final String roomId;
+  final String title;
+  const FriendWorldGamePage({super.key, required this.roomId, required this.title});
+  @override State<FriendWorldGamePage> createState() => _FriendWorldGamePageState();
+}
+
+class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
+  final _db = FirebaseFirestore.instance;
+  bool _busy = false;
+  String? _notice;
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  DocumentReference<Map<String, dynamic>> get _room => _db.collection('arcadeRooms').doc(widget.roomId);
+  static const int _side = 9;
+  static const Set<int> _walls = {20, 21, 22, 38, 39, 40, 56, 57, 58};
+  static const List<int> _firstStars = [4, 13, 18, 31, 36, 49, 64, 76];
+
+  Map<String, dynamic> _initialState(List<String> members) {
+    final players = <String, int>{};
+    for (var i = 0; i < members.length; i++) {
+      players[members[i]] = i == 0 ? 0 : i == 1 ? 80 : i == 2 ? 8 : 72;
+    }
+    return {
+      'mode': 'cooperative_2d',
+      'players': players,
+      'stars': _firstStars,
+      'score': 0,
+      'moves': 0,
+      'wave': 1,
+      'finished': false,
+    };
+  }
+
+  Future<void> _ensureState(List<String> members, Map<String, dynamic> state) async {
+    if (state['mode'] == 'cooperative_2d' && state['players'] is Map) return;
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(_room);
+      if (!snap.exists) return;
+      final room = snap.data()!;
+      final current = Map<String, dynamic>.from(room['state'] ?? const {});
+      if (current['mode'] != 'cooperative_2d' || current['players'] is! Map) {
+        tx.update(_room, {'state': _initialState(List<String>.from(room['members'] ?? members)), 'updatedAt': FieldValue.serverTimestamp()});
+      }
+    });
+  }
+
+  Future<void> _move(int target) async {
+    if (_busy) return;
+    setState(() { _busy = true; _notice = null; });
+    try {
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(_room);
+        if (!snap.exists) throw StateError('الغرفة غير موجودة.');
+        final room = snap.data()!;
+        final members = List<String>.from(room['members'] ?? const []);
+        if (!members.contains(_uid)) throw StateError('هذا الحساب ليس ضمن لاعبي الغرفة.');
+        if (room['status'] != 'playing') throw StateError('ابدأوا الجولة من غرفة الانتظار أولاً.');
+        final state = Map<String, dynamic>.from(room['state'] ?? const {});
+        if (state['mode'] != 'cooperative_2d') throw StateError('جاري تجهيز عالم اللعبة، حاول بعد لحظة.');
+        final players = Map<String, dynamic>.from(state['players'] ?? const {});
+        final current = (players[_uid] as num?)?.toInt();
+        if (current == null) throw StateError('تعذر تحديد مكان شخصيتك.');
+        final distance = (target ~/ _side - current ~/ _side).abs() + (target % _side - current % _side).abs();
+        if (target < 0 || target >= _side * _side || distance != 1) throw StateError('اختار خانة مجاورة لشخصيتك.');
+        if (_walls.contains(target)) throw StateError('هذا الطريق مغلق؛ جرّب طريقاً آخر.');
+        if (players.values.any((p) => (p as num).toInt() == target)) throw StateError('لا يمكن الوقوف فوق شخصية صديقك.');
+        final stars = List<int>.from(state['stars'] ?? _firstStars);
+        var score = (state['score'] as num?)?.toInt() ?? 0;
+        if (stars.remove(target)) score++;
+        var wave = (state['wave'] as num?)?.toInt() ?? 1;
+        if (stars.isEmpty) {
+          wave++;
+          stars.addAll(_firstStars.map((v) => (v + wave * 7) % 81).where((v) => !_walls.contains(v) && !players.values.any((p) => p == v)));
+        }
+        players[_uid] = target;
+        final moves = ((state['moves'] as num?)?.toInt() ?? 0) + 1;
+        tx.update(_room, {
+          'state': {...state, 'players': players, 'stars': stars, 'score': score, 'moves': moves, 'wave': wave},
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      });
+      HapticFeedback.selectionClick();
+    } catch (e) {
+      if (mounted) setState(() => _notice = e.toString().replaceFirst('Bad state: ', ''));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('مغامرة الأصدقاء • 2D'), actions: [
+        IconButton(tooltip: 'غرفة الصوت', onPressed: () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => LiveKitCallsPage(initialRoom: 'arcade_${widget.roomId}'),
+        )), icon: const Icon(Icons.mic_rounded)),
+        IconButton(tooltip: 'نسخ رمز الغرفة', onPressed: () async {
+          final snap = await _room.get();
+          await Clipboard.setData(ClipboardData(text: snap.data()?['roomCode']?.toString() ?? widget.roomId));
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ رمز الغرفة')));
+        }, icon: const Icon(Icons.copy_rounded)),
+      ]),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: _room.snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) return const Center(child: Text('تعذر الاتصال بعالم اللعبة. تحقق من اتصال الإنترنت وقواعد الغرفة.'));
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final room = snapshot.data!.data();
+          if (room == null) return const Center(child: Text('الغرفة غير موجودة.'));
+          final members = List<String>.from(room['members'] ?? const []);
+          final state = Map<String, dynamic>.from(room['state'] ?? const {});
+          if (state['mode'] != 'cooperative_2d' || state['players'] is! Map) {
+            _ensureState(members, state);
+            return const Center(child: CircularProgressIndicator());
+          }
+          final players = Map<String, dynamic>.from(state['players'] ?? const {});
+          final stars = List<int>.from(state['stars'] ?? _firstStars);
+          final myPosition = (players[_uid] as num?)?.toInt() ?? 0;
+          final score = (state['score'] as num?)?.toInt() ?? 0;
+          final names = Map<String, dynamic>.from(room['memberNames'] ?? const {});
+          final roomCode = room['roomCode']?.toString() ?? widget.roomId;
+          return ListView(padding: const EdgeInsets.all(14), children: [
+            Container(
+              padding: const EdgeInsets.all(17),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: const LinearGradient(colors: [Color(0xFF151B3B), Color(0xFF6654D9), Color(0xFF008F91)]),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('CO-OP WORLD • LIVE', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 7),
+                const Text('اجمعوا النجوم كفريق واحد ✨', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text('النقاط المشتركة: $score  •  المرحلة: ${state['wave'] ?? 1}  •  الحركات: ${state['moves'] ?? 0}', style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 8),
+                Text('اللاعبون: ${members.map((m) => names[m]?.toString() ?? (m == _uid ? 'أنت' : 'صديق')).join('  •  ')}', style: const TextStyle(color: Colors.white70)),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            if (room['status'] != 'playing')
+              const Card(child: Padding(padding: EdgeInsets.all(14), child: Text('بانتظار بدء الجولة من غرفة الأصدقاء. ارجعوا للغرفة واضغطوا بدء اللعب.'))),
+            AspectRatio(
+              aspectRatio: 1,
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _side * _side,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: _side, crossAxisSpacing: 3, mainAxisSpacing: 3),
+                itemBuilder: (context, cell) {
+                  final player = players.entries.where((e) => (e.value as num).toInt() == cell).map((e) => e.key).firstOrNull;
+                  final isMe = player == _uid;
+                  final star = stars.contains(cell);
+                  final wall = _walls.contains(cell);
+                  final row = cell ~/ _side, col = cell % _side;
+                  final canMove = room['status'] == 'playing' && !wall &&
+                    ((row - myPosition ~/ _side).abs() + (col - myPosition % _side).abs() == 1) &&
+                    !players.values.any((v) => (v as num).toInt() == cell);
+                  return InkWell(
+                    onTap: canMove && !_busy ? () => _move(cell) : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      decoration: BoxDecoration(
+                        color: isMe ? const Color(0xFF6654D9) : player != null ? const Color(0xFF008F91) :
+                          wall ? Colors.blueGrey.shade800 : star ? Colors.amber.withValues(alpha: .22) : Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: canMove ? Colors.lightGreenAccent : Colors.transparent, width: 1.5),
+                      ),
+                      child: Center(child: Text(isMe ? '🧙' : player != null ? '🧝' : wall ? '🪨' : star ? '⭐' : '', style: const TextStyle(fontSize: 15))),
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (_busy) const LinearProgressIndicator(),
+            if (_notice != null) Padding(padding: const EdgeInsets.all(8), child: Text(_notice!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => LiveKitCallsPage(initialRoom: 'arcade_${widget.roomId}'),
+              )), icon: const Icon(Icons.mic_rounded), label: const Text('فويس مباشر'))),
+              const SizedBox(width: 8),
+              Expanded(child: OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.chat_rounded), label: const Text('دردشة الغرفة'))),
+            ]),
+            const Padding(padding: EdgeInsets.only(top: 10), child: Text('كل حركة تتزامن مباشرة عند جميع اللاعبين. اجمعوا النجوم معاً وتجاوزوا الصخور كفريق.', textAlign: TextAlign.center)),
+            Text('رمز الغرفة: $roomCode', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
+          ]);
+        },
+      ),
+    ),
+  );
+}
