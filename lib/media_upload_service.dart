@@ -1,8 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:tus_client_dart/tus_client_dart.dart';
 
 /// Uploads media to the signed-in Firebase user's own Supabase Storage folder.
 /// Storage RLS verifies the Firebase JWT issuer, audience and UID.
@@ -10,6 +14,7 @@ Future<String> uploadForumMedia(
   XFile file, {
   required String folder,
   String? roomId,
+  void Function(double progress)? onProgress,
 }) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) throw StateError('سجّل الدخول أولاً.');
@@ -86,16 +91,67 @@ Future<String> uploadForumMedia(
     throw ArgumentError('صيغة الملف غير مدعومة. استخدم صور JPG/PNG/WEBP/GIF أو فيديو MP4/MOV أو صوت MP3/M4A/AAC/WAV/OGG/FLAC أو APK/ZIP/PDF/XAPK.');
   }
 
-  final bytes = await file.readAsBytes();
-  if (bytes.isEmpty) throw StateError('الملف فارغ ولا يمكن رفعه.');
-  final largeUpload = folder == 'shared-files' || folder == 'watch-rooms';
-  final maxBytes = largeUpload ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
-  if (bytes.length > maxBytes) {
-    throw StateError('حجم الملف أكبر من الحد المسموح (' + (largeUpload ? '100' : '50') + ' ميغابايت).');
+  final path = prefix + DateTime.now().microsecondsSinceEpoch.toString() + '.$ext';
+  final supabase = Supabase.instance.client;
+  final storage = supabase.storage.from('forum-media');
+
+  if (folder == 'watch-rooms') {
+    final localFile = File(file.path);
+    if (!await localFile.exists()) throw StateError('ملف الفيديو غير موجود على الجهاز.');
+    final fileSize = await localFile.length();
+    const maxVideoBytes = 4 * 1024 * 1024 * 1024;
+    if (fileSize <= 0) throw StateError('ملف الفيديو فارغ ولا يمكن رفعه.');
+    if (fileSize > maxVideoBytes) {
+      throw StateError('الحد الأعلى لفيديو غرفة المشاهدة 4GB.');
+    }
+
+    // Stream large files in TUS chunks rather than loading the whole video
+    // into memory. Persist the upload fingerprint for interruption recovery.
+    final projectRef = Uri.parse(supabase.supabaseUrl).host.split('.').first;
+    final tusEndpoint = Uri.parse(
+      'https://$projectRef.storage.supabase.co/storage/v1/upload/resumable',
+    );
+    final supportDir = await getApplicationSupportDirectory();
+    final tusStoreDir = Directory('${supportDir.path}/forum_tus_uploads');
+    await tusStoreDir.create(recursive: true);
+    final tusClient = TusClient(
+      tusEndpoint,
+      file,
+      store: TusFileStore(tusStoreDir),
+      headers: {
+        'apikey': supabase.supabaseKey,
+        'Authorization': 'Bearer $token',
+        'x-upsert': 'false',
+      },
+      metadata: {
+        'bucketName': 'forum-media',
+        'objectName': path,
+        'contentType': contentType,
+        'cacheControl': '3600',
+      },
+      maxChunkSize: 6 * 1024 * 1024,
+      retries: 5,
+    );
+    try {
+      await tusClient.upload(
+        onProgress: (progress, estimate, client) {
+          onProgress?.call(progress.clamp(0.0, 1.0).toDouble());
+        },
+      );
+      onProgress?.call(1.0);
+      return storage.getPublicUrl(path);
+    } catch (e) {
+      throw StateError('تعذر رفع الفيديو الكبير. تحقق من حد الرفع العام في Supabase وخطة التخزين والاتصال. ($e)');
+    }
   }
 
-  final path = '$prefix${DateTime.now().microsecondsSinceEpoch}.$ext';
-  final storage = Supabase.instance.client.storage.from('forum-media');
+  final bytes = await file.readAsBytes();
+  if (bytes.isEmpty) throw StateError('الملف فارغ ولا يمكن رفعه.');
+  final maxBytes = folder == 'shared-files' ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
+  if (bytes.length > maxBytes) {
+    throw StateError('حجم الملف أكبر من الحد المسموح (' + (folder == 'shared-files' ? '100' : '50') + ' ميغابايت).');
+  }
+
   try {
     await storage.uploadBinary(
       path,
