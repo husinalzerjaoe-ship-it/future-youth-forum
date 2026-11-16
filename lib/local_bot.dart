@@ -1,9 +1,17 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 const _botColor = Color(0xFF6554D9);
+const _assistantWebhookUrl =
+    'https://cloud.activepieces.com/api/v1/webhooks/YQruwrsE0xEvTlbBdcNsy/sync';
 
 class LocalHelperBotPage extends StatefulWidget {
   const LocalHelperBotPage({super.key});
+
   @override
   State<LocalHelperBotPage> createState() => _LocalHelperBotPageState();
 }
@@ -12,7 +20,10 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
   final input = TextEditingController();
   final scroll = ScrollController();
   final List<Map<String, String>> messages = [
-    {'from': 'bot', 'text': 'هلا بيك! أنا مساعد ملتقى شباب المستقبل 🤖\nأكدر أساعدك بمعلومات عن التطبيق، الرومات، النشر، والخصوصية. اختار سؤال أو اكتب سؤالك.'},
+    {
+      'from': 'bot',
+      'text': 'هلا بيك! أنا مساعد ملتقى شباب المستقبل 🤖💜\nاكتب سؤالك وراح أحاول أجيبك بمساعدة الذكاء الاصطناعي.',
+    },
   ];
   bool thinking = false;
 
@@ -23,140 +34,239 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
     super.dispose();
   }
 
-  String answer(String raw) {
-    final q = raw.toLowerCase().replaceAll('أ','ا').replaceAll('إ','ا').replaceAll('آ','ا').replaceAll('ة','ه');
-    bool has(List<String> words) => words.any(q.contains);
-    if (has(['مرحبا','هلا','السلام','اهلا','شلونك'])) return 'هلا وغلا بيك 🌟 نورت ملتقى شباب المستقبل! اسألني عن أي قسم أو ميزة بالتطبيق.';
-    if (has(['شكرا','مشكور','تسلم'])) return 'تدلل، هذا واجبي 💜';
-    if (has(['روم','غرفه','غرفة','دردشه','محادث'])) return 'عندنا خمس غرف: العراق 🇮🇶، سوريا 🇸🇾، فلسطين 🇵🇸، الخليج 🌴، والأصدقاء 🌍. افتح الأقسام ثم دردشات الدول واختار الغرفة. حافظ على الاحترام ولا تنشر بياناتك الشخصية.';
-    if (has(['شعر','قصيد','قصيده'])) return 'افتح الأقسام ← الشعر ← أضف الشعر. اكتب قصيدتك واضغط نشر. خلي القصيدة من كتابتك أو اذكر صاحبها إذا كانت منقولة.';
-    if (has(['اقتباس','عباره','عبارة'])) return 'من الأقسام افتح الاقتباسات. تگدر تضيف عبارة جديدة أو تستخدم زر النسخ حتى تنسخ اقتباس يعجبك.';
-    if (has(['ستوري','ستوريات','قصه','قصة'])) return 'افتح الأقسام ← الستوريات ← إضافة ستوري. اختار صورة أو فيديو من المعرض. الستوري تنتهي بعد 24 ساعة.';
-    if (has(['فيديو','تيك','ريلز'])) return 'حالياً التطبيق يدعم نشر رابط فيديو بالمنشور وفيديوهات الستوريات حتى دقيقة. صفحة فيديوهات عمودية مثل تيك توك ضمن التطوير وليست متاحة بعد.';
-    if (has(['منشور','بوست','نشر'])) return 'من تبويب المنشورات اضغط زر + أو «اكتب منشوراً»، اكتب كلامك أو أضف رابط فيديو، وبعدها انشر. تگدر تستقبل إعجابات وتعليقات على المنشور.';
-    if (has(['اعجاب','لايك','قلب'])) return 'اضغط زر القلب أسفل المنشور حتى تسجل إعجابك، واضغط مرة ثانية لإزالته. عدد الإعجابات يظهر بجانبه.';
-    if (has(['تعليق','تعليقات'])) return 'اضغط «تعليقات» أسفل المنشور، اكتب تعليقك في الحقل واضغط إرسال. خليك محترم وابتعد عن الإساءة.';
-    if (has(['ابلاغ','إبلاغ','تبليغ','شكوى'])) return 'من أسفل المنشور اضغط رمز العلم واختار سبب الإبلاغ. البلاغ يوصل لسجل الإدارة للمراجعة. لا تستخدم البلاغات للمزاح.';
-    if (has(['ملف','بروفايل','صوره شخصيه','نبذه'])) return 'افتح تبويب «ملفي» ثم «تعديل الملف الشخصي». تگدر تغير الاسم والنبذة ورابط الصورة.';
-    if (has(['تقييم','نجوم'])) return 'افتح صفحة عضو واضغط النجوم لتقييمه من نجمة إلى خمس نجوم. قيّم التعامل الحقيقي وبإنصاف.';
-    if (has(['حساب','تسجيل','دخول','كلمه المرور','كلمة المرور','ايميل','بريد'])) return 'أنشئ حساباً ببريد إلكتروني وكلمة مرور لا تقل عن 6 أحرف. لا تشارك كلمة المرور مع أي شخص. إذا نسيتها استخدم استعادة كلمة المرور من شاشة الدخول إذا كانت متاحة.';
-    if (has(['حذف حساب','اغلاق حساب','إغلاق حساب'])) return 'حذف الحساب نهائياً غير متاح من داخل التطبيق حالياً. تواصل مع إدارة الملتقى لطلب المساعدة، ولا ترسل كلمة مرورك لأي شخص.';
-    if (has(['خصوصيه','خصوصية','امان','أمان','حمايه','حماية'])) return 'نصائح الأمان: لا تنشر رقمك أو عنوانك أو كلمات المرور، لا تفتح روابط مجهولة، لا ترسل صوراً خاصة للغرباء، واحظر/بلّغ عن أي إساءة عند توفر أدواتها.';
-    if (has(['تنمر','سب','شتيمه','اساءه','إساءة','مضايقه'])) return 'إذا تعرضت لإساءة لا ترد بإساءة. احتفظ بلقطة شاشة، استخدم الإبلاغ إن توفر، وابتعد عن مشاركة معلوماتك الشخصية. البلاغات الحالية تُسجل للمراجعة وليست حظراً آلياً.';
-    if (has(['اداره','مدير','مشرف','قوانين','قانون'])) return 'قواعد الملتقى: الاحترام، عدم التنمر أو التهديد، عدم نشر بيانات الآخرين، عدم الاحتيال أو الروابط الضارة، واحترام حقوق النشر. بعض إجراءات الإشراف ما زالت قيد التطوير.';
-    if (has(['العراق','سوريا','فلسطين','الخليج'])) return 'غرف الدول موجودة ضمن الأقسام ← دردشات الدول. اختار الغرفة المناسبة وتواصل بأدب مع الأعضاء.';
-    if (has(['صباح الخير','مساء الخير','تصبح'])) return 'صباح النور أو مساء الورد 🌷 نتمنى لك وقتاً جميلاً داخل الملتقى.';
-    if (has(['نصيحه','نصيحة','دراسه','دراسة','نجاح'])) return 'نصيحتي: حدد هدفاً صغيراً لليوم، قسّمه لخطوات، وداوم عليه. التقدم المستمر أهم من الحماس المؤقت ✨';
-    if (has(['صديق','اصدقاء','تعارف'])) return 'تگدر تتعرف على الأعضاء من المنشورات والغرف العامة. لا تستعجل الثقة ولا تشارك بياناتك أو صورك الخاصة مع أشخاص ما تعرفهم.';
-    if (has(['انترنت','بدون نت','اوفلاين'])) return 'البوت نفسه يعمل بدون إنترنت لأنه مبرمج داخل التطبيق. أما المحادثات والمنشورات والستوريات فتحتاج اتصالاً بالإنترنت وخدمات Firebase.';
-    if (has(['ذكاء اصطناعي','ai','chatgpt'])) return 'أنا مساعد محلي مجاني، ما أستخدم مفتاح API ولا أرسل أسئلتك لخدمة ذكاء اصطناعي. إجاباتي مبنية على معلومات وقواعد مضافة مسبقاً، لذلك قد لا أفهم كل سؤال.';
-    if (has(['اقتراح','فكره','فكرة','ميزة','مميزات'])) return 'أفكار نطمح نضيفها: رسائل خاصة، متابعة الأصدقاء، إشعارات، بث مباشر، تحديات ومسابقات، شارات إنجاز، بحث متقدم، ومقاطع فيديو عمودية. بعض هذه الميزات لم تُنفذ بعد.';
-    if (has(['رياضه','رياضة','كره','كرة','مباراه','مباراة','لاعب','فريق'])) return 'قسم الرياضة وكرة القدم من الأقسام المطلوبة للملتقى. تابع أخبار الفرق والنتائج من مصادر موثوقة، ولا تعتمد على إشاعة غير مؤكدة. إذا لم يظهر القسم عندك بعد، فهذا يعني أن إضافته لم تصل إلى نسخة التطبيق المثبتة بعد.';
-    if (has(['تحميل','تنزيل','احفظ','حفظ الفيديو'])) return 'تنزيل فيديوهات الأعضاء المرفوعة داخل الملتقى ميزة نعمل على ربطها بالحفظ في معرض جهازك. زر تنزيل الستوري مضاف للكود، لكن يلزم نجاح بناء النسخة وتجربتها على جهازك. روابط يوتيوب لا نوفر لها تنزيل.';
-    if (has(['خلفيه','خلفية'])) return 'تغيير خلفية المحادثة الخاصة موجود بالكود، وكل مستخدم يحفظ خلفيته بحسابه داخل المحادثة. إذا ما ظهرت عندك، تحقق من نشر قواعد Firestore ومن صلاحيات رفع الصور في Supabase.';
-    if (has(['منشن','منشن','اذكر','اشاره','إشارة','رد على تعليق'])) return 'ميزة الرد مع @منشن مطلوبة حتى توصل الإجابة لصاحب التعليق الصحيح. لا أؤكد أنها مفعلة بالكامل حالياً؛ يجب ربط الرد بمعرّف التعليق وصاحب التعليق وإرسال إشعار له.';
-    if (has(['نقاط','محفظه','محفظة','رصيد'])) return 'توجد نقاط تفاعل أولية في التطبيق، لكن نظام المحفظة الآمن يحتاج احتساباً من الخادم حتى لا تتكرر النقاط بالتلاعب. لا تشارك بيانات حسابك مقابل نقاط.';
-    if (has(['اطار','إطار','اطارات','إطارات','متجر'])) return 'متجر الإطارات والشارات من ميزات الملتقى المطلوبة. قبل الشراء بالنقاط يجب التأكد من رصيدك ومن أن عملية الخصم تتم بطريقة آمنة.';
-    if (has(['لعبه','لعبة','العاب','ألعاب','تحدي','مسابقه','مسابقة'])) return 'مركز الألعاب يحتوي ألعاب وأسئلة ودعوات أولية. اللعب المتزامن بين شخصين مع مزامنة الأدوار والنتيجة يحتاج محرك مباراة مباشر، لذلك لا أعتبر الدعوة وحدها لعبة جماعية مكتملة.';
-    if (has(['يوتيوب','مشاهده جماعيه','حفله مشاهده','حفلة مشاهدة'])) return 'تقدر تضيف روابط يوتيوب إلى قائمة المشاهدة. حفلة المشاهدة المتزامنة تحتاج غرفة جلسة ومزامنة التشغيل والإيقاف والتقديم بين المشاركين. لا يمكن تنزيل محتوى يوتيوب من التطبيق.';
-    if (has(['صوره','صورة','صور','معرض'])) return 'الملف الشخصي يعرض الصورة الشخصية، والمنشورات تعرض النص وروابط الفيديو. رفع الصور والفيديوهات مباشرة من الجهاز إلى المنشورات وتشغيلها داخل التطبيق يحتاج استكمال ربط الرفع والعرض.';
-    if (has(['خاص','رساله خاصه','رسالة خاصة','ما تشتغل المحادثه','المحادثه الخاصه'])) return 'للمحادثة الخاصة: افتح زر الرسائل ثم محادثة جديدة واختر العضو. أصلحنا شرط قراءة قائمة المحادثات في قواعد المشروع، لكن يجب نشر قواعد Firestore الجديدة ثم اختبار الرسائل بين حسابين. إذا ظهر خطأ، أرسل نصه أو صورة الشاشة.';
-    if (has(['بحث','معلومه حديثه','معلومة حديثة','من الانترنت','الانترنت'])) return 'هذه النسخة من مساعد الملتقى تعتمد على قاعدة أسئلة وأجوبة داخل التطبيق، وليست متصلة حالياً بمحرك بحث مباشر. حتى أجيب عن الأخبار والمعلومات الحديثة بمصادر وروابط، يلزم ربط خدمة بحث آمنة من الخادم وعدم وضع مفاتيحها السرية داخل التطبيق.';
-    if (has(['صباح الخير','مساء الخير','تصبح'])) return 'صباح النور أو مساء الورد 🌷 نتمنى لك وقتاً جميلاً داخل الملتقى.';
-    return 'أريد أساعدك 💜 حالياً أفهم أسئلة عن: الحساب، الملف الشخصي، المنشورات، الإعجابات، التعليقات، الإبلاغ، الغرف، الشعر، الاقتباسات، الستوريات، الفيديو، الخصوصية، الأمان، وقوانين الملتقى. جرّب تصيغ سؤالك بكلمات من هالمواضيع. أنا بوت محلي مجاني وليس ذكاءً اصطناعياً عاماً.';
+  String? _extractAnswer(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      final text = value.trim();
+      if (text.isEmpty) return null;
+      try {
+        final decoded = jsonDecode(text);
+        final nested = _extractAnswer(decoded);
+        if (nested != null) return nested;
+      } catch (_) {
+        // Plain-text responses are valid too.
+      }
+      return text;
+    }
+    if (value is List) {
+      for (final item in value) {
+        final answer = _extractAnswer(item);
+        if (answer != null) return answer;
+      }
+      return null;
+    }
+    if (value is Map) {
+      for (final key in [
+        'answer', 'output', 'response', 'text', 'message',
+        'content', 'result', 'data', 'body', 'choices',
+      ]) {
+        if (value.containsKey(key)) {
+          final answer = _extractAnswer(value[key]);
+          if (answer != null) return answer;
+        }
+      }
+    }
+    return null;
   }
 
-  void send([String? suggestion]) {
+  Future<String> _askAssistant(
+    String question,
+    List<Map<String, String>> history,
+  ) async {
+    final user = FirebaseAuth.instance.currentUser;
+    final response = await http
+        .post(
+          Uri.parse(_assistantWebhookUrl),
+          headers: const {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json, text/plain',
+          },
+          body: jsonEncode({
+            'message': question,
+            'text': question,
+            'prompt': question,
+            'input': question,
+            'history': history,
+            'user': {'uid': user?.uid, 'name': user?.displayName},
+          }),
+        )
+        .timeout(const Duration(seconds: 27));
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('استجابة الخادم ${response.statusCode}');
+    }
+
+    final answer = _extractAnswer(response.body);
+    if (answer == null) {
+      throw const FormatException(
+        'وصل رد فارغ. تأكد أن آخر خطوة في Flow هي Return Response وتعيد جواب ChatGPT.',
+      );
+    }
+    return answer;
+  }
+
+  Future<void> send([String? suggestion]) async {
     final value = (suggestion ?? input.text).trim();
     if (value.isEmpty || thinking) return;
+
+    final history = messages
+        .map((item) => {
+              'role': item['from'] == 'user' ? 'user' : 'assistant',
+              'content': item['text'] ?? '',
+            })
+        .toList(growable: false);
+
     setState(() {
       messages.add({'from': 'user', 'text': value});
       input.clear();
       thinking = true;
     });
-    Future<void>.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      setState(() {
-        messages.add({'from': 'bot', 'text': answer(value)});
-        thinking = false;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (scroll.hasClients) scroll.animateTo(
+    _scrollToBottom();
+
+    String reply;
+    try {
+      reply = await _askAssistant(value, history);
+    } on TimeoutException {
+      reply = 'تأخر رد المساعد أكثر من الوقت المسموح. جرّب مرة ثانية.';
+    } on FormatException catch (error) {
+      reply = 'وصل رد غير مفهوم من Flow. ${error.message}';
+    } catch (_) {
+      reply = 'تعذر الاتصال بمساعد الذكاء الاصطناعي حالياً. تأكد من الإنترنت وأن Flow منشور ويحتوي خطوة Return Response، ثم حاول مجدداً.';
+    }
+
+    if (!mounted) return;
+    setState(() {
+      messages.add({'from': 'bot', 'text': reply});
+      thinking = false;
+    });
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scroll.hasClients) {
+        scroll.animateTo(
           scroll.position.maxScrollExtent,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
-      });
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) => Directionality(
-    textDirection: TextDirection.rtl,
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Row(children: [
-          CircleAvatar(backgroundColor: Color(0xFFEAE6FF), child: Icon(Icons.smart_toy, color: _botColor)),
-          SizedBox(width: 10),
-          Text('مساعد الملتقى'),
-        ]),
-      ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-          child: Wrap(spacing: 8, runSpacing: 8, children: [
-            'شلون أدخل الرومات؟', 'شلون أنشر ستوري؟', 'شلون أحمي حسابي؟', 'شلون أنشر قصيدة؟', 'شلون أرسل رسالة خاصة؟', 'شلون أنزل فيديو؟', 'وين قسم الرياضة؟', 'شلون أستخدم النقاط؟', 'هل أكو ألعاب جماعية؟', 'هل البوت يبحث بالإنترنت؟',
-          ].map((q) => ActionChip(label: Text(q), onPressed: () => send(q))).toList()),
-        ),
-        Expanded(child: ListView.builder(
-          controller: scroll,
-          padding: const EdgeInsets.all(12),
-          itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final item = messages[index];
-            final isBot = item['from'] == 'bot';
-            return Align(
-              alignment: isBot ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * .84),
-                margin: const EdgeInsets.symmetric(vertical: 5),
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Row(children: [
+              CircleAvatar(
+                backgroundColor: Color(0xFFEAE6FF),
+                child: Icon(Icons.smart_toy, color: _botColor),
+              ),
+              SizedBox(width: 10),
+              Text('مساعد الملتقى'),
+            ]),
+          ),
+          body: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  'شلون أدخل الرومات؟',
+                  'شلون أنشر ستوري؟',
+                  'شلون أحمي حسابي؟',
+                  'اشرح لي الذكاء الاصطناعي',
+                  'اقترح لي أفكار جديدة',
+                ]
+                    .map((q) => ActionChip(
+                          label: Text(q),
+                          onPressed: thinking ? null : () => send(q),
+                        ))
+                    .toList(),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: scroll,
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isBot ? const Color(0xFFEDEAFF) : const Color(0xFFE7F3FF),
-                  borderRadius: BorderRadius.circular(16),
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  final item = messages[index];
+                  final isBot = item['from'] == 'bot';
+                  return Align(
+                    alignment:
+                        isBot ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * .84,
+                      ),
+                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isBot
+                            ? const Color(0xFFEDEAFF)
+                            : const Color(0xFFE7F3FF),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: SelectableText(
+                        item['text'] ?? '',
+                        style: const TextStyle(height: 1.5),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            if (thinking)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 9),
+                    Text('المساعد يفكر ويكتب...'),
+                  ]),
                 ),
-                child: Text(item['text'] ?? '', style: const TextStyle(height: 1.5)),
               ),
-            );
-          },
-        )),
-        if (thinking) const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Align(alignment: Alignment.centerRight, child: Text('المساعد يكتب...')),
-        ),
-        SafeArea(top: false, child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(children: [
-            Expanded(child: TextField(
-              controller: input,
-              minLines: 1,
-              maxLines: 4,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => send(),
-              decoration: const InputDecoration(
-                hintText: 'اكتب سؤالك...',
-                border: OutlineInputBorder(),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: input,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => send(),
+                      decoration: const InputDecoration(
+                        hintText: 'اكتب سؤالك...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: thinking ? null : send,
+                    icon: const Icon(Icons.send),
+                    style: IconButton.styleFrom(
+                      backgroundColor: _botColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ]),
               ),
-            )),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: thinking ? null : send,
-              icon: const Icon(Icons.send),
-              style: IconButton.styleFrom(backgroundColor: _botColor, foregroundColor: Colors.white),
             ),
           ]),
-        )),
-      ]),
-    ),
-  );
+        ),
+      );
 }
