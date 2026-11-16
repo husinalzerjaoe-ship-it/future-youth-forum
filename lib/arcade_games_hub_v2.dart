@@ -401,7 +401,32 @@ class _ArcadePlayPageState extends State<_ArcadePlayPage> {
         return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Text('غيّر المسار وتفادَ العائق', style: TextStyle(color: Colors.white70)),
           const SizedBox(height: 20),
-          Row(children: List.generate(3, (i) => Expanded(child: GestureDetector(onTap: () => _hit(i), child: Container(height: 150, margin: const EdgeInsets.all(5), decoration: BoxDecoration(color: _lane == i ? _cyan.withValues(alpha: .2) : Colors.white10, borderRadius: BorderRadius.circular(13), border: Border.all(color: _lane == i ? _cyan : Colors.white12)), child: Center(child: Text(_obstacle == i ? '🚧' : _lane == i ? '🚗' : '·', style: const TextStyle(fontSize: 34))))))),
+          Row(
+            children: List.generate(3, (i) {
+              final selected = _lane == i;
+              final obstacle = _obstacle == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _hit(i),
+                  child: Container(
+                    height: 150,
+                    margin: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: selected ? _cyan.withValues(alpha: .2) : Colors.white10,
+                      borderRadius: BorderRadius.circular(13),
+                      border: Border.all(color: selected ? _cyan : Colors.white12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        obstacle ? '🚧' : selected ? '🚗' : '·',
+                        style: const TextStyle(fontSize: 34),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ]);
       case 'penalty':
       case 'stars':
