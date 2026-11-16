@@ -41,15 +41,28 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
   }
 
   Future<void> _ensureState(List<String> members, Map<String, dynamic> state) async {
-    if (state['mode'] == 'cooperative_2d' && state['players'] is Map) return;
+    final existing = state['players'] is Map
+        ? Map<String, dynamic>.from(state['players'] as Map)
+        : <String, dynamic>{};
+    if (state['mode'] == 'cooperative_2d' && members.every(existing.containsKey)) return;
     await _db.runTransaction((tx) async {
       final snap = await tx.get(_room);
       if (!snap.exists) return;
       final room = snap.data()!;
       final current = Map<String, dynamic>.from(room['state'] ?? const {});
-      if (current['mode'] != 'cooperative_2d' || current['players'] is! Map) {
-        tx.update(_room, {'state': _initialState(List<String>.from(room['members'] ?? members)), 'updatedAt': FieldValue.serverTimestamp()});
+      final roomMembers = List<String>.from(room['members'] ?? members);
+      final currentPlayers = current['players'] is Map
+          ? Map<String, dynamic>.from(current['players'] as Map)
+          : <String, dynamic>{};
+      if (current['mode'] != 'cooperative_2d') {
+        tx.update(_room, {'state': _initialState(roomMembers), 'updatedAt': FieldValue.serverTimestamp()});
+        return;
       }
+      const spawns = [0, 80, 8, 72];
+      for (var i = 0; i < roomMembers.length && i < spawns.length; i++) {
+        currentPlayers.putIfAbsent(roomMembers[i], () => spawns[i]);
+      }
+      tx.update(_room, {'state': {...current, 'players': currentPlayers}, 'updatedAt': FieldValue.serverTimestamp()});
     });
   }
 
@@ -243,7 +256,7 @@ class _FriendWorldLobbyPageState extends State<FriendWorldLobbyPage> {
     }
     setState(() => _busy = true);
     try {
-      final result = await _db.collection('arcadeRooms').where('roomCode', isEqualTo: code).limit(1).get();
+      final result = await _db.collection('arcadeRooms').where('roomCode', isEqualTo: code).where('status', isEqualTo: 'waiting').limit(1).get();
       if (result.docs.isEmpty) throw StateError('الغرفة غير موجودة.');
       final ref = result.docs.first.reference;
       await _db.runTransaction((tx) async {
