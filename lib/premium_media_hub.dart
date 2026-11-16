@@ -162,8 +162,8 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       final source = File(picked.path);
       final bytes = await source.length();
       if (bytes == 0) { _toast('ملف الفيديو فارغ.'); return; }
-      if (bytes > 100 * 1024 * 1024) {
-        _toast('حجم الفيديو أكبر من 100 ميغابايت حالياً.');
+      if (bytes > 4 * 1024 * 1024 * 1024) {
+        _toast('الحد الأعلى لفيديو غرفة المشاهدة 4GB.');
         return;
       }
       final dir = await getApplicationDocumentsDirectory();
@@ -189,8 +189,8 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     final file = File(entry.path);
     if (!await file.exists()) { _toast('ملف الفيديو لم يعد موجوداً على الجهاز.'); return; }
     final size = await file.length();
-    if (size == 0 || size > 100 * 1024 * 1024) {
-      _toast(size == 0 ? 'ملف الفيديو فارغ.' : 'الحد الأعلى لرفع فيديو الغرفة 100 ميغابايت.');
+    if (size == 0 || size > 4 * 1024 * 1024 * 1024) {
+      _toast(size == 0 ? 'ملف الفيديو فارغ.' : 'الحد الأعلى لرفع فيديو الغرفة 4GB.');
       return;
     }
     setState(() { _busy = true; _progress = null; _busyLabel = 'جاري رفع الفيديو لغرفة المشاهدة...'; });
@@ -198,6 +198,9 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       final remoteUrl = await uploadForumMedia(
         XFile(entry.path, name: entry.path.split(Platform.pathSeparator).last),
         folder: 'watch-rooms',
+        onProgress: (progress) {
+          if (mounted) setState(() => _progress = progress);
+        },
       );
       if (!mounted) return;
       setState(() { _busy = false; _busyLabel = null; });
