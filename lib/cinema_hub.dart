@@ -42,25 +42,34 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
     } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ المفضلة.'))); }
   }
 
-  Future<List<_Film>> _load({bool series = false}) async {
-    final q = series
-        ? 'collection:classic_tv AND mediatype:movies'
-        : 'collection:opensource_movies AND mediatype:movies';
-    // Load up to 900 catalogue records in pages; actual playback is checked per title.
-    final pages = await Future.wait(List.generate(9, (index) async {
-      final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=${index + 1}&output=json&sort%5B%5D=downloads%20desc');
-      final response = await http.get(uri).timeout(const Duration(seconds: 25));
-      if (response.statusCode != 200) throw Exception('archive unavailable');
-      final root = jsonDecode(response.body) as Map<String, dynamic>;
-      final responseData = root['response'] as Map<String, dynamic>;
-      return (responseData['docs'] as List<dynamic>? ?? const <dynamic>[]);
-    }));
-    final seen = <String>{};
-    return pages.expand((page) => page).whereType<Map<String, dynamic>>().map((d) {
-      final id = (d['identifier'] ?? '').toString();
-      return _Film(id, (d['title'] ?? 'عمل سينمائي').toString(),
-        (d['year'] ?? '').toString(), (d['description'] ?? '').toString(), isSeries: series);
-    }).where((film) => film.id.isNotEmpty && seen.add(film.id)).toList();
+  Future<List<_Film>> _load({bool? series}) async {
+    Future<List<_Film>> loadCollection(String query, bool isSeries) async {
+      final pages = await Future.wait(List.generate(9, (index) async {
+        final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(query)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=${index + 1}&output=json&sort%5B%5D=downloads%20desc');
+        final response = await http.get(uri).timeout(const Duration(seconds: 25));
+        if (response.statusCode != 200) throw Exception('archive unavailable');
+        final root = jsonDecode(response.body) as Map<String, dynamic>;
+        final responseData = root['response'] as Map<String, dynamic>;
+        return (responseData['docs'] as List<dynamic>? ?? const <dynamic>[]);
+      }));
+      final seen = <String>{};
+      return pages.expand((page) => page).whereType<Map<String, dynamic>>().map((d) {
+        final id = (d['identifier'] ?? '').toString();
+        return _Film(id, (d['title'] ?? 'عمل سينمائي').toString(),
+          (d['year'] ?? '').toString(), (d['description'] ?? '').toString(), isSeries: isSeries);
+      }).where((film) => film.id.isNotEmpty && seen.add(film.id)).toList();
+    }
+
+    final collections = <Future<List<_Film>>>[];
+    if (series == null || series == false) {
+      collections.add(loadCollection('collection:opensource_movies AND mediatype:movies', false));
+    }
+    if (series == null || series == true) {
+      collections.add(loadCollection('collection:classic_tv AND mediatype:movies', true));
+    }
+    final loaded = await Future.wait(collections);
+    final unique = <String>{};
+    return loaded.expand((items) => items).where((film) => unique.add(film.id)).toList();
   }
 
   List<_Film> _filter(List<_Film> films) {
@@ -106,7 +115,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
             TextButton(onPressed: () => setState(() => _catalog = _load()), child: const Text('إعادة المحاولة')),
           ]));
           final films = _filter(snap.data ?? []);
-          return RefreshIndicator(onRefresh: () async => setState(() => _catalog = _load(series: _category == 'المسلسلات' || _category == 'مسلسلات كلاسيكية')),
+          return RefreshIndicator(onRefresh: () async => setState(() => _catalog = _load(series: _category == 'المسلسلات' || _category == 'مسلسلات كلاسيكية' ? true : _category == 'الأفلام' ? false : null)),
             child: CustomScrollView(slivers: [
               SliverToBoxAdapter(child: Container(
                 margin: const EdgeInsets.all(14), padding: const EdgeInsets.all(20),
@@ -149,7 +158,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal,
                 itemCount: _categories.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) => ChoiceChip(label: Text(_categories[i]), selected: _category == _categories[i],
-                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'المسلسلات' || _categories[i] == 'مسلسلات كلاسيكية'); }))))),
+                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'المسلسلات' || _categories[i] == 'مسلسلات كلاسيكية' ? true : _categories[i] == 'الأفلام' ? false : null); }))))),
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                 child: Row(children: [const Icon(Icons.local_movies, color: _cinemaAccent), const SizedBox(width: 8),
                   const Expanded(child: Text('مكتبة الأعمال المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
