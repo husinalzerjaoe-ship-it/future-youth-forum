@@ -10,7 +10,6 @@ import 'game_center.dart';
 import 'inspiration_hub.dart';
 import 'local_bot.dart';
 import 'match_center.dart';
-import 'v14_command_center.dart';
 
 const _v17Purple = Color(0xFF806BFF);
 
@@ -34,7 +33,6 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('عالم الأنمي', 'قائمة المشاهدة وخلفيات الأنمي', Icons.animation_rounded, () => const AnimeExperiencePage(), 'أنمي اوتاكو'),
     _Destination('مكتبة الإلهام', 'الشعر والاقتباسات والخواطر', Icons.auto_stories_rounded, () => const InspirationHubPage(), 'شعر اقتباس خواطر'),
     _Destination('المساعد المحلي', 'مساعدة وأفكار داخل التطبيق', Icons.smart_toy_rounded, () => const LocalHelperBotPage(), 'مساعد ذكاء مساعدة'),
-    _Destination('مركز الأوامر', 'كل أقسام الملتقى واختصاراتها', Icons.dashboard_customize_rounded, () => const V14CommandCenterPage(), 'أقسام اختصارات بحث'),
   ];
 
   @override
@@ -43,7 +41,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
   @override
   Widget build(BuildContext context) {
     final q = _search.text.trim().toLowerCase();
-    final results = _destinations.where((d) => ('\${d.title} \${d.description} \${d.keywords}').toLowerCase().contains(q)).toList();
+    final results = _destinations.where((d) => ('${d.title} ${d.description} ${d.keywords}').toLowerCase().contains(q)).toList();
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -178,7 +176,7 @@ class V17MiniGamesPage extends StatelessWidget {
           contentPadding: const EdgeInsets.all(14),
           leading: CircleAvatar(radius: 25, backgroundColor: _v17Purple.withValues(alpha: .16), child: Icon(g.icon, color: _v17Purple)),
           title: Text(g.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('\${g.subtitle} • \${g.questions.length} أسئلة'),
+          subtitle: Text('${g.subtitle} • ${g.questions.length} أسئلة'),
           trailing: const Icon(Icons.play_circle_fill_rounded, color: _v17Purple, size: 30),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => V17QuizPlayPage(quiz: g))),
         ),
@@ -225,7 +223,7 @@ class _V17QuizPlayPageState extends State<V17QuizPlayPage> {
     }
     setState(() => _finished = true);
     final prefs = await SharedPreferences.getInstance();
-    final key = 'v17_best_\${widget.quiz.title.hashCode}';
+    final key = 'v17_best_${widget.quiz.title.hashCode}';
     if (_score > (prefs.getInt(key) ?? 0)) await prefs.setInt(key, _score);
   }
 
@@ -245,7 +243,7 @@ class _V17QuizPlayPageState extends State<V17QuizPlayPage> {
                 const Icon(Icons.emoji_events_rounded, size: 64, color: Color(0xFFFFC857)),
                 const SizedBox(height: 12),
                 const Text('انتهى التحدي!', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
-                Text('نتيجتك: $_score من \${widget.quiz.questions.length}', style: const TextStyle(fontSize: 18)),
+                Text('نتيجتك: $_score من ${widget.quiz.questions.length}', style: const TextStyle(fontSize: 18)),
                 const SizedBox(height: 18),
                 FilledButton.icon(onPressed: _restart, icon: const Icon(Icons.replay), label: const Text('إعادة اللعب')),
               ]),
@@ -253,7 +251,7 @@ class _V17QuizPlayPageState extends State<V17QuizPlayPage> {
           : ListView(padding: const EdgeInsets.all(18), children: [
               LinearProgressIndicator(value: (_index + 1) / widget.quiz.questions.length, minHeight: 7),
               const SizedBox(height: 12),
-              Text('السؤال \${_index + 1} من \${widget.quiz.questions.length} • النقاط $_score', style: const TextStyle(color: _v17Purple, fontWeight: FontWeight.bold)),
+              Text('السؤال ${_index + 1} من ${widget.quiz.questions.length} • النقاط $_score', style: const TextStyle(color: _v17Purple, fontWeight: FontWeight.bold)),
               const SizedBox(height: 18),
               Text(q.text, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
               const SizedBox(height: 16),
