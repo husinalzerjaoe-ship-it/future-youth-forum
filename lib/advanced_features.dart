@@ -657,14 +657,49 @@ class NotificationsPage extends StatelessWidget {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: const Text('الإشعارات')),
+      appBar: AppBar(
+        title: const Text('الإشعارات'),
+        actions: [
+          IconButton(
+            tooltip: 'تحديد الكل كمقروء',
+            icon: const Icon(Icons.done_all_rounded),
+            onPressed: () async {
+              try {
+                final snapshot = await _db.collection('notifications').where('recipientId', isEqualTo: _uid).limit(100).get();
+                final unread = snapshot.docs.where((doc) => doc.data()['read'] != true).toList();
+                if (unread.isEmpty) {
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كل الإشعارات مقروءة بالفعل.')));
+                  return;
+                }
+                final batch = _db.batch();
+                for (final doc in unread) {
+                  batch.update(doc.reference, {'read': true});
+                }
+                await batch.commit();
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديد الإشعارات المحمّلة كمقروءة.')));
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث الإشعارات.')));
+              }
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _db.collection('notifications').where('recipientId', isEqualTo: _uid).limit(100).snapshots(),
         builder: (context, s) {
           if (s.hasError) return const Center(child: Text('تعذر تحميل الإشعارات'));
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           if (s.data!.docs.isEmpty) return const Center(child: Text('ما عندك إشعارات حالياً'));
-          return ListView(children: s.data!.docs.map((doc) {
+          final ordered = s.data!.docs.toList()
+            ..sort((a, b) {
+              final ad = a.data(), bd = b.data();
+              final unreadOrder = (ad['read'] == true ? 1 : 0).compareTo(bd['read'] == true ? 1 : 0);
+              if (unreadOrder != 0) return unreadOrder;
+              final at = ad['createdAt'] is Timestamp ? (ad['createdAt'] as Timestamp).millisecondsSinceEpoch : 0;
+              final bt = bd['createdAt'] is Timestamp ? (bd['createdAt'] as Timestamp).millisecondsSinceEpoch : 0;
+              return bt.compareTo(at);
+            });
+          return ListView(children: ordered.map((doc) {
             final d = doc.data();
             return ListTile(
               leading: CircleAvatar(child: Icon(d['type'] == 'message' ? Icons.mail : Icons.notifications)),
