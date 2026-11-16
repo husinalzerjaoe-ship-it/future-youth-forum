@@ -110,7 +110,9 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         : null;
     setState(() { _creating = true; _error = null; });
     try {
+      final roomCode = (100000 + Random.secure().nextInt(900000)).toString();
       final ref = await _watchDb.collection('watchRooms').add({
+        'roomCode': roomCode,
         'name': _name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim(),
         'roomType': widget.cinemaMode ? 'cinema' : 'watch',
         if (widget.cinemaMode) 'contentTitle': _name.text.trim(),
@@ -141,6 +143,18 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
           });
         }
       }
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('غرفتك جاهزة 🎬'),
+          content: SelectableText('رمز الغرفة: ' + roomCode + '\n' + (_privateRoom ? 'شارك الرمز وكلمة المرور مع الأصدقاء الذين دعوتهم فقط.' : 'شارك الرمز مع أصدقائك حتى ينضمون للمشاهدة.')),
+          actions: [
+            TextButton.icon(onPressed: () { Clipboard.setData(ClipboardData(text: roomCode)); Navigator.pop(dialogContext); },
+              icon: const Icon(Icons.copy), label: const Text('نسخ الرمز')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('متابعة')),
+          ],
+        )));
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: ref.id)));
     } catch (_) {
@@ -194,6 +208,22 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
           ],
         ))),
         const SizedBox(height: 12),
+        _RoomCodeJoinCard(onJoin: (code) async {
+          try {
+            final found = await _watchDb.collection('watchRooms')
+              .where('roomCode', isEqualTo: code)
+              .where('visibility', isEqualTo: 'public')
+              .limit(1).get();
+            if (found.docs.isEmpty) {
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ما لقينا غرفة عامة بهذا الرمز. الغرف الخاصة تحتاج دعوة من صاحبها.')));
+              return;
+            }
+            if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: found.docs.first.id)));
+          } catch (_) {
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر البحث عن الغرفة.')));
+          }
+        }),
+        const SizedBox(height: 12),
         const Text('الغرف المباشرة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).where('visibility', isEqualTo: 'public').limit(40).snapshots(),
@@ -207,7 +237,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
               return Card(child: ListTile(
                 leading: const CircleAvatar(child: Icon(Icons.live_tv)),
                 title: Text(d['name'] as String? ?? 'غرفة مشاهدة'),
-                subtitle: Text((d['sourceType'] == 'youtube' ? 'YouTube' : 'بث مباشر / فيديو') + ' • ' + (d['status'] == 'playing' ? 'يعمل الآن' : 'متوقف')),
+                subtitle: Text('رمز: ${d['roomCode'] ?? '—'} • ' + (d['sourceType'] == 'youtube' ? 'YouTube' : 'بث مباشر / فيديو') + ' • ' + (d['status'] == 'playing' ? 'يعمل الآن' : 'متوقف')),
                 trailing: const Icon(Icons.chevron_left),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: doc.id))),
               ));
@@ -879,4 +909,36 @@ class _WatchPartyFullscreenPageState extends State<_WatchPartyFullscreenPage> {
       DropdownButton<double>(value: widget.speed, dropdownColor: Colors.black87, style: const TextStyle(color: Colors.white), items: const [0.5,0.75,1.0,1.25,1.5,2.0].map((v) => DropdownMenuItem(value:v, child: Text('${v}x'))).toList(), onChanged: (v) { if(v!=null) widget.onSpeed(v); }),
     ])),
   ])));
+}
+
+ 
+class _RoomCodeJoinCard extends StatefulWidget {
+  const _RoomCodeJoinCard({required this.onJoin});
+  final Future<void> Function(String code) onJoin;
+  @override State<_RoomCodeJoinCard> createState() => _RoomCodeJoinCardState();
+}
+class _RoomCodeJoinCardState extends State<_RoomCodeJoinCard> {
+  final _code = TextEditingController();
+  bool _busy = false;
+  @override void dispose() { _code.dispose(); super.dispose(); }
+  Future<void> _join() async {
+    final code = _code.text.trim();
+    if (!RegExp(r'^\\d{6}$').hasMatch(code)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')));
+      return;
+    }
+    setState(() => _busy = true);
+    try { await widget.onJoin(code); } finally { if (mounted) setState(() => _busy = false); }
+  }
+  @override Widget build(BuildContext context) => Card(
+    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('عندك رمز غرفة؟', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: TextField(controller: _code, keyboardType: TextInputType.number, maxLength: 6,
+          decoration: const InputDecoration(hintText: 'أدخل الرمز المكوّن من 6 أرقام', counterText: '', border: OutlineInputBorder()))),
+        const SizedBox(width: 8),
+        FilledButton(onPressed: _busy ? null : _join, child: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('دخول')),
+      ]),
+    ])));
 }
