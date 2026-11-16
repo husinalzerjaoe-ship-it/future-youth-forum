@@ -41,9 +41,18 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
     );
   }
 
+  String _roomFromInput(String input) {
+    final parsed = Uri.tryParse(input);
+    if (parsed != null && parsed.host.toLowerCase() == 'meet.jit.si') {
+      final segments = parsed.pathSegments.where((part) => part.isNotEmpty).toList();
+      if (segments.isNotEmpty) return segments.first;
+    }
+    return input.trim();
+  }
+
   Future<void> _joinRoom() async {
     final user = FirebaseAuth.instance.currentUser;
-    final room = _roomController.text.trim();
+    final room = _roomFromInput(_roomController.text.trim());
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('سجّل الدخول إلى الملتقى أولاً')),
@@ -65,7 +74,7 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
       final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذر فتح Jitsi. تأكد من اتصال الإنترنت أو افتح الرابط يدوياً.')),
+          const SnackBar(content: Text('تعذر فتح Jitsi. جرّب Chrome أو انسخ الرابط وافتحه يدوياً.')),
         );
       }
     } catch (error) {
@@ -126,7 +135,7 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
               controller: _roomController,
               textDirection: TextDirection.ltr,
               decoration: InputDecoration(
-                labelText: 'رمز الغرفة',
+                labelText: 'رمز الغرفة أو رابط Jitsi',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
                   tooltip: 'إنشاء رمز جديد',
