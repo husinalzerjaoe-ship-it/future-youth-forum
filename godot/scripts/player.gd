@@ -1,8 +1,8 @@
 extends CharacterBody3D
 
-@export var move_speed: float = 5.5
-@export var jump_velocity: float = 5.0
-@export var gravity: float = 16.0
+@export var move_speed: float = 6.0
+@export var jump_velocity: float = 6.0
+@export var gravity: float = 17.0
 
 var _move_input := Vector2.ZERO
 var _mobile_jump_requested := false
@@ -19,8 +19,7 @@ func _register_input(action_name: String, key: Key) -> void:
         InputMap.add_action(action_name)
     var event := InputEventKey.new()
     event.physical_keycode = key
-    if not InputMap.action_get_events(action_name).any(func(existing): return existing is InputEventKey and existing.physical_keycode == key):
-        InputMap.action_add_event(action_name, event)
+    InputMap.action_add_event(action_name, event)
 
 func set_mobile_move(value: Vector2) -> void:
     _move_input = value.limit_length(1.0)
