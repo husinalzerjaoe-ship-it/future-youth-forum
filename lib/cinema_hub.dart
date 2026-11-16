@@ -119,7 +119,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
                     onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArabicAnimeCatalogPage())),
-                    icon: const Icon(Icons.auto_awesome), label: const Text('عالم الأنمي • أكثر من 1000 عنوان'),
+                    icon: const Icon(Icons.auto_awesome), label: const Text('عالم الأنمي • نحو 1000 عنوان'),
                   ),
                   const SizedBox(height: 12),
                   Wrap(spacing: 8, runSpacing: 8, children: [
@@ -421,7 +421,7 @@ class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
       body: Column(children: [
         Container(width: double.infinity, margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF34205B), Color(0xFF17182E)])),
-          child: const Text('تصفّح أكثر من 1000 عنوان أنمي، وابحث عن الترجمة أو الدبلجة العربية عبر منصات العرض الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
+          child: const Text('تصفّح نحو 1000 عنوان أنمي، وابحث عن الترجمة أو الدبلجة العربية عبر منصات العرض الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
             style: TextStyle(color: Colors.white, height: 1.6))),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 2, 12, 8),
