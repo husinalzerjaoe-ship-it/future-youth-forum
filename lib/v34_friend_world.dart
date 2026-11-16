@@ -18,6 +18,7 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
   final _db = FirebaseFirestore.instance;
   bool _busy = false;
   String? _notice;
+  final TextEditingController _chatController = TextEditingController();
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   DocumentReference<Map<String, dynamic>> get _room => _db.collection('arcadeRooms').doc(widget.roomId);
   static const int _side = 9;
@@ -64,6 +65,27 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
       }
       tx.update(_room, {'state': {...current, 'players': currentPlayers}, 'updatedAt': FieldValue.serverTimestamp()});
     });
+  }
+
+  @override
+  void dispose() {
+    _chatController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendChat() async {
+    final text = _chatController.text.trim();
+    if (text.isEmpty || text.length > 500) return;
+    _chatController.clear();
+    try {
+      await _room.collection('chat').add({
+        'uid': _uid,
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      if (mounted) setState(() => _notice = 'تعذر إرسال رسالة الغرفة: $e');
+    }
   }
 
   Future<void> _move(int target) async {
@@ -196,12 +218,62 @@ class _FriendWorldGamePageState extends State<FriendWorldGamePage> {
             if (_busy) const LinearProgressIndicator(),
             if (_notice != null) Padding(padding: const EdgeInsets.all(8), child: Text(_notice!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
             const SizedBox(height: 10),
+            SizedBox(width: double.infinity, child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => LiveKitCallsPage(initialRoom: 'arcade_${widget.roomId}'),
+            )), icon: const Icon(Icons.mic_rounded), label: const Text('فويس مباشر'))),
+            const SizedBox(height: 16),
+            const Text('دردشة لاعبي الغرفة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            const SizedBox(height: 8),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _room.collection('chat').orderBy('createdAt', descending: true).limit(30).snapshots(),
+              builder: (context, chatSnapshot) {
+                if (chatSnapshot.hasError) {
+                  return const Text('تعذر تحميل دردشة الغرفة. تحقق من صلاحيات Firestore.');
+                }
+                final messages = chatSnapshot.data?.docs ?? [];
+                if (messages.isEmpty) {
+                  return const Padding(padding: EdgeInsets.all(12), child: Text('ابدأوا الحديث أثناء المغامرة.'));
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  reverse: true,
+                  itemCount: messages.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 5),
+                  itemBuilder: (context, index) {
+                    final message = messages[index].data();
+                    final sender = message['uid']?.toString() ?? '';
+                    final senderName = names[sender]?.toString() ?? (sender == _uid ? 'أنت' : 'لاعب');
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(senderName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                        const SizedBox(height: 3),
+                        Text(message['text']?.toString() ?? ''),
+                      ]),
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => LiveKitCallsPage(initialRoom: 'arcade_${widget.roomId}'),
-              )), icon: const Icon(Icons.mic_rounded), label: const Text('فويس مباشر'))),
+              Expanded(child: TextField(
+                controller: _chatController,
+                maxLength: 500,
+                decoration: const InputDecoration(
+                  hintText: 'اكتب رسالة للاعبين...',
+                  counterText: '',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (_) => _sendChat(),
+              )),
               const SizedBox(width: 8),
-              Expanded(child: OutlinedButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.chat_rounded), label: const Text('دردشة الغرفة'))),
+              IconButton.filled(onPressed: _sendChat, icon: const Icon(Icons.send_rounded)),
             ]),
             const Padding(padding: EdgeInsets.only(top: 10), child: Text('كل حركة تتزامن مباشرة عند جميع اللاعبين. اجمعوا النجوم معاً وتجاوزوا الصخور كفريق.', textAlign: TextAlign.center)),
             Text('رمز الغرفة: $roomCode', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.bold)),
