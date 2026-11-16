@@ -372,7 +372,7 @@ class _V17DeviceSettingsPageState extends State<V17DeviceSettingsPage> {
           _section('جودة الوسائط', Icons.high_quality_rounded, [
             DropdownButtonFormField<String>(
               value: _quality,
-              decoration: const InputDecoration(labelText: 'جودة الصور والفيديو', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'تفضيل جودة الوسائط', helperText: 'الجودة النهائية تعتمد على الخيارات التي يوفرها مصدر الصورة أو الفيديو.', border: OutlineInputBorder()),
               items: const [
                 DropdownMenuItem(value: 'auto', child: Text('تلقائية حسب الاتصال')),
                 DropdownMenuItem(value: 'data', child: Text('موفرة للبيانات')),
