@@ -218,19 +218,35 @@ class _FilmDetails extends StatefulWidget {
 }
 
 class _FilmDetailsState extends State<_FilmDetails> {
-  bool _busy = false; String? _directUrl; String? _message;
+  bool _busy = false; String? _directUrl; String? _message; String? _subtitleUrl; String _subtitleStatus = 'لم يتم فحص ملفات الترجمة بعد';
   Future<void> _checkVideo() async {
     setState(() { _busy = true; _message = null; });
     try {
       final r = await http.get(Uri.https('archive.org', '/metadata/${widget.film.id}')).timeout(const Duration(seconds: 20));
       if (r.statusCode != 200) throw Exception();
       final data = jsonDecode(r.body) as Map<String, dynamic>;
-      final files = (data['files'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().where((f) {
+      final allFiles = (data['files'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
+      final subtitleFiles = allFiles.where((f) {
+        final name = (f['name'] ?? '').toString().toLowerCase();
+        final subtitle = name.endsWith('.srt') || name.endsWith('.vtt') || name.endsWith('.ass') || name.endsWith('.ssa') || name.endsWith('.sub');
+        final arabic = RegExp(r'(^|[._ -])(arabic|ara|ar)([._ -]|$)', caseSensitive: false).hasMatch(name);
+        final language = (f['language'] ?? '').toString().toLowerCase();
+        return subtitle && (arabic || language.contains('arabic'));
+      }).toList();
+      if (subtitleFiles.isNotEmpty) {
+        final subtitleName = (subtitleFiles.first['name'] ?? '').toString();
+        _subtitleUrl = 'https://archive.org/download/${widget.film.id}/${Uri.encodeComponent(subtitleName)}';
+        _subtitleStatus = 'عُثر على ملف ترجمة عربي في المصدر؛ يلزم التأكد من توافق التوقيت والجودة.';
+      } else {
+        _subtitleUrl = null;
+        _subtitleStatus = 'لم نعثر على ملف ترجمة عربي موصوف بوضوح ضمن ملفات المصدر.';
+      }
+      final files = allFiles.where((f) {
         final n = (f['name'] ?? '').toString().toLowerCase();
         return n.endsWith('.mp4') || n.endsWith('.m4v') || n.endsWith('.webm');
       }).toList();
       files.sort((a,b) => (int.tryParse((b['size'] ?? '0').toString()) ?? 0).compareTo(int.tryParse((a['size'] ?? '0').toString()) ?? 0));
-      if (files.isEmpty) { setState(() => _message = 'ما لقينا ملف فيديو مباشر. تگدر تفتح المصدر، لكن المزامنة غير مضمونة.'); }
+      if (files.isEmpty) { setState(() { _message = 'ما لقينا ملف فيديو مباشر. تگدر تفتح المصدر، لكن المزامنة غير مضمونة.'; }); }
       else {
         final name = (files.first['name'] ?? '').toString();
         setState(() => _directUrl = 'https://archive.org/download/${widget.film.id}/${Uri.encodeComponent(name)}');
@@ -257,8 +273,16 @@ class _FilmDetailsState extends State<_FilmDetails> {
         const SizedBox(height: 6),
         Wrap(spacing: 7, children: [
           Chip(label: Text(widget.film.isSeries ? 'مسلسل / حلقات' : 'فيلم')),
-          const Chip(label: Text('الترجمة العربية: غير مؤكدة')),
+          Chip(label: Text(_subtitleUrl == null ? 'الترجمة: غير مثبتة' : 'ملف ترجمة عربي موجود')),
         ]),
+        Text(_subtitleStatus, textDirection: TextDirection.rtl, textAlign: TextAlign.right,
+          style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        if (_subtitleUrl != null)
+          TextButton.icon(
+            onPressed: () => launchUrl(Uri.parse(_subtitleUrl!), mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.subtitles_rounded),
+            label: const Text('فتح ملف الترجمة العربية من المصدر'),
+          ),
         const SizedBox(height: 8),
         Text(widget.film.description.isEmpty
             ? 'عمل من مكتبة Internet Archive المفتوحة. تفاصيل اللغة والترجمة تحتاج التحقق من صفحة المصدر.'
