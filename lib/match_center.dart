@@ -36,6 +36,11 @@ class _MatchCenterPageState extends State<MatchCenterPage> {
     'دوري أبطال أوروبا': 'uefa.champions',
     'الدوري الأوروبي': 'uefa.europa',
     'الدوري العراقي': 'irq.1',
+    'الدوري السعودي': 'ksa.1',
+    'الدوري البرتغالي': 'por.1',
+    'الدوري الهولندي': 'ned.1',
+    'الدوري الأمريكي': 'usa.1',
+    'كأس العالم': 'fifa.world',
   };
   String selected = 'eng.1';
   late Future<List<Map<String, dynamic>>> matches;
