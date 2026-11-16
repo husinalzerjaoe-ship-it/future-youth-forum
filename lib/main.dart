@@ -20,6 +20,7 @@ import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
 import 'watch_party.dart';
+import 'cinema_hub.dart';
 import 'match_center.dart';
 import 'game_center.dart';
 import 'community_expansion.dart' hide CommunityEventsPage;
@@ -746,6 +747,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('يوتيوب وروابط فيديو وأفلام ومسلسلات متاحة للتضمين مع مزامنة ودردشة'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WatchPartyLobbyPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF2D204A), child: Icon(Icons.movie_filter_rounded, color: Color(0xFFB68CFF))),
+                title: const Text('سينما الملتقى', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('مكتبة الأفلام والمسلسلات وغرف المشاهدة مع الأصدقاء'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaHubPage())),
               ),
             ),
             Card(
