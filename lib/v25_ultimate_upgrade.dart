@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game_room_social.dart';
 
-const _v25Purple=Color(0xFF806BFF),_v25Navy=Color(0xFF171936);
+const _v25Navy=Color(0xFF171936);
 
 class V25UltimateUpgradePage extends StatelessWidget{
  const V25UltimateUpgradePage({super.key});
@@ -104,19 +104,6 @@ class _V25DuoXoRoomPageState extends State<V25DuoXoRoomPage>{
   }on FirebaseException catch(e){msg('تعذر إرسال الدعوة: '+e.code);}
  }
 
- Future<void> inviteFriend()async{
-  try{
-   final profiles=await db.collection('publicProfiles').limit(100).get();if(!mounted)return;
-   final target=await showModalBottomSheet<String>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:ListView(shrinkWrap:true,children:[
-    const Padding(padding:EdgeInsets.all(16),child:Text('اختَر صديقاً لدعوته')),
-    ...profiles.docs.where((p)=>p.id!=uid).map((p)=>ListTile(title:Text((p.data()['name']??'عضو').toString()),onTap:()=>Navigator.pop(c,p.id))),
-   ])));
-   if(target==null)return;
-   final me=await db.collection('publicProfiles').doc(uid).get();
-   await db.collection('gameInvites').add({'from':uid,'to':target,'fromName':me.data()?['name']??'صديق','game':'xo','roomId':widget.roomId,'roomCode':widget.roomId,'status':'pending','createdAt':FieldValue.serverTimestamp()});
-   msg('تم إرسال دعوة اللعبة.');
-  }on FirebaseException catch(e){msg('تعذر إرسال الدعوة: '+e.code);}
- }
  Future<void> reset(String host)async{if(uid==host&&!busy)await room.update({'board':List<String>.filled(9,''),'winner':'','turn':host,'status':'playing','updatedAt':FieldValue.serverTimestamp()});}
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:Text('XO نيون • '+widget.roomId)),body:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:room.snapshots(),builder:(c,s){
   if(s.hasError)return const Center(child:Text('تعذر الاتصال بالغرفة.'));if(!s.hasData)return const Center(child:CircularProgressIndicator());if(!s.data!.exists)return const Center(child:Text('الغرفة غير موجودة.'));
@@ -126,8 +113,7 @@ class _V25DuoXoRoomPageState extends State<V25DuoXoRoomPage>{
    Card(child:Padding(padding:const EdgeInsets.all(12),child:Row(mainAxisAlignment:MainAxisAlignment.spaceAround,children:[Text('✕ '+(names[ps.isNotEmpty?ps.first:'']??'المضيف').toString(),style:const TextStyle(color:Colors.cyan,fontWeight:FontWeight.bold)),Text('◯ '+(names[ps.length>1?ps[1]:'']??'بانتظار صديق').toString(),style:const TextStyle(color:Colors.pinkAccent,fontWeight:FontWeight.bold))]))),
    Card(child:Padding(padding:const EdgeInsets.all(12),child:Text(status=='waiting'?'شارك الرمز '+widget.roomId+' أو ادعُ صديقاً.':status=='finished'?result:mine?'دورك! اختَر خانة.':'انتظر حركة صديقك…',textAlign:TextAlign.center,style:const TextStyle(fontSize:17,fontWeight:FontWeight.w900)))),
    if(status=='waiting'&&uid==host)FilledButton.icon(onPressed:inviteFriend,icon:const Icon(Icons.person_add),label:const Text('دعوة صديق')),
-   AspectRatio(aspectRatio:1,child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:9,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:9,mainAxisSpacing:9),itemBuilder:(c,i){final m=b[i],color=m=='X'?Colors.cyanAccent:Colors.pinkAccent;return InkWell(onTap:status=='playing'&&mine&&m.isEmpty&&!busy?()=>move(i):null,child:Container(decoration:BoxDecoration(color:_n25,borderRadius:BorderRadius.circular(17),border:Border.all(color:m.isEmpty?Colors.white24:color,width:2)),child:Center(child:Text(m=='X'?'✕':m=='O'?'◯':'',style:TextStyle(fontSize:58,color:color,fontWeight:FontWeight.w900)))));})),
-   if(status=='waiting'&&uid==host)FilledButton.icon(onPressed:inviteFriend,icon:const Icon(Icons.person_add),label:const Text('دعوة صديق')),
+   AspectRatio(aspectRatio:1,child:GridView.builder(physics:const NeverScrollableScrollPhysics(),itemCount:9,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:9,mainAxisSpacing:9),itemBuilder:(c,i){final m=b[i],color=m=='X'?Colors.cyanAccent:Colors.pinkAccent;return InkWell(onTap:status=='playing'&&mine&&m.isEmpty&&!busy?()=>move(i):null,child:Container(decoration:BoxDecoration(color:_v25Navy,borderRadius:BorderRadius.circular(17),border:Border.all(color:m.isEmpty?Colors.white24:color,width:2)),child:Center(child:Text(m=='X'?'✕':m=='O'?'◯':'',style:TextStyle(fontSize:58,color:color,fontWeight:FontWeight.w900)))));})),
    if(status=='finished'&&uid==host)FilledButton(onPressed:()=>reset(host),child:const Text('جولة جديدة')),
    GameRoomSocialPanel(roomId:widget.roomId),SelectableText('رمز الغرفة: '+widget.roomId,textAlign:TextAlign.center),
    TextButton.icon(onPressed:()=>Clipboard.setData(ClipboardData(text:widget.roomId)),icon:const Icon(Icons.copy),label:const Text('نسخ الرمز')),
@@ -143,7 +129,7 @@ class _V25MemoryDuelPageState extends State<V25MemoryDuelPage>{
  Future<void> flip(int i)async{if(locked||open.contains(i)||matched.contains(i))return;setState(()=>open.add(i));if(open.length<2)return;final pair=open.toList();if(cards[pair[0]]==cards[pair[1]]){setState((){matched.addAll(pair);scores[player]++;open.clear();});if(matched.length==cards.length){await showDialog<void>(context:context,builder:(c)=>AlertDialog(title:Text(scores[0]==scores[1]?'تعادل':scores[0]>scores[1]?'فاز الأول':'فاز الثاني'),content:Text(scores[0].toString()+' - '+scores[1].toString()),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('حلو'))]));}}else{locked=true;await Future<void>.delayed(const Duration(milliseconds:850));if(!mounted)return;setState((){open.clear();player=1-player;locked=false;});}}
  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('ذاكرة الألوان • لاعبان'),actions:[IconButton(onPressed:reset,icon:const Icon(Icons.refresh))]),body:ListView(padding:const EdgeInsets.all(14),children:[
   Text('الأول: '+scores[0].toString()+' • الثاني: '+scores[1].toString()+' • الدور: '+(player+1).toString(),textAlign:TextAlign.center,style:const TextStyle(fontWeight:FontWeight.bold)),
-  GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:cards.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(c,i){final show=open.contains(i)||matched.contains(i);return InkWell(onTap:show?null:()=>flip(i),child:Container(decoration:BoxDecoration(color:show?const Color(0xFF51418F):_n25,borderRadius:BorderRadius.circular(15),border:Border.all(color:show?Colors.amber:Colors.white24)),child:Center(child:Text(show?cards[i]:'✦',style:const TextStyle(fontSize:34,color:Colors.white)))));}),
+  GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:cards.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(c,i){final show=open.contains(i)||matched.contains(i);return InkWell(onTap:show?null:()=>flip(i),child:Container(decoration:BoxDecoration(color:show?const Color(0xFF51418F):_v25Navy,borderRadius:BorderRadius.circular(15),border:Border.all(color:show?Colors.amber:Colors.white24)),child:Center(child:Text(show?cards[i]:'✦',style:const TextStyle(fontSize:34,color:Colors.white)))));}),
   OutlinedButton(onPressed:reset,child:const Text('إعادة اللعبة')),const Text('لعب محلي على جهاز واحد؛ مرّروا الجهاز بين الأدوار.',textAlign:TextAlign.center,style:TextStyle(fontSize:11,color:Colors.grey)),
  ])));
 }
@@ -160,7 +146,7 @@ class _V25FocusDuelPageState extends State<V25FocusDuelPage>{
   Text(finished?(a==b?'تعادل':a>b?'فاز الأول':'فاز الثاني'):'الجولة '+round.toString()+' من 10 • دور اللاعب '+(player+1).toString(),textAlign:TextAlign.center,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
   Text('النتيجة '+a.toString()+' - '+b.toString(),textAlign:TextAlign.center),
   if(!finished)Text(done?'انتهى دورك.':'اضغط المربع رقم '+(target+1).toString(),textAlign:TextAlign.center),
-  GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:9,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(c,i)=>InkWell(onTap:active?()=>tap(i):null,child:Container(decoration:BoxDecoration(color:done&&i==target?Colors.green.withValues(alpha:.3):_n25,borderRadius:BorderRadius.circular(14),border:Border.all(color:done&&i==target?Colors.green:Colors.white24)),child:Center(child:Text(done&&i==target?'✓':(i+1).toString(),style:const TextStyle(fontSize:25,color:Colors.white)))))),
+  GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:9,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(c,i)=>InkWell(onTap:active?()=>tap(i):null,child:Container(decoration:BoxDecoration(color:done&&i==target?Colors.green.withValues(alpha:.3):_v25Navy,borderRadius:BorderRadius.circular(14),border:Border.all(color:done&&i==target?Colors.green:Colors.white24)),child:Center(child:Text(done&&i==target?'✓':(i+1).toString(),style:const TextStyle(fontSize:25,color:Colors.white)))))),
   if(done&&!finished)FilledButton(onPressed:next,child:const Text('الدور التالي')),if(finished)FilledButton(onPressed:reset,child:const Text('إعادة التحدي')),
  ])));
 }
@@ -200,7 +186,7 @@ class _V25CoinStorePageState extends State<V25CoinStorePage>{
   return StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:FirebaseFirestore.instance.collection('coinWallets').doc(uid).snapshots(),builder:(c,s){
    final balance=(s.data?.data()?['coins'] as num?)?.toInt()??0,visible=items.where((x)=>category=='الكل'||x.category==category).toList();
    return ListView(padding:const EdgeInsets.all(14),children:[
-    Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(borderRadius:BorderRadius.circular(18),gradient:const LinearGradient(colors:[_n25,Color(0xFF5B35B5)])),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('محفظة الملتقى',style:TextStyle(color:Colors.white70)),Text(founder?'∞ عملات المؤسس':balance.toString()+' عملة',style:const TextStyle(color:Colors.white,fontSize:27,fontWeight:FontWeight.w900)),const Text('العملات منفصلة عن نقاط النشاط.',style:TextStyle(color:Colors.white70))])),
+    Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(borderRadius:BorderRadius.circular(18),gradient:const LinearGradient(colors:[_v25Navy,Color(0xFF5B35B5)])),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[const Text('محفظة الملتقى',style:TextStyle(color:Colors.white70)),Text(founder?'∞ عملات المؤسس':balance.toString()+' عملة',style:const TextStyle(color:Colors.white,fontSize:27,fontWeight:FontWeight.w900)),const Text('العملات منفصلة عن نقاط النشاط.',style:TextStyle(color:Colors.white70))])),
     Wrap(spacing:8,children:[OutlinedButton.icon(onPressed:topup,icon:const Icon(Icons.add_card),label:const Text('طلب شحن للمراجعة')),if(founder)FilledButton.icon(onPressed:grant,icon:const Icon(Icons.card_giftcard),label:const Text('منح عملات'))]),
     const Text('الطلب لا يسحب أموالاً. الموافقة يدوية من المؤسس؛ لا توجد بوابة دفع مفعّلة.',style:TextStyle(fontSize:11,color:Colors.grey)),
     const Text('الألقاب والإطارات وفقاعات الدردشة والثيمات',style:TextStyle(fontSize:18,fontWeight:FontWeight.w900)),
@@ -263,6 +249,6 @@ class _V25PerformancePageState extends State<V25PerformancePage>{
   FilledButton.icon(onPressed:save,icon:const Icon(Icons.save),label:const Text('حفظ وتطبيق')),
   const Text('بعض تفضيلات الوسائط والحركات تحتاج ربطاً في الأقسام نفسها. معدل الإطارات يحدده الهاتف والنظام.',style:TextStyle(fontSize:11,color:Colors.grey)),
  ]);
- @override Widget build(BuildContext context)=>embedded?body():Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('أداء الأجهزة V25')),body:body()));
+ @override Widget build(BuildContext context)=>widget.embedded?body():Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('أداء الأجهزة V25')),body:body()));
 }
 class _Item{const _Item(this.id,this.name,this.category,this.emoji,this.price);final String id,name,category,emoji;final int price;}
