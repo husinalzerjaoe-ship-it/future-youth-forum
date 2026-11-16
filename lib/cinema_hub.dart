@@ -18,7 +18,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   String _category = 'الكل';
   late Future<List<_Film>> _catalog;
   final Set<String> _favorites = {};
-  static const _categories = ['الكل','مسلسلات كلاسيكية','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة'];
+  static const _categories = ['الكل','الأفلام','المسلسلات','مفضلاتي','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة'];
 
   @override void initState() { super.initState(); _catalog = _load(); _loadFavorites(); }
   @override void dispose() { _search.dispose(); super.dispose(); }
@@ -71,6 +71,9 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         'خيال علمي' => RegExp(r'science fiction|sci.fi|space|alien').hasMatch(t),
         'مغامرة' => RegExp(r'adventure|western|war').hasMatch(t),
         'أفلام صامتة' => (int.tryParse(f.year) ?? 9999) < 1930,
+        'الأفلام' => true,
+        'المسلسلات' => true,
+        'مفضلاتي' => _favorites.contains(f.id),
         'مسلسلات كلاسيكية' => true,
         _ => true,
       };
@@ -98,7 +101,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
             TextButton(onPressed: () => setState(() => _catalog = _load()), child: const Text('إعادة المحاولة')),
           ]));
           final films = _filter(snap.data ?? []);
-          return RefreshIndicator(onRefresh: () async => setState(() => _catalog = _load()),
+          return RefreshIndicator(onRefresh: () async => setState(() => _catalog = _load(series: _category == 'المسلسلات' || _category == 'مسلسلات كلاسيكية')),
             child: CustomScrollView(slivers: [
               SliverToBoxAdapter(child: Container(
                 margin: const EdgeInsets.all(14), padding: const EdgeInsets.all(20),
@@ -141,11 +144,11 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal,
                 itemCount: _categories.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) => ChoiceChip(label: Text(_categories[i]), selected: _category == _categories[i],
-                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'مسلسلات كلاسيكية'); }))))),
+                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'المسلسلات' || _categories[i] == 'مسلسلات كلاسيكية'); }))))),
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                 child: Row(children: [const Icon(Icons.local_movies, color: _cinemaAccent), const SizedBox(width: 8),
                   const Expanded(child: Text('مكتبة الأعمال المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
-                  Text('${films.length} عمل')]))),
+                  Text(_category == 'مفضلاتي' ? '${films.length} مفضلة' : '${films.length} عمل')]))),
               if (films.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('ما لقينا نتائج بهذا البحث.')))
               else SliverPadding(padding: const EdgeInsets.all(14), sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate((_, i) {
