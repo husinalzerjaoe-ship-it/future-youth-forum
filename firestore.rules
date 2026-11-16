@@ -1606,5 +1606,9 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // V26 gaming guide, local game library notes and wallpaper favourites use
+    // SharedPreferences. They do not create Firestore records, so no permissive
+    // client-writable cloud collection is added until a synced schema is designed.
+
   }
 }
