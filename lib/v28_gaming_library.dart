@@ -65,11 +65,11 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   }
   Future<void> openHero(Map<String,dynamic> h) async {
     final slug=field(h,['slug','id'],'');if(slug.isEmpty)return;
-    setState(() { selected=h; selectedRank=rankFor(h); detailLoading=true; counters=[]; builds=[]; });
+    setState(() { selected=h; selectedRank=rankFor(h); detailLoading=true; counters=[]; });
     try{
       final r=await Future.wait([getData('/heroes/'+slug),getData('/heroes/'+slug+'/counters')]);
       if(!mounted)return;
-      setState(() { selected=asMap(r[0]).isEmpty?h:asMap(r[0]); counters=asList(r[1]); builds=asList(r[2]); detailLoading=false; });
+      setState(() { selected=asMap(r[0]).isEmpty?h:asMap(r[0]); counters=asList(r[1]); detailLoading=false; });
     }catch(_){if(mounted)setState(()=>detailLoading=false);}
   }
   List<String> flatten(dynamic v,[int depth=0]){
