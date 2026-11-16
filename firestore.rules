@@ -28,7 +28,7 @@ service cloud.firestore {
     function roomNotBanned(roomId) {
       return !exists(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid))
         || (get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.permanent != true
-          && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt < request.time);
+          && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt <= request.time);
     }
     // Private account data, including email, is visible only to its owner.
     match /users/{userId} {
@@ -586,13 +586,14 @@ service cloud.firestore {
 
     match /regionalChats/{roomId}/bans/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
-      allow create, update: if isFounder()
+      // Founder and assigned chat moderators can manage regional-room bans.
+      allow create, update: if isChatStaff()
         && request.resource.data.permanent is bool
         && request.resource.data.by == request.auth.uid
         && (request.resource.data.permanent == true
           ? request.resource.data.expiresAt == null
           : request.resource.data.expiresAt is timestamp);
-      allow delete: if isFounder();
+      allow delete: if isChatStaff();
     }
 
     match /regionalChats/{roomId}/messages/{messageId} {
@@ -619,7 +620,8 @@ service cloud.firestore {
             && request.resource.data.videoUrl is string
             && request.resource.data.videoUrl.matches('https://.*'))
         );
-      allow update, delete: if isFounder();
+      // Keep regional-room moderation consistent with the public chat staff role.
+      allow update, delete: if isChatStaff();
     }
 
     match /userBlocks/{blockId} {
