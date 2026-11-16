@@ -122,7 +122,8 @@ service cloud.firestore {
         && request.resource.data.bio.size() <= 300
         && request.resource.data.photoUrl is string
         && request.resource.data.photoUrl.size() <= 2048;
-      allow update: if request.auth != null
+      allow update: if (
+        request.auth != null
         && request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'photoUrl'])
         && request.resource.data.name is string
@@ -131,7 +132,17 @@ service cloud.firestore {
         && request.resource.data.bio is string
         && request.resource.data.bio.size() <= 300
         && request.resource.data.photoUrl is string
-        && request.resource.data.photoUrl.size() <= 2048;
+        && request.resource.data.photoUrl.size() <= 2048
+      ) || (
+        isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customTitle', 'customTitleColor', 'customTitleUpdatedAt'])
+        && request.resource.data.customTitle is string
+        && request.resource.data.customTitle.size() <= 32
+        && request.resource.data.customTitleColor is int
+        && request.resource.data.customTitleColor >= 0
+        && request.resource.data.customTitleColor <= 4294967295
+        && request.resource.data.customTitleUpdatedAt == request.time
+      );
       allow delete: if false;
 
       match /followers/{followerId} {
