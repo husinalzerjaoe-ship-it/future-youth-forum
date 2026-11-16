@@ -31,7 +31,6 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   String? _error;
   String? _endpoint;
   OverlayEntry? _miniCallOverlay;
-  bool _miniMode = false;
 
   @override
   void initState() {
@@ -182,7 +181,6 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   void _continueInApp() {
     if (_room == null || _miniCallOverlay != null) return;
-    setState(() => _miniMode = true);
     _miniCallOverlay = OverlayEntry(
       builder: (overlayContext) => Positioned(
         top: MediaQuery.paddingOf(overlayContext).top + 8,
@@ -244,7 +242,6 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     if (callRoute != null) {
       Navigator.of(context, rootNavigator: true).popUntil((route) => route == callRoute);
     }
-    if (mounted) setState(() => _miniMode = false);
   }
 
   Future<void> _toggleMicrophone() async {
@@ -279,7 +276,6 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     setState(() {
       _room = null;
       _listener = null;
-      _miniMode = false;
     });
     if (room != null) {
       room.removeListener(_onRoomChanged);
