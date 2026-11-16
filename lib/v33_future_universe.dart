@@ -95,7 +95,7 @@ class _FutureUniversePageState extends State<FutureUniversePage> {
     final unique = entries.map((e) => e.route).toSet().toList();
     final current = <String>[...order.where(unique.contains), ...unique.where((r) => !order.contains(r))];
     final index = current.indexOf(route);
-    final nextIndex = (index + delta).clamp(0, current.length - 1);
+    final nextIndex = (index + delta).clamp(0, current.length - 1).toInt();
     if (index < 0 || nextIndex == index) return;
     final item = current.removeAt(index);
     current.insert(nextIndex, item);
