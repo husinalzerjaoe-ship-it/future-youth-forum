@@ -929,7 +929,13 @@ class PostsPage extends StatelessWidget {
               final d = doc.data();
               return Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 ListTile(contentPadding: EdgeInsets.zero, leading: UserAvatar(url: d['authorPhoto'] as String?),
-                  title: Text(d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream: db.collection('publicProfiles').doc(d['authorId'] as String? ?? '').snapshots(), builder: (context, profile) {
+                    final p = profile.data?.data() ?? {}; final title = (p['customTitle'] ?? '').toString().trim();
+                    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge(title: title, colorValue: p['customTitleColor'] is int ? p['customTitleColor'] as int : null, compact: true)),
+                    ]);
+                  }),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
                 if ((d['text'] as String? ?? '').isNotEmpty) Text(d['text'] as String, style: const TextStyle(fontSize: 16)),
                 if ((d['imageUrl'] as String? ?? '').isNotEmpty)
