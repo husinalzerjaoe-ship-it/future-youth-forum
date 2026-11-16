@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const _v18Ink = Color(0xFF111321);
 const _v18Purple = Color(0xFF8B72FF);
 
 class V18DiscoveryHubPage extends StatefulWidget {
