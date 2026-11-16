@@ -46,7 +46,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       _items.removeWhere((e) => !File(e.path).existsSync());
     } catch (_) {}
     if (mounted) setState(() => _loading = false);
-    await _save();
+    try { await _save(); } catch (error) { debugPrint('Media library save failed: $error'); }
   }
 
   Future<void> _save() async {
@@ -219,6 +219,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     final index = tracks.indexWhere((e) => e.path == entry.path);
     if (index < 0) return;
     try {
+      await initializeLocalAudioService();
       await appAudioHandler.loadLocalQueue([
         for (final e in tracks) MediaItem(id: e.path, title: e.title, album: 'مكتبة ملتقى شباب المستقبل')
       ], initialIndex: index);
@@ -345,7 +346,11 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     }, childCount: entries.length));
   }
 
-  Widget _nowPlaying() => StreamBuilder<MediaItem?>(
+  Widget _nowPlaying() {
+    // AudioService is initialized asynchronously after the home screen appears.
+    // Never dereference the late handler until initialization has completed.
+    if (!isAudioServiceInitialized) return const SizedBox.shrink();
+    return StreamBuilder<MediaItem?>(
     stream: appAudioHandler.mediaItem,
     builder: (context, media) {
       final item = media.data;
@@ -371,6 +376,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       );
     },
   );
+  }
 }
 
 class _MediaEntry {
