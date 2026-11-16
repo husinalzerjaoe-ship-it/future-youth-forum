@@ -130,7 +130,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
         await for (final chunk in response) {
           sink.add(chunk);
           received += chunk.length;
-          if (mounted && total > 0) setState(() => _progress = (received / total).clamp(0.0, 1.0));
+          if (mounted && total > 0) setState(() => _progress = (received / total).clamp(0.0, 1.0).toDouble());
         }
       } finally { await sink.flush(); await sink.close(); }
       if (received == 0) throw const HttpException('الملف فارغ');
