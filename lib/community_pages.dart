@@ -49,7 +49,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'دردشات الدول',subtitle:'العراق وسوريا وثلاث غرف أخرى',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
   (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
   (title:'يوتيوب والترفيه',subtitle:'أغانٍ وفيديوهات وروابط أفلام رسمية',category:'الترفيه',icon:Icons.play_circle_fill,page:const YouTubeShelfPage()),
-  (title:'مكالمات الصوت والفيديو',subtitle:'مكالمات جماعية وخاصة عبر LiveKit',category:'التواصل',icon:Icons.video_call_rounded,page:const LiveKitCallsPage()),
+  (title:'مكالمات الصوت والفيديو',subtitle:'اتصلوا بالصوت وانتقلوا بين الأقسام والمكالمة مستمرة',category:'التواصل',icon:Icons.video_call_rounded,page:LiveKitCallsPage(onContinue:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>const CommunityHubPage())))),
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
