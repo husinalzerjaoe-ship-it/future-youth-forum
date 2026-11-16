@@ -154,10 +154,10 @@ class _V25FocusDuelPageState extends State<V25FocusDuelPage>{
 class V25CoinStorePage extends StatefulWidget{const V25CoinStorePage({super.key});@override State<V25CoinStorePage> createState()=>_V25CoinStorePageState();}
 class _V25CoinStorePageState extends State<V25CoinStorePage>{
  static const items=[
-  _Item('star','لقب نجم الملتقى','ألقاب','⭐',40),_Item('legend','لقب أسطورة','ألقاب','👑',120),_Item('creator','لقب المبدع','ألقاب','🎨',60),
-  _Item('neon','إطار نيون','إطارات','🟣',50),_Item('ocean','إطار المحيط','إطارات','🌊',50),_Item('gold','إطار ذهبي','إطارات','✨',140),
-  _Item('cyan','فقاعة سماوية','فقاعات','💬',35),_Item('aurora','فقاعة الشفق','فقاعات','🌌',75),_Item('goldbubble','فقاعة ذهبية','فقاعات','💛',110),
-  _Item('night','ثيم منتصف الليل','ثيمات','🌙',80),_Item('sakura','ثيم ساكورا','ثيمات','🌸',80),_Item('galaxy','ثيم المجرة','ثيمات','🌠',130),
+  _Item('star','لقب نجم الملتقى','ألقاب','⭐',40),_Item('legend','لقب أسطورة','ألقاب','👑',120),_Item('creator','لقب المبدع','ألقاب','🎨',60),_Item('explorer','لقب المستكشف','ألقاب','🧭',55),_Item('champion','لقب البطل','ألقاب','🏆',90),_Item('poet','لقب شاعر الملتقى','ألقاب','✒️',70),
+  _Item('neon','إطار نيون','إطارات','🟣',50),_Item('ocean','إطار المحيط','إطارات','🌊',50),_Item('gold','إطار ذهبي','إطارات','✨',140),_Item('ruby','إطار ياقوت','إطارات','🔴',95),_Item('emerald','إطار زمرد','إطارات','🟢',95),_Item('ice','إطار جليدي','إطارات','❄️',110),_Item('flame','إطار اللهب','إطارات','🔥',120),_Item('royal','إطار ملكي','إطارات','💠',160),
+  _Item('cyan','فقاعة سماوية','فقاعات','💬',35),_Item('aurora','فقاعة الشفق','فقاعات','🌌',75),_Item('goldbubble','فقاعة ذهبية','فقاعات','💛',110),_Item('mintbubble','فقاعة نعناع','فقاعات','🟩',45),_Item('rosebubble','فقاعة وردية','فقاعات','🌷',55),_Item('glassbubble','فقاعة زجاجية','فقاعات','🫧',100),_Item('darkbubble','فقاعة ليلية','فقاعات','🌑',65),
+  _Item('night','ثيم منتصف الليل','ثيمات','🌙',80),_Item('sakura','ثيم ساكورا','ثيمات','🌸',80),_Item('galaxy','ثيم المجرة','ثيمات','🌠',130),_Item('sunset','ثيم الغروب','ثيمات','🌅',90),_Item('forest','ثيم الغابة','ثيمات','🌲',90),_Item('cyber','ثيم سايبر','ثيمات','🤖',150),
  ];
  final uid=FirebaseAuth.instance.currentUser?.uid??'';final founder=FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com';
  String category='الكل';Set<String> owned={},equipped={};bool loaded=false;
@@ -169,7 +169,7 @@ class _V25CoinStorePageState extends State<V25CoinStorePage>{
   if(owned.contains(x.id)){setState(()=>equipped.contains(x.id)?equipped.remove(x.id):equipped.add(x.id));await save();return;}
   if(!founder&&balance<x.price){msg('رصيدك غير كافٍ. قدّم طلب إضافة عملات للمراجعة.');return;}
   if(!founder){try{final r=FirebaseFirestore.instance.collection('coinWallets').doc(uid);await FirebaseFirestore.instance.runTransaction((tx)async{final s=await tx.get(r);final n=(s.data()?['coins'] as num?)?.toInt()??0;if(n<x.price)throw Exception('الرصيد غير كافٍ.');tx.update(r,{'coins':n-x.price,'updatedAt':FieldValue.serverTimestamp()});});}catch(e){msg(e.toString().replaceFirst('Exception: ','تعذر الشراء: '));return;}}
-  setState((){owned.add(x.id);equipped.add(x.id);});await save();msg('تم اقتناء '+x.name+' وتفعيله محلياً.');
+  setState((){owned.add(x.id);equipped.add(x.id);});await save();msg('تم اقتناء '+x.name+' وتفعيله على هذا الجهاز.');
  }
  Future<void> topup()async{
   final amount=await showModalBottomSheet<int>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Column(mainAxisSize:MainAxisSize.min,children:[const Padding(padding:EdgeInsets.all(16),child:Text('طلب إضافة عملات — لا يوجد دفع داخل التطبيق')),for(final n in [100,250,500,1000])ListTile(title:Text(n.toString()+' عملة'),onTap:()=>Navigator.pop(c,n))])));
@@ -193,7 +193,7 @@ class _V25CoinStorePageState extends State<V25CoinStorePage>{
     SingleChildScrollView(scrollDirection:Axis.horizontal,child:Row(children:['الكل','ألقاب','إطارات','فقاعات','ثيمات'].map((v)=>Padding(padding:const EdgeInsetsDirectional.only(end:6),child:ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v)))).toList())),
     if(!loaded)const LinearProgressIndicator(),
     ...visible.map((x)=>Card(child:ListTile(leading:CircleAvatar(child:Text(x.emoji,style:const TextStyle(fontSize:22))),title:Text(x.name),subtitle:Text(x.category+' • '+x.price.toString()+' عملة'),trailing:owned.contains(x.id)?OutlinedButton(onPressed:()=>buy(x,balance),child:Text(equipped.contains(x.id)?'إلغاء':'تفعيل')):FilledButton(onPressed:loaded?()=>buy(x,balance):null,child:Text(founder?'اقتناء ∞':'شراء'))))),
-    const Text('المظهر المقتنى يحفظ محلياً بهذا الإصدار؛ مزامنته مع ملفات الأعضاء والدردشة تحتاج ربطاً إضافياً.',style:TextStyle(fontSize:11,color:Colors.grey)),
+    const Text('المظاهر الإضافية محفوظة على هذا الجهاز حالياً؛ مزامنة الملف والدردشة السحابية ضمن إصلاح V28 الجاري.',style:TextStyle(fontSize:11,color:Colors.grey)),
     if(founder)const _TopupReview(),
    ]);
   });
