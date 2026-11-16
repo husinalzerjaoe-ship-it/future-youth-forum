@@ -75,8 +75,8 @@ class _V28GamingLibraryPageState extends State<V28GamingLibraryPage> {
   List<String> flatten(dynamic v,[int depth=0]){
     if(depth>2||v==null)return [];
     if(v is String||v is num||v is bool)return [v.toString()];
-    if(v is List)return v.expand((e)=>flatten(e,depth+1)).take(30).toList();
-    if(v is Map)return v.entries.where((e)=>!['id','slug','url','image','icon','portrait','artwork'].contains(e.key.toLowerCase())).take(18).expand((e)=>[e.key+': '+flatten(e.value,depth+1).join('، ')]).toList();
+    if(v is List)return v.expand<String>((e)=>flatten(e,depth+1)).take(30).toList();
+    if(v is Map)return v.entries.where((e)=>!['id','slug','url','image','icon','portrait','artwork'].contains(e.key.toLowerCase())).take(18).expand<String>((e)=><String>[e.key.toString()+': '+flatten(e.value,depth+1).join('، ')]).toList();
     return [];
   }
   List<Map<String,dynamic>> get visibleHeroes=>heroes.where((h){
