@@ -79,7 +79,7 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
       final p=await SharedPreferences.getInstance();
       await p.setStringList('v12_creator_drafts',_drafts);
       if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر المسودة في المنشورات وإزالتها من قائمة المسودات.')));
-    }catch(error){
+    }catch(_){
       if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر نشر المسودة. تحقق من قواعد Firestore.')));
     }
   }
