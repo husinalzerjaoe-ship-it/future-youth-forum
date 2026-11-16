@@ -11,7 +11,6 @@ import 'local_bot.dart';
 
 const _v12Ink = Color(0xFF10162E);
 const _v12Panel = Color(0xFF1A2342);
-const _v12Violet = Color(0xFF927CFF);
 const _v12Aqua = Color(0xFF42D9E8);
 
 class V12CompanionCenterPage extends StatefulWidget {
