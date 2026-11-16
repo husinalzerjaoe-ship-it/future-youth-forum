@@ -48,6 +48,7 @@ import 'v33_future_universe.dart';
 import 'v22_cinema_discovery.dart';
 import 'ai_assistant.dart';
 import 'local_bot.dart';
+import 'godot_game_launcher.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -78,17 +79,122 @@ Future<void> _notifyContentMentions({
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await Supabase.initialize(
-    url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
-    anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
-    // Forward the signed-in Firebase ID token so Supabase Storage RLS can
-    // identify the same user. Configure Firebase as a Supabase Third-party Auth
-    // provider; the current storage policies validate Firebase issuer, audience and UID.
-    accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
-  );
-  await initializeLocalAudioService();
-  runApp(const FutureYouthApp());
+  // Render a Flutter-owned loading/error screen immediately. A slow network
+  // service must never leave Android's native splash covering the whole app.
+  runApp(const FutureYouthBootstrap());
+}
+
+class FutureYouthBootstrap extends StatefulWidget {
+  const FutureYouthBootstrap({super.key});
+  @override
+  State<FutureYouthBootstrap> createState() => _FutureYouthBootstrapState();
+}
+
+class _FutureYouthBootstrapState extends State<FutureYouthBootstrap> {
+  bool _ready = false;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    if (mounted) setState(() { _loading = true; _error = null; });
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 25));
+      if (!mounted) return;
+      setState(() { _ready = true; _loading = false; });
+
+      // Supabase Storage and the local audio player are optional services.
+      // Start them after the app UI is visible so neither can block sign-in.
+      Future<void>(() async {
+        try {
+          await Supabase.initialize(
+            url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
+            anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
+            accessToken: () async =>
+                FirebaseAuth.instance.currentUser?.getIdToken(),
+          ).timeout(const Duration(seconds: 20));
+        } catch (error, stackTrace) {
+          debugPrint('Supabase initialization failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      });
+      Future<void>(() async {
+        try {
+          await initializeLocalAudioService().timeout(
+            const Duration(seconds: 12),
+          );
+        } catch (error, stackTrace) {
+          debugPrint('Audio service initialization failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Firebase startup failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'تعذر تشغيل خدمات التطبيق. تحقق من الإنترنت ثم اضغط إعادة المحاولة.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const FutureYouthApp();
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF111321),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: brand,
+          brightness: Brightness.dark,
+        ),
+      ),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.groups_rounded, size: 64, color: Color(0xFFB9AEFF)),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'ملتقى شباب المستقبل',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error ?? 'جاري تجهيز الملتقى...',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 22),
+                  if (_loading)
+                    const CircularProgressIndicator()
+                  else
+                    FilledButton.icon(
+                      onPressed: _initialize,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class FutureYouthApp extends StatefulWidget {
@@ -623,6 +729,9 @@ class _HomePageState extends State<HomePage> {
                 case 'friendsArena':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsBattleArenaPage()));
                   break;
+                case 'godotLauncher':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const GodotGameLauncherPage()));
+                  break;
                 case 'growth':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureGrowthPage()));
                   break;
@@ -715,6 +824,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'futureArcade', child: ListTile(leading: Icon(Icons.sports_esports_rounded), title: Text('مدينة الألعاب الجديدة 2D'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'friendsArena', child: ListTile(leading: Icon(Icons.people_alt_rounded), title: Text('منافسات الأصدقاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'godotLauncher', child: ListTile(leading: Icon(Icons.view_in_ar_rounded), title: Text('مغامرات Godot ثلاثية الأبعاد'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'growth', child: ListTile(leading: Icon(Icons.track_changes_rounded), title: Text('مسار تطوري والأهداف اليومية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'universe', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('كون المستقبل V33 – مركز التخصيص'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('الإنجازات والأوسمة'), contentPadding: EdgeInsets.zero)),
@@ -782,52 +892,101 @@ class MiniNowPlayingBar extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => StreamBuilder<MediaItem?>(
-    stream: appAudioHandler.mediaItem,
-    builder: (context, itemSnapshot) {
-      final item = itemSnapshot.data;
-      if (item == null) return const SizedBox.shrink();
-      final duration = item.duration ?? Duration.zero;
-      return StreamBuilder<PlaybackState>(
-        stream: appAudioHandler.playbackState,
-        builder: (context, stateSnapshot) {
-          final playing = stateSnapshot.data?.playing ?? false;
-          return Material(
-            color: const Color(0xFF211B45),
-            child: Container(
-              padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 8, 5),
-              decoration: BoxDecoration(border: Border(top: BorderSide(color: const Color(0xFF9B8BFF).withOpacity(.35)))),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Row(children: [
-                  Container(width: 38, height: 38, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF806BEE), Color(0xFF3D8DBB)]), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.music_note_rounded, color: Colors.white)),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                    Text(item.artist ?? item.album ?? 'ملتقى شباب المستقبل', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                  ])),
-                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'السابق', onPressed: appAudioHandler.skipToPrevious, icon: const Icon(Icons.skip_previous_rounded, color: Colors.white)),
-                  IconButton(visualDensity: VisualDensity.compact, tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل', onPressed: playing ? appAudioHandler.pause : appAudioHandler.play, icon: Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: const Color(0xFFC5B9FF), size: 31)),
-                  IconButton(visualDensity: VisualDensity.compact, tooltip: 'التالي', onPressed: appAudioHandler.skipToNext, icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
-                ]),
-                StreamBuilder<Duration>(
-                  stream: AudioService.position,
-                  builder: (context, positionSnapshot) {
-                    final position = positionSnapshot.data ?? Duration.zero;
-                    final maxMs = duration.inMilliseconds > 0 ? duration.inMilliseconds.toDouble() : 1.0;
-                    return Row(children: [
-                      Text(_clock(position), style: const TextStyle(color: Colors.white60, fontSize: 9)),
-                      Expanded(child: SliderTheme(data: SliderTheme.of(context).copyWith(trackHeight: 2, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5), overlayShape: SliderComponentShape.noOverlay), child: Slider(min: 0, max: maxMs, value: position.inMilliseconds.clamp(0, maxMs.toInt()).toDouble(), onChanged: duration == Duration.zero ? null : (v) => appAudioHandler.seek(Duration(milliseconds: v.round())), activeColor: const Color(0xFFB8A8FF), inactiveColor: Colors.white24))),
-                      Text(_clock(duration), style: const TextStyle(color: Colors.white60, fontSize: 9)),
-                    ]);
-                  },
+  Widget build(BuildContext context) {
+    // Audio service is optional and initializes after the home screen appears.
+    // Never dereference its handler until initialization has completed.
+    if (!isAudioServiceInitialized) return const SizedBox.shrink();
+    final handler = appAudioHandler;
+
+    return StreamBuilder<MediaItem?>(
+      stream: handler.mediaItem,
+      builder: (context, itemSnapshot) {
+        final item = itemSnapshot.data;
+        if (item == null) return const SizedBox.shrink();
+        final duration = item.duration ?? Duration.zero;
+        return StreamBuilder<PlaybackState>(
+          stream: handler.playbackState,
+          builder: (context, stateSnapshot) {
+            final playing = stateSnapshot.data?.playing ?? false;
+            return Material(
+              color: const Color(0xFF211B45),
+              child: Container(
+                padding: const EdgeInsetsDirectional.fromSTEB(12, 7, 8, 5),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(
+                    color: const Color(0xFF9B8BFF).withOpacity(.35),
+                  )),
                 ),
-              ]),
-            ),
-          );
-        },
-      );
-    },
-  );
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Row(children: [
+                    Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [
+                          Color(0xFF806BEE), Color(0xFF3D8DBB),
+                        ]),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.music_note_rounded, color: Colors.white),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(item.artist ?? item.album ?? 'ملتقى شباب المستقبل',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                      ],
+                    )),
+                    IconButton(visualDensity: VisualDensity.compact,
+                      tooltip: 'السابق', onPressed: handler.skipToPrevious,
+                      icon: const Icon(Icons.skip_previous_rounded, color: Colors.white)),
+                    IconButton(visualDensity: VisualDensity.compact,
+                      tooltip: playing ? 'إيقاف مؤقت' : 'تشغيل',
+                      onPressed: playing ? handler.pause : handler.play,
+                      icon: Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                        color: const Color(0xFFC5B9FF), size: 31)),
+                    IconButton(visualDensity: VisualDensity.compact,
+                      tooltip: 'التالي', onPressed: handler.skipToNext,
+                      icon: const Icon(Icons.skip_next_rounded, color: Colors.white)),
+                  ]),
+                  StreamBuilder<Duration>(
+                    stream: AudioService.position,
+                    builder: (context, positionSnapshot) {
+                      final position = positionSnapshot.data ?? Duration.zero;
+                      final maxMs = duration.inMilliseconds > 0
+                          ? duration.inMilliseconds.toDouble() : 1.0;
+                      return Row(children: [
+                        Text(_clock(position), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                        Expanded(child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 2,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                            overlayShape: SliderComponentShape.noOverlay,
+                          ),
+                          child: Slider(
+                            min: 0, max: maxMs,
+                            value: position.inMilliseconds.clamp(0, maxMs.toInt()).toDouble(),
+                            onChanged: duration == Duration.zero ? null :
+                              (v) => handler.seek(Duration(milliseconds: v.round())),
+                            activeColor: const Color(0xFFB8A8FF),
+                            inactiveColor: Colors.white24,
+                          ),
+                        )),
+                        Text(_clock(duration), style: const TextStyle(color: Colors.white60, fontSize: 9)),
+                      ]);
+                    },
+                  ),
+                ]),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 class PostsPage extends StatelessWidget {
@@ -1051,7 +1210,7 @@ class PostsPage extends StatelessWidget {
                     final p = profile.data?.data() ?? {}; final title = (p['customTitle'] ?? '').toString().trim();
                     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge(title: title, colorValue: p['customTitleColor'] is int ? p['customTitleColor'] as int : null, compact: true)),
+                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge.fromProfile(title: title, profile: p, compact: true)),
                     ]);
                   }),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
@@ -1277,7 +1436,7 @@ class MyProfilePage extends StatelessWidget {
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
           if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
+            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
@@ -1490,7 +1649,7 @@ class MemberProfilePage extends StatelessWidget {
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
+              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
             if (uid != FirebaseAuth.instance.currentUser!.uid)

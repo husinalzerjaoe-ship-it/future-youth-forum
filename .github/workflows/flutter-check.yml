@@ -67,10 +67,31 @@ jobs:
           GRADLE
       - name: Configure Android background audio
         run: python scripts/configure_android_audio.py
+      - name: Configure embedded Godot Android runtime
+        run: python scripts/configure_godot_android.py
       - name: Set Android app display name
         run: sed -i 's/android:label="forum"/android:label="ملتقى شباب المستقبل"/' android/app/src/main/AndroidManifest.xml
       - name: Configure Future Youth Forum launcher icon
         run: python scripts/configure_android_branding.py
+      - name: Verify Android Flutter embedding v2 manifest
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = "android/app/src/main/AndroidManifest.xml"
+          root = ET.parse(path).getroot()
+          android = "{http://schemas.android.com/apk/res/android}"
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Android application element is missing")
+          app_name = app.get(android + "name")
+          if app_name == "io.flutter.app.FlutterApplication":
+              raise SystemExit("Legacy FlutterApplication v1 declaration remains")
+          marker = next((item for item in app.findall("meta-data")
+                         if item.get(android + "name") == "flutterEmbedding"), None)
+          if marker is None or marker.get(android + "value") != "2":
+              raise SystemExit("Flutter embedding v2 marker is missing or unreadable")
+          print("Verified Flutter Android embedding v2 in the generated manifest.")
+          PY
       - name: Build release APK
         run: flutter build apk --release
       - name: Upload release APK
