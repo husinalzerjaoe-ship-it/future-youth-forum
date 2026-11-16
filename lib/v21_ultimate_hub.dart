@@ -13,6 +13,7 @@ import 'match_center.dart';
 import 'v12_companion_center.dart';
 import 'v18_discovery_hub.dart';
 import 'v22_cinema_discovery.dart';
+import 'v23_creative_lab.dart';
 
 const _v21Accent = Color(0xFF8B72FF);
 
@@ -26,6 +27,7 @@ class _V21UltimateHubPageState extends State<V21UltimateHubPage> {
   int _xp = 0;
   bool _loaded = false;
   static final _places = <_V21Place>[
+    _V21Place('مختبر الإبداع اليومي', 'أفكار وتحديات كتابة وتصميم وتفكير مع حفظ المفضلة', Icons.lightbulb_circle_rounded, const V23CreativeLabPage(), 'تحديات إبداع كتابة تصميم تفكير يومي'),
     _V21Place('المكتبة الثقافية', 'قراءة ومقالات ورف محفوظ', Icons.auto_stories_rounded, const V21LibraryPage(), 'كتب قراءة ثقافة مقالات معرفة'),
     _V21Place('أكاديمية المستقبل', 'اختبارات ومراجعة', Icons.school_rounded, const V21AcademyPage(), 'تعليم دراسة أكاديمية اختبار'),
     _V21Place('استوديو الإبداع', 'اكتب أفكارك واحفظ مسوداتك', Icons.palette_rounded, const V21CreatorStudioPage(), 'إبداع كتابة خواطر'),
