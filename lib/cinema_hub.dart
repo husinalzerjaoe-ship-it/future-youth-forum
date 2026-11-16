@@ -18,7 +18,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   String _category = 'الكل';
   late Future<List<_Film>> _catalog;
   final Set<String> _favorites = {};
-  static const _categories = ['الكل','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة','مسلسلات كلاسيكية'];
+  static const _categories = ['الكل','رعب','غموض','كوميديا','دراما','خيال علمي','مغامرة','أفلام صامتة','مسلسلات'];
 
   @override void initState() { super.initState(); _catalog = _load(); _loadFavorites(); }
   @override void dispose() { _search.dispose(); super.dispose(); }
@@ -43,19 +43,50 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
   }
 
   Future<List<_Film>> _load({bool series = false}) async {
-    final q = series
-        ? 'collection:opensource_movies AND mediatype:movies AND (title:episode OR title:serial OR title:season OR title:series)'
-        : 'collection:opensource_movies AND mediatype:movies';
-    final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(q)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&rows=100&page=1&output=json&sort%5B%5D=downloads%20desc');
-    final response = await http.get(uri).timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) throw Exception('archive unavailable');
-    final root = jsonDecode(response.body) as Map<String, dynamic>;
-    final docs = ((root['response'] as Map<String, dynamic>)['docs'] as List<dynamic>);
-    return docs.map((v) {
-      final d = v as Map<String, dynamic>;
-      return _Film((d['identifier'] ?? '').toString(), (d['title'] ?? 'عمل سينمائي').toString(),
-        (d['year'] ?? '').toString(), (d['description'] ?? '').toString());
-    }).where((f) => f.id.isNotEmpty).toList();
+    // Series come from a dedicated catalogue, never inferred from movie-title keywords.
+    if (series) {
+      final collected = <_Film>[];
+      for (var page = 0; page < 3; page++) {
+        final response = await http.get(Uri.https('api.tvmaze.com', '/shows', {'page': '$page'}))
+            .timeout(const Duration(seconds: 20));
+        if (response.statusCode == 404) break;
+        if (response.statusCode != 200) throw Exception('TV catalogue unavailable');
+        final rows = jsonDecode(response.body) as List<dynamic>;
+        for (final row in rows.whereType<Map<String, dynamic>>()) {
+          final premiered = (row['premiered'] ?? '').toString();
+          final summary = (row['summary'] ?? '').toString()
+              .replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\\s+'), ' ').trim();
+          collected.add(_Film('tvmaze-${row['id']}', (row['name'] ?? 'مسلسل').toString(),
+            premiered.length >= 4 ? premiered.substring(0, 4) : '', summary,
+            isSeries: true, sourceUrl: (row['url'] ?? 'https://www.tvmaze.com').toString(),
+            imageUrl: ((row['image'] as Map<String, dynamic>?)?['medium'] ?? '').toString()));
+        }
+      }
+      return collected;
+    }
+
+    // Five pages × 100 records: a 500-title target, subject to source availability.
+    final collected = <_Film>[];
+    final seen = <String>{};
+    for (var page = 1; page <= 5; page++) {
+      const query = 'collection:opensource_movies AND mediatype:movies';
+      final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(query)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&fl%5B%5D=subject&rows=100&page=$page&output=json&sort%5B%5D=downloads%20desc');
+      final response = await http.get(uri).timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) throw Exception('movie catalogue unavailable');
+      final root = jsonDecode(response.body) as Map<String, dynamic>;
+      final docs = ((root['response'] as Map<String, dynamic>)['docs'] as List<dynamic>? ?? const []);
+      for (final value in docs.whereType<Map<String, dynamic>>()) {
+        final id = (value['identifier'] ?? '').toString();
+        if (id.isEmpty || !seen.add(id)) continue;
+        final subjects = value['subject'];
+        final description = [(value['description'] ?? '').toString(),
+          if (subjects is List) subjects.join(' '), if (subjects is String) subjects].join(' ');
+        collected.add(_Film(id, (value['title'] ?? 'فيلم مفتوح').toString(),
+          (value['year'] ?? '').toString(), description));
+      }
+      if (docs.length < 100) break;
+    }
+    return collected;
   }
 
   List<_Film> _filter(List<_Film> films) {
@@ -71,7 +102,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         'خيال علمي' => RegExp(r'science fiction|sci.fi|space|alien').hasMatch(t),
         'مغامرة' => RegExp(r'adventure|western|war').hasMatch(t),
         'أفلام صامتة' => (int.tryParse(f.year) ?? 9999) < 1930,
-        'مسلسلات كلاسيكية' => RegExp(r'episode|serial|chapter|season|series').hasMatch(t),
+        'مسلسلات' => f.isSeries,
         _ => true,
       };
       return searchOk && categoryOk;
@@ -125,11 +156,11 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14), scrollDirection: Axis.horizontal,
                 itemCount: _categories.length, separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) => ChoiceChip(label: Text(_categories[i]), selected: _category == _categories[i],
-                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'مسلسلات كلاسيكية'); }))))),
+                  onSelected: (_) => setState(() { _category = _categories[i]; _catalog = _load(series: _categories[i] == 'مسلسلات'); }))))),
               SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
                 child: Row(children: [const Icon(Icons.local_movies, color: _cinemaAccent), const SizedBox(width: 8),
-                  const Expanded(child: Text('مكتبة الأعمال المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
-                  Text('${films.length} عمل')]))),
+                  Expanded(child: Text(_category == 'مسلسلات' ? 'كتالوج المسلسلات المستقل' : 'مكتبة الأفلام المفتوحة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                  Text('${films.length} ${_category == 'مسلسلات' ? 'مسلسل' : 'فيلم'}')]))),
               if (films.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('ما لقينا نتائج بهذا البحث.')))
               else SliverPadding(padding: const EdgeInsets.all(14), sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate((_, i) {
@@ -139,7 +170,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                 }, childCount: films.length),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .68, crossAxisSpacing: 12, mainAxisSpacing: 12))),
               const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(16), child: Text(
-                'المكتبة تجلب أعمالاً من مجموعة Open Source Movies في Internet Archive. التوفر والترخيص يختلفان حسب العمل؛ راجع صفحة المصدر قبل المشاركة.',
+                _category == 'مسلسلات' ? 'بيانات المسلسلات من TVMaze وليست ملفات حلقات. افتح المصدر الرسمي لمعرفة خيارات المشاهدة.' : 'الأفلام من مجموعة Open Source Movies في Internet Archive. يجلب التطبيق خمس صفحات، بحد مستهدف 500 عنوان إذا وفر المصدر النتائج.',
                 style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.6)))),
             ]));
         },
@@ -149,8 +180,10 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
 }
 
 class _Film {
-  const _Film(this.id, this.title, this.year, this.description);
+  const _Film(this.id, this.title, this.year, this.description, {this.isSeries = false, this.sourceUrl = '', this.imageUrl = ''});
   final String id, title, year, description;
+  final bool isSeries;
+  final String sourceUrl, imageUrl;
 }
 
 class _FilmCard extends StatelessWidget {
@@ -163,7 +196,7 @@ class _FilmCard extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Expanded(child: Stack(fit: StackFit.expand, children: [
           ClipRRect(borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            child: Image.network('https://archive.org/services/img/${film.id}', fit: BoxFit.cover,
+            child: Image.network(film.isSeries ? film.imageUrl : 'https://archive.org/services/img/${film.id}', fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, color: _cinemaAccent, size: 50)))),
           Positioned(top: 3, left: 3, child: IconButton.filledTonal(onPressed: onFavorite,
             icon: Icon(favorite ? Icons.favorite : Icons.favorite_border, color: favorite ? Colors.pinkAccent : Colors.white))),
@@ -171,7 +204,7 @@ class _FilmCard extends StatelessWidget {
         ])),
         Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(film.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-          Text(film.year.isEmpty ? 'عمل مفتوح' : film.year, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
+          Text(film.isSeries ? 'مسلسل • ${film.year}' : (film.year.isEmpty ? 'فيلم مفتوح' : 'فيلم • ${film.year}'), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey)),
         ])),
       ])),
   );
@@ -186,6 +219,7 @@ class _FilmDetails extends StatefulWidget {
 class _FilmDetailsState extends State<_FilmDetails> {
   bool _busy = false; String? _directUrl; String? _message;
   Future<void> _checkVideo() async {
+    if (widget.film.isSeries) { setState(() => _message = 'هذا مسلسل من كتالوج مستقل. افتح صفحة المصدر الرسمية لمعلومات الحلقات وخيارات المشاهدة.'); return; }
     setState(() { _busy = true; _message = null; });
     try {
       final r = await http.get(Uri.https('archive.org', '/metadata/${widget.film.id}')).timeout(const Duration(seconds: 20));
@@ -215,11 +249,11 @@ class _FilmDetailsState extends State<_FilmDetails> {
     child: SafeArea(child: Padding(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         ClipRRect(borderRadius: BorderRadius.circular(16), child: AspectRatio(aspectRatio: 16/8,
-          child: Image.network('https://archive.org/services/img/${widget.film.id}', fit: BoxFit.cover,
+          child: Image.network(widget.film.isSeries ? widget.film.imageUrl : 'https://archive.org/services/img/${widget.film.id}', fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, size: 50))))),
         const SizedBox(height: 12),
         Text(widget.film.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(widget.film.year, style: const TextStyle(color: Colors.grey)),
+        Text(widget.film.isSeries ? 'مسلسل • ${widget.film.year}' : 'فيلم • ${widget.film.year}', style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 8),
         Text(widget.film.description.isEmpty ? 'عمل من مكتبة Internet Archive المفتوحة.' : widget.film.description,
           maxLines: 4, overflow: TextOverflow.ellipsis),
@@ -231,7 +265,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
           icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : Icon(_directUrl == null ? Icons.search : Icons.groups),
           label: Text(_busy ? 'جارٍ فحص الفيديو...' : _directUrl == null ? 'فحص التشغيل وإنشاء غرفة' : 'شاهد مع الأصدقاء')),
-        TextButton.icon(onPressed: () => launchUrl(Uri.https('archive.org', '/details/${widget.film.id}'), mode: LaunchMode.externalApplication),
+        TextButton.icon(onPressed: () => launchUrl((widget.film.isSeries ? Uri.parse(widget.film.sourceUrl) : Uri.https('archive.org', '/details/${widget.film.id}')), mode: LaunchMode.externalApplication),
           icon: const Icon(Icons.open_in_new), label: const Text('صفحة المصدر')),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
       ]))));
