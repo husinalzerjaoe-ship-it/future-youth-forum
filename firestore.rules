@@ -210,7 +210,16 @@ service cloud.firestore {
           || (room.invitedUids is list && request.auth.uid in room.invitedUids)
         );
       }
-      allow read: if canAccessRoom();
+      // Use the queried document's own fields for top-level room reads.
+      // Firestore queries are not filters: a get() of the same document here
+      // prevents public/invited room queries from proving their read access.
+      // Keep canAccessRoom() below for nested collections, where the parent
+      // room must be loaded explicitly.
+      allow read: if request.auth != null && (
+        !('visibility' in resource.data) || resource.data.visibility != 'private'
+        || resource.data.hostUid == request.auth.uid
+        || (resource.data.invitedUids is list && request.auth.uid in resource.data.invitedUids)
+      );
       allow create: if request.auth != null
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.name is string
