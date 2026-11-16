@@ -243,7 +243,7 @@ class _GameVoicePlayerState extends State<_GameVoicePlayer> {
   @override void initState() {
     super.initState();
     _player = AudioPlayer();
-    _player.setUrl(widget.url).catchError((_) {});
+    _player.setUrl(widget.url).catchError((_) => null);
   }
   @override void dispose() { _player.dispose(); super.dispose(); }
   @override Widget build(BuildContext context) => SizedBox(
