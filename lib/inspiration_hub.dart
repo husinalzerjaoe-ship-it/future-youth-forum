@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _ink = Color(0xFF171936);
 const _violet = Color(0xFF6554D9);
@@ -10,6 +11,34 @@ class InspirationHubPage extends StatefulWidget {
 }
 class _InspirationHubPageState extends State<InspirationHubPage> {
   String category = 'قصائد فصحى';
+  final TextEditingController _search = TextEditingController();
+  Set<String> _saved = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() => _saved = (prefs.getStringList('v15_inspiration_saved') ?? <String>[]).toSet());
+  }
+
+  Future<void> _toggleSaved(String value) async {
+    final next = Set<String>.from(_saved);
+    if (next.contains(value)) { next.remove(value); } else { next.add(value); }
+    setState(() => _saved = next);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('v15_inspiration_saved', next.toList());
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
   final tabs = const ['قصائد فصحى','قصائد طويلة','قصائد قصيرة','شعر عراقي','شعر عراقي طويل','شعر عراقي قصير','قصائد عن الوطن','قصائد عن الأم','قصائد عن العلم','قصائد عن الأمل','الخذلان','الفراق','الحنين','الحب','الصداقة','شعر شعبي','اقتباسات','اقتباسات طويلة','اقتباسات قصيرة','اقتباسات عن النجاح','اقتباسات عن الصداقة','اقتباسات عن القراءة','اقتباسات عن التقنية','خواطر عن العائلة','عبارات عراقية','نصائح','حكم وأقوال','أدعية','أذكار','استغفار وتسبيح','معايدات','صباحيات','مسائيات','الصبر والأمل','الكرامة وعزة النفس','رسائل حب','تهاني التخرج','نجاح وطموح','أسئلة للنقاش','نكت خفيفة'];
   static const themes = ['الأمل','الوطن','الصداقة','الأم','العلم','الكرامة','الحنين','الصبر','النجاح','الوفاء'];
   static const open = ['إذا أقبل الصبح استفاقت عزائمٌ','وفي القلب نورٌ لا تطفئه عاصفٌ','على درب أحلامي أسيرُ مؤمّلاً','ومن رحم الآلام يولدُ فرحُنا','أيا صاحِ إن المجد ليس هديةً','تعلّمْ فكم بالعلم تسمو نفوسُنا','إذا ضاق دربٌ فالأماني رحابةٌ','وما خاب قلبٌ باليقين تسلّحا','لأمي دعاءٌ في الفؤاد مردّدٌ','بلادي وإن طال المسير أحبّها'];
@@ -283,16 +312,17 @@ class _InspirationHubPageState extends State<InspirationHubPage> {
       'يا بغداد، حبج بگلبي حكاية ما تخلص.'
     ]
   };
-\n  List<String> get items => switch(category) {'قصائد فصحى'=>classical,'قصائد طويلة'=>longPoems,'قصائد قصيرة'=>shortPoems,'شعر عراقي'=>folk,'شعر عراقي طويل'=>iraqiLong,'شعر عراقي قصير'=>iraqiShort,'الخذلان'=>heartbreak,'الفراق'=>separation,'الحنين'=>nostalgia,'الحب'=>loveTexts,'الصداقة'=>friendship,'شعر شعبي'=>folk,'اقتباسات'=>quotes,'اقتباسات طويلة'=>longQuotes,'اقتباسات قصيرة'=>shortQuotes,'نصائح'=>advice,'حكم وأقوال'=>wisdom,'أدعية'=>prayers,'أذكار'=>adhkar,'استغفار وتسبيح'=>istighfar,'معايدات'=>greetings,'صباحيات'=>mornings,'مسائيات'=>evenings,'الصبر والأمل'=>patience,'رسائل حب'=>loveMessages,'تهاني التخرج'=>graduation,'نجاح وطموح'=>ambition,'أسئلة للنقاش'=>discussion,'نكت خفيفة'=>lightJokes,_=>bonusCollections[category] ?? dignity};
-  @override Widget build(BuildContext context) { final cs=Theme.of(context).colorScheme; return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+\n  List<String> get items => switch(category) {'المفضلة'=>_saved.toList(),'قصائد فصحى'=>classical,'قصائد طويلة'=>longPoems,'قصائد قصيرة'=>shortPoems,'شعر عراقي'=>folk,'شعر عراقي طويل'=>iraqiLong,'شعر عراقي قصير'=>iraqiShort,'الخذلان'=>heartbreak,'الفراق'=>separation,'الحنين'=>nostalgia,'الحب'=>loveTexts,'الصداقة'=>friendship,'شعر شعبي'=>folk,'اقتباسات'=>quotes,'اقتباسات طويلة'=>longQuotes,'اقتباسات قصيرة'=>shortQuotes,'نصائح'=>advice,'حكم وأقوال'=>wisdom,'أدعية'=>prayers,'أذكار'=>adhkar,'استغفار وتسبيح'=>istighfar,'معايدات'=>greetings,'صباحيات'=>mornings,'مسائيات'=>evenings,'الصبر والأمل'=>patience,'رسائل حب'=>loveMessages,'تهاني التخرج'=>graduation,'نجاح وطموح'=>ambition,'أسئلة للنقاش'=>discussion,'نكت خفيفة'=>lightJokes,_=>bonusCollections[category] ?? dignity};
+  @override Widget build(BuildContext context) { final cs=Theme.of(context).colorScheme; final shown=items.where((v)=>_search.text.trim().isEmpty||v.toLowerCase().contains(_search.text.trim().toLowerCase())).toList(); return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
     appBar:AppBar(title:const Text('مكتبة الملتقى')),
     body:Container(color:cs.surface,child:Column(children:[
       Container(width:double.infinity,padding:const EdgeInsets.all(18),decoration:const BoxDecoration(gradient:LinearGradient(colors:[_ink,_violet,Color(0xFF168E9B)]),borderRadius:BorderRadius.vertical(bottom:Radius.circular(26))),child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text('مساحة للكلمة الجميلة ✨',style:TextStyle(color:Colors.white,fontSize:22,fontWeight:FontWeight.bold)),SizedBox(height:5),Text('قصائد وعبارات ومعايدات وأدعية تجمعنا على الخير',style:TextStyle(color:Colors.white70))])),
       SizedBox(height:62,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10,vertical:10),children:tabs.map((t)=>Padding(padding:const EdgeInsets.symmetric(horizontal:4),child:ChoiceChip(label:Text(t),selected:category==t,onSelected:(_)=>setState(()=>category=t),selectedColor:cs.primary,labelStyle:TextStyle(color:category==t?cs.onPrimary:cs.onSurface,fontWeight:FontWeight.bold)))).toList())),
-      Expanded(child:ListView.separated(padding:const EdgeInsets.all(14),itemCount:items.length,separatorBuilder:(_,__)=>const SizedBox(height:9),itemBuilder:(context,i)=>Card(color:cs.surfaceContainerLow,elevation:1,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(17)),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Row(children:[Icon(category=='اقتباسات'?Icons.format_quote:category=='أدعية'?Icons.volunteer_activism:category=='معايدات'?Icons.card_giftcard:category=='صباحيات'?Icons.wb_sunny:category=='مسائيات'?Icons.nights_stay:Icons.auto_awesome,color:cs.primary),const SizedBox(width:8),Text(category,style:TextStyle(color:cs.primary,fontWeight:FontWeight.bold)),const Spacer(),Text((i+1).toString()+' / '+items.length.toString(),style:const TextStyle(color:Colors.grey,fontSize:12))]),
-        const SizedBox(height:9),SelectableText(items[i],style:TextStyle(fontSize:18,height:1.9,color:cs.onSurface,fontWeight:FontWeight.w500)),
-        Align(alignment:Alignment.centerLeft,child:IconButton(tooltip:'نسخ',onPressed:()=>Clipboard.setData(ClipboardData(text:items[i])).then((_)=>ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نسخ النص')))),icon:Icon(Icons.copy_rounded,color:cs.primary)))
+      Padding(padding:const EdgeInsets.fromLTRB(12,2,12,6),child:TextField(controller:_search,onChanged:(_)=>setState((){}),decoration:InputDecoration(prefixIcon:const Icon(Icons.search_rounded),hintText:'ابحث في القصائد والاقتباسات...',suffixIcon:_search.text.isEmpty?null:IconButton(icon:const Icon(Icons.close),onPressed:(){_search.clear();setState((){});}),border:OutlineInputBorder(borderRadius:BorderRadius.circular(15))))),
+      Expanded(child:shown.isEmpty?const Center(child:Text('ماكو نصوص تطابق البحث أو المحفوظات.')):ListView.separated(padding:const EdgeInsets.all(14),itemCount:shown.length,separatorBuilder:(_,__)=>const SizedBox(height:9),itemBuilder:(context,i)=>Card(color:cs.surfaceContainerLow,elevation:1,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(17)),child:Padding(padding:const EdgeInsets.all(16),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Row(children:[Icon(category=='اقتباسات'?Icons.format_quote:category=='أدعية'?Icons.volunteer_activism:category=='معايدات'?Icons.card_giftcard:category=='صباحيات'?Icons.wb_sunny:category=='مسائيات'?Icons.nights_stay:Icons.auto_awesome,color:cs.primary),const SizedBox(width:8),Text(category,style:TextStyle(color:cs.primary,fontWeight:FontWeight.bold)),const Spacer(),Text((i+1).toString()+' / '+shown.length.toString(),style:const TextStyle(color:Colors.grey,fontSize:12))]),
+        const SizedBox(height:9),SelectableText(shown[i],style:TextStyle(fontSize:18,height:1.9,color:cs.onSurface,fontWeight:FontWeight.w500)),
+        Row(mainAxisAlignment:MainAxisAlignment.end,children:[IconButton(tooltip:_saved.contains(shown[i])?'إزالة من المحفوظات':'حفظ النص',onPressed:()=>_toggleSaved(shown[i]),icon:Icon(_saved.contains(shown[i])?Icons.bookmark_rounded:Icons.bookmark_border_rounded,color:cs.primary)),IconButton(tooltip:'نسخ',onPressed:()=>Clipboard.setData(ClipboardData(text:shown[i])).then((_)=>ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نسخ النص')))),icon:Icon(Icons.copy_rounded,color:cs.primary))])
       ]))))),
     ])),
   )); }
