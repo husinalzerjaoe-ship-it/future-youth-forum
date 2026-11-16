@@ -46,6 +46,7 @@ import 'v31_member_titles.dart';
 import 'v32_future_growth.dart';
 import 'v33_future_universe.dart';
 import 'v22_cinema_discovery.dart';
+import 'ai_assistant.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -617,6 +618,9 @@ class _HomePageState extends State<HomePage> {
                 case 'memberTitles':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FounderMemberTitlesPage()));
                   break;
+                case 'aiAssistant':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
+                  break;
                 case 'logout':
                   FirebaseAuth.instance.signOut();
                   break;
@@ -656,6 +660,12 @@ class _HomePageState extends State<HomePage> {
                 const PopupMenuItem(value: 'moderation', child: ListTile(leading: Icon(Icons.history), title: Text('سجل المشرفين'), contentPadding: EdgeInsets.zero)),
               if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
                 const PopupMenuItem(value: 'memberTitles', child: ListTile(leading: Icon(Icons.workspace_premium_outlined), title: Text('إدارة ألقاب الأعضاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'aiAssistant', child: ListTile(
+                leading: Icon(Icons.auto_awesome_rounded),
+                title: Text('مساعد المستقبل الذكي'),
+                subtitle: Text('محادثة ذكاء اصطناعي'),
+                contentPadding: EdgeInsets.zero,
+              )),
               const PopupMenuDivider(),
               const PopupMenuItem(value: 'logout', child: ListTile(leading: Icon(Icons.logout), title: Text('تسجيل الخروج'), contentPadding: EdgeInsets.zero)),
             ],
