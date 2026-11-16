@@ -287,7 +287,9 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
               const Icon(Icons.graphic_eq, color: Color(0xFFBDAEFF)),
               const SizedBox(width: 8),
               Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              IconButton(tooltip: 'السابق', onPressed: appAudioHandler.skipToPrevious, icon: const Icon(Icons.skip_previous_rounded)),
               IconButton(onPressed: () => playing ? appAudioHandler.pause() : appAudioHandler.play(), icon: Icon(playing ? Icons.pause : Icons.play_arrow)),
+              IconButton(tooltip: 'التالي', onPressed: appAudioHandler.skipToNext, icon: const Icon(Icons.skip_next_rounded)),
               IconButton(onPressed: appAudioHandler.stop, icon: const Icon(Icons.stop)),
             ]),
           ));
