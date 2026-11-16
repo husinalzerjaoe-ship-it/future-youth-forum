@@ -310,7 +310,7 @@ class _StoriesPageState extends State<StoriesPage>{
    if(docs.isEmpty)return const Center(child:Text('ماكو ستوريات حالياً'));
    return ListView(children:docs.map((doc){final d=doc.data();final video=d['mediaType']=='video';final url=d['mediaUrl'] as String;
     return Card(clipBehavior:Clip.antiAlias,child:Column(children:[
-     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ??'عضو'),trailing: (d['authorId'] == FirebaseAuth.instance.currentUser?.uid) ? PopupMenuButton<String>(onSelected: (v) { if (v == 'delete') deleteStory(doc.id, d); }, itemBuilder: (_) => const [PopupMenuItem(value:'delete',child:Text('حذف الستوري'))]) : null),
+     ListTile(leading:const CircleAvatar(child:Icon(Icons.person)),title:StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream:db2.collection('publicProfiles').doc((d['authorId']??'').toString()).snapshots(),builder:(context,profile){final p=profile.data?.data()??{};final title=(p['customTitle']??'').toString().trim();return Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو'),if(title.isNotEmpty)Padding(padding:const EdgeInsets.only(top:3),child:MemberTitleBadge(title:title,colorValue:p['customTitleColor'] is int?p['customTitleColor'] as int:null,compact:true))]);}),trailing: (d['authorId'] == FirebaseAuth.instance.currentUser?.uid) ? PopupMenuButton<String>(onSelected: (v) { if (v == 'delete') deleteStory(doc.id, d); }, itemBuilder: (_) => const [PopupMenuItem(value:'delete',child:Text('حذف الستوري'))]) : null),
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
@@ -598,7 +598,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
        if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
        if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(senderId,d['senderName'] as String? ?? 'عضو'))
       ]),
-      if(!mine&&title.isNotEmpty)Padding(padding:const EdgeInsets.only(bottom:6),child:MemberTitleBadge(title:title,colorValue:titleColor,compact:true)),
+      if(title.isNotEmpty)Padding(padding:const EdgeInsets.only(bottom:6),child:MemberTitleBadge(title:title,colorValue:titleColor,compact:true)),
       if(type=='voice'&&audio!=null)_RegionVoicePlayer(url:audio,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
       if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
       if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
