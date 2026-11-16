@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'v18_discovery_hub.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'achievement_hub.dart';
 import 'advanced_features.dart';
@@ -40,6 +41,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('عالم الأنمي', 'قائمة المشاهدة وخلفيات الأنمي', Icons.animation_rounded, () => const AnimeExperiencePage(), 'أنمي اوتاكو'),
     _Destination('مكتبة الإلهام', 'الشعر والاقتباسات والخواطر', Icons.auto_stories_rounded, () => const InspirationHubPage(), 'شعر اقتباس خواطر'),
     _Destination('المساعد المحلي', 'مساعدة وأفكار داخل التطبيق', Icons.smart_toy_rounded, () => const LocalHelperBotPage(), 'مساعد ذكاء مساعدة'),
+    _Destination('مكتبة V18 الشاملة', 'ديوان وأذكار وأكاديمية وعلوم ومطبخ وثقافة وبودكاست', Icons.auto_awesome_rounded, () => const V18DiscoveryHubPage(), 'شعر دعاء ذكر قرآن تعليم علوم فضاء مطبخ العراق بودكاست ثقافة'),
   ];
 
   @override
@@ -53,7 +55,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('مركز V17 الذكي'),
+          title: const Text('مركز الملتقى الذكي'),
           actions: [IconButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const V17DeviceSettingsPage())), icon: const Icon(Icons.tune_rounded))],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(54),
@@ -107,16 +109,32 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
       if (results.isEmpty)
         const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('ما لقينا قسماً مطابقاً. جرّب كلمة ثانية.')))
       else
-        ...results.map((d) => Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
-            leading: CircleAvatar(backgroundColor: _v17Purple.withValues(alpha: .16), child: Icon(d.icon, color: _v17Purple)),
-            title: Text(d.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(d.description),
-            trailing: const Icon(Icons.chevron_left_rounded),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => d.page())),
-          ),
-        )),
+        ...results.asMap().entries.map((entry) {
+          final d = entry.value;
+          const covers = <List<Color>>[
+            [Color(0xFF5636A8), Color(0xFF172554)], [Color(0xFF00695C), Color(0xFF123B50)],
+            [Color(0xFFAD4B16), Color(0xFF54236E)], [Color(0xFF2457A6), Color(0xFF20204C)],
+          ];
+          final colors = covers[entry.key % covers.length];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 10), clipBehavior: Clip.antiAlias,
+            child: InkWell(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => d.page())),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: colors)),
+                child: Row(children: [
+                  Container(width: 54, height: 54, decoration: BoxDecoration(color: Colors.white.withValues(alpha: .15), borderRadius: BorderRadius.circular(16)),
+                    child: Icon(d.icon, color: Colors.white, size: 30)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(d.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 4), Text(d.description, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ])),
+                  const Icon(Icons.chevron_left_rounded, color: Colors.white),
+                ]),
+              )),
+          );
+        }),
     ],
   );
 }
