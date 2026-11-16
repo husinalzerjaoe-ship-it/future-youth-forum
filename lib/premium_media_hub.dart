@@ -275,7 +275,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     stream: appAudioHandler.mediaItem,
     builder: (context, media) {
       final item = media.data;
-      if (item == null) return null;
+      if (item == null) return const SizedBox.shrink();
       return StreamBuilder<PlaybackState>(
         stream: appAudioHandler.playbackState,
         builder: (context, state) {
