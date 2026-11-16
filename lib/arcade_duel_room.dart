@@ -327,7 +327,7 @@ class _ArcadeDuelRoomPageState extends State<ArcadeDuelRoomPage> {
             ),
             const SizedBox(height: 12),
             ...members.map((id) => Card(child: ListTile(
-              leading: CircleAvatar(child: Text((names[id]?.toString().isNotEmpty ?? false) ? names[id].toString().characters.first : 'ل')),
+              leading: CircleAvatar(child: Text((names[id]?.toString().isNotEmpty ?? false) ? names[id].toString().substring(0, 1) : 'ل')),
               title: Text(id == _uid ? 'أنت' : names[id]?.toString() ?? 'لاعب'),
               trailing: Text('${scores[id] ?? 0} نقطة', style: const TextStyle(fontWeight: FontWeight.w900)),
             ))),
