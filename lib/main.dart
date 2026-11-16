@@ -135,10 +135,12 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
     v17ReduceMotionNotifier.value = reduceMotion;
     v17CompactCardsNotifier.value = compactCards;
     final performance = prefs.getString('v17_performance') ?? 'balanced';
+    final mediaQuality = prefs.getString('v17_media_quality') ?? 'auto';
     PaintingBinding.instance.imageCache.maximumSize = performance == 'high' ? 600 : performance == 'battery' ? 160 : 320;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = performance == 'high'
-        ? 120 * 1024 * 1024
-        : performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    final baseCacheBytes = performance == 'high' ? 120 * 1024 * 1024 : performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = mediaQuality == 'data'
+        ? baseCacheBytes ~/ 2
+        : mediaQuality == 'high' ? baseCacheBytes : (baseCacheBytes * 3) ~/ 4;
     if (!mounted) return;
     setState(() {
       _accent = accent;
