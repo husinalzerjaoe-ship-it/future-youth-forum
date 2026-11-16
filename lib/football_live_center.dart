@@ -24,6 +24,10 @@ class _FootballLiveCenterPageState extends State<FootballLiveCenterPage> {
     'دوري أبطال أوروبا': 'uefa.champions',
     'الدوري الأوروبي': 'uefa.europa',
     'الدوري السعودي': 'ksa.1',
+    'الدوري البرتغالي': 'por.1',
+    'الدوري الهولندي': 'ned.1',
+    'الدوري الأمريكي': 'usa.1',
+    'كأس العالم': 'fifa.world',
   };
   static const channels = <_Channel>[
     _Channel('beIN SPORTS', 'https://www.beinsports.com/ar-mena', 'الموقع الرسمي • تحقق من اشتراك وحقوق العراق'),
@@ -31,6 +35,7 @@ class _FootballLiveCenterPageState extends State<FootballLiveCenterPage> {
     _Channel('أبوظبي الرياضية', 'https://www.adsports.ae', 'الموقع الرسمي للقناة'),
     _Channel('دبي الرياضية', 'https://www.dubaisports.ae', 'الموقع الرسمي للقناة'),
     _Channel('العراقية الرياضية', 'https://imn.iq', 'شبكة الإعلام العراقي'),
+    _Channel('قنوات الكأس', 'https://www.alkass.net/', 'الموقع الرسمي لقنوات الكأس • توفر البث حسب الحقوق والمنطقة'),
   ];
   static const familyChannels = <_Channel>[
     _Channel('MBC3', 'https://shahid.mbc.net/ar/livestream/mbc3/livechannel-816771', 'بث MBC3 الرسمي عبر شاهد • قد يتطلب اشتراكاً'),
