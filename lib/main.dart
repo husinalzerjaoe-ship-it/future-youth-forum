@@ -87,8 +87,17 @@ Future<void> main() async {
     // provider; the current storage policies validate Firebase issuer, audience and UID.
     accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
   );
-  await initializeLocalAudioService();
+  // Launch the app as soon as core Firebase/Supabase setup is ready.
+  // Audio service startup is optional and must never block the login screen.
   runApp(const FutureYouthApp());
+  Future<void>(() async {
+    try {
+      await initializeLocalAudioService();
+    } catch (error, stackTrace) {
+      debugPrint('Audio service initialization failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  });
 }
 
 class FutureYouthApp extends StatefulWidget {
