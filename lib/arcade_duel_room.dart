@@ -80,11 +80,8 @@ class _ArcadeDuelLobbyPageState extends State<ArcadeDuelLobbyPage> {
         if (data['gameId'] != 'arcade_duel_hub') throw StateError('هذا الرمز ليس لغرفة ألعاب الصالة.');
         if (members.contains(_uid)) return;
         if (data['status'] != 'waiting' || members.length >= 4) throw StateError('الغرفة بدأت أو اكتمل عدد اللاعبين.');
-        final names = Map<String, dynamic>.from(data['memberNames'] ?? const {});
-        names[_uid] = _name;
         tx.update(ref, {
           'members': [...members, _uid],
-          'memberNames': names,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
