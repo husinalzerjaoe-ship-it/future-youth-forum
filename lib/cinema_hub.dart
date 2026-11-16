@@ -55,7 +55,7 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
         for (final row in rows.whereType<Map<String, dynamic>>()) {
           final premiered = (row['premiered'] ?? '').toString();
           final summary = (row['summary'] ?? '').toString()
-              .replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\\s+'), ' ').trim();
+              .replaceAll(RegExp(r'<[^>]*>'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
           collected.add(_Film('tvmaze-${row['id']}', (row['name'] ?? 'مسلسل').toString(),
             premiered.length >= 4 ? premiered.substring(0, 4) : '', summary,
             isSeries: true, sourceUrl: (row['url'] ?? 'https://www.tvmaze.com').toString(),
@@ -65,10 +65,10 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
       return collected;
     }
 
-    // Five pages × 100 records: a 500-title target, subject to source availability.
+    // Six pages × 100 records: a 500-title target, subject to source availability.
     final collected = <_Film>[];
     final seen = <String>{};
-    for (var page = 1; page <= 5; page++) {
+    for (var page = 1; page <= 6; page++) {
       const query = 'collection:opensource_movies AND mediatype:movies';
       final uri = Uri.parse('https://archive.org/advancedsearch.php?q=${Uri.encodeQueryComponent(query)}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=description&fl%5B%5D=subject&rows=100&page=$page&output=json&sort%5B%5D=downloads%20desc');
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
@@ -219,7 +219,7 @@ class _FilmDetails extends StatefulWidget {
 class _FilmDetailsState extends State<_FilmDetails> {
   bool _busy = false; String? _directUrl; String? _message;
   Future<void> _checkVideo() async {
-    if (widget.film.isSeries) { setState(() => _message = 'هذا مسلسل من كتالوج مستقل. افتح صفحة المصدر الرسمية لمعلومات الحلقات وخيارات المشاهدة.'); return; }
+    if (widget.film.isSeries) { await launchUrl(Uri.parse(widget.film.sourceUrl), mode: LaunchMode.externalApplication); return; }
     setState(() { _busy = true; _message = null; });
     try {
       final r = await http.get(Uri.https('archive.org', '/metadata/${widget.film.id}')).timeout(const Duration(seconds: 20));
@@ -264,7 +264,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
         FilledButton.icon(onPressed: _busy ? null : (_directUrl == null ? _checkVideo : _start),
           icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
             : Icon(_directUrl == null ? Icons.search : Icons.groups),
-          label: Text(_busy ? 'جارٍ فحص الفيديو...' : _directUrl == null ? 'فحص التشغيل وإنشاء غرفة' : 'شاهد مع الأصدقاء')),
+          label: Text(widget.film.isSeries ? 'افتح معلومات المسلسل' : (_busy ? 'جارٍ فحص الفيديو...' : _directUrl == null ? 'فحص التشغيل وإنشاء غرفة' : 'شاهد مع الأصدقاء'))),
         TextButton.icon(onPressed: () => launchUrl((widget.film.isSeries ? Uri.parse(widget.film.sourceUrl) : Uri.https('archive.org', '/details/${widget.film.id}')), mode: LaunchMode.externalApplication),
           icon: const Icon(Icons.open_in_new), label: const Text('صفحة المصدر')),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
