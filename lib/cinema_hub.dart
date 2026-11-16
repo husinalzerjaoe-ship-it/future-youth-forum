@@ -112,6 +112,12 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                   const SizedBox(height: 8),
                   const Text('مكتبة أعمال مفتوحة، وغرف خاصة بدردشة ومزامنة للمقاطع المباشرة المدعومة.',
                     style: TextStyle(color: Colors.white70, height: 1.6)),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArabicAnimeCatalogPage())),
+                    icon: const Icon(Icons.auto_awesome), label: const Text('دليل الأنمي • تصفّح 500+ عنوان'),
+                  ),
                   const SizedBox(height: 12),
                   FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaRoomsPage())),
                     icon: const Icon(Icons.meeting_room), label: const Text('غرف السينما')),
@@ -257,4 +263,102 @@ class CinemaRoomsPage extends StatelessWidget {
           ))).toList());
         },
       )));
+}
+
+
+class ArabicAnimeCatalogPage extends StatefulWidget {
+  const ArabicAnimeCatalogPage({super.key});
+  @override State<ArabicAnimeCatalogPage> createState() => _ArabicAnimeCatalogPageState();
+}
+
+class _ArabicAnimeCatalogPageState extends State<ArabicAnimeCatalogPage> {
+  final _search = TextEditingController();
+  final List<Map<String, dynamic>> _items = [];
+  int _page = 1;
+  bool _loading = false;
+  bool _hasNext = true;
+  String? _error;
+
+  @override void initState() { super.initState(); _load(); }
+  @override void dispose() { _search.dispose(); super.dispose(); }
+
+  Future<void> _load({bool reset = false}) async {
+    if (_loading) return;
+    if (reset) { _page = 1; _hasNext = true; _items.clear(); }
+    if (!_hasNext) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final query = _search.text.trim();
+      final uri = query.isEmpty
+        ? Uri.https('api.jikan.moe', '/v4/top/anime', {'page': '$_page', 'limit': '25', 'sfw': 'true'})
+        : Uri.https('api.jikan.moe', '/v4/anime', {'page': '$_page', 'limit': '25', 'q': query, 'sfw': 'true'});
+      final response = await http.get(uri, headers: {'Accept': 'application/json'}).timeout(const Duration(seconds: 25));
+      if (response.statusCode == 429) throw Exception('الخدمة طلبت انتظاراً قصيراً؛ حاول بعد دقيقة.');
+      if (response.statusCode != 200) throw Exception('تعذر جلب قائمة الأنمي حالياً.');
+      final root = jsonDecode(response.body) as Map<String, dynamic>;
+      final rows = (root['data'] as List<dynamic>? ?? []).whereType<Map<String, dynamic>>().toList();
+      final pagination = root['pagination'] as Map<String, dynamic>? ?? {};
+      if (mounted) setState(() {
+        _items.addAll(rows);
+        _hasNext = (pagination['has_next_page'] == true) && rows.isNotEmpty && _page < 20;
+        _page++;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    } finally { if (mounted) setState(() => _loading = false); }
+  }
+
+  Future<void> _checkArabic(Map<String, dynamic> anime) async {
+    final title = (anime['title_english'] ?? anime['title'] ?? '').toString();
+    final uri = Uri.https('www.google.com', '/search', {'q': '$title ترجمة عربية رسمي Crunchyroll Netflix'});
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('دليل الأنمي')),
+      body: Column(children: [
+        Container(width: double.infinity, margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), gradient: const LinearGradient(colors: [Color(0xFF34205B), Color(0xFF17182E)])),
+          child: const Text('تصفّح مئات عناوين الأنمي وابحث عن النسخ ذات الترجمة أو الدبلجة العربية عبر المنصات الرسمية. توفر العربية يختلف حسب البلد والمنصة والعنوان، لذلك لا نضع علامة مترجم إلا بعد التحقق.',
+            style: TextStyle(color: Colors.white, height: 1.6))),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: TextField(
+          controller: _search,
+          onSubmitted: (_) => _load(reset: true),
+          decoration: InputDecoration(
+            hintText: 'ابحث باسم الأنمي...',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: () => _load(reset: true)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+          ))),
+        if (_error != null) Padding(padding: const EdgeInsets.all(8), child: Text(_error!, style: const TextStyle(color: Colors.orange))),
+        Expanded(child: _items.isEmpty && _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _items.length + (_hasNext || _loading ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index >= _items.length) return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(child: _loading ? const CircularProgressIndicator() : OutlinedButton.icon(
+                    onPressed: _load, icon: const Icon(Icons.expand_more), label: const Text('عرض 25 عنواناً إضافياً'))));
+                final item = _items[index];
+                final title = (item['title_english'] ?? item['title'] ?? 'Anime').toString();
+                final image = ((item['images'] as Map?)?['jpg'] as Map?)?['large_image_url']?.toString();
+                final genres = (item['genres'] as List<dynamic>? ?? []).whereType<Map>().map((g) => g['name'].toString()).take(3).join(' • ');
+                final year = item['year']?.toString() ?? item['aired']?['prop']?['from']?['year']?.toString() ?? '—';
+                return Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), child: ListTile(
+                  isThreeLine: true,
+                  leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: image != null
+                    ? Image.network(image, width: 58, height: 82, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.animation))
+                    : const SizedBox(width: 58, height: 82, child: Icon(Icons.animation))),
+                  title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('$year • ${item['type'] ?? 'Anime'} • $genres\nتوفر الترجمة العربية: تحقّق من المنصة الرسمية', maxLines: 3, overflow: TextOverflow.ellipsis),
+                  trailing: IconButton(tooltip: 'البحث عن ترجمة عربية', icon: const Icon(Icons.translate, color: _cinemaAccent), onPressed: () => _checkArabic(item)),
+                  onTap: () => _checkArabic(item),
+                ));
+              })),
+      ]),
+    ),
+  );
 }
