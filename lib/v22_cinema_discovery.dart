@@ -106,6 +106,7 @@ class _V22CinemaDiscoveryPageState extends State<V22CinemaDiscoveryPage> {
       }
     } catch (_) {}
     if (!mounted) return;
+    final safeProviderLink = providerLink;
     showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true, builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Padding(
       padding: const EdgeInsets.fromLTRB(18,8,18,24),
       child: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
@@ -122,7 +123,7 @@ class _V22CinemaDiscoveryPageState extends State<V22CinemaDiscoveryPage> {
         const SizedBox(height:12),
         Wrap(spacing:8,children:[
           OutlinedButton.icon(onPressed:() async { await launchUrl(Uri.parse('https://www.themoviedb.org/' + (item.isMovie?'movie/':'tv/') + item.id.toString()),mode:LaunchMode.externalApplication); },icon:const Icon(Icons.info_outline),label:const Text('تفاصيل TMDB')),
-          if (providerLink != null && providerLink!.startsWith('https://')) FilledButton.icon(onPressed:() async { await launchUrl(Uri.parse(providerLink!),mode:LaunchMode.externalApplication); },icon:const Icon(Icons.ondemand_video),label:const Text('خيارات المشاهدة')),
+          if (safeProviderLink != null && safeProviderLink.startsWith('https://')) FilledButton.icon(onPressed:() async { await launchUrl(Uri.parse(safeProviderLink),mode:LaunchMode.externalApplication); },icon:const Icon(Icons.ondemand_video),label:const Text('خيارات المشاهدة')),
           TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق')),
         ]),
       ])),
