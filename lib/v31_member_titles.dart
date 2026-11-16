@@ -145,14 +145,27 @@ class _FounderMemberTitlesPageState extends State<FounderMemberTitlesPage> {
               : Timestamp.fromDate(DateTime.now().add(Duration(days: int.parse(duration)))),
           'customTitleUpdatedAt': FieldValue.serverTimestamp(),
         });
+        // The profile update is the actual title operation. Keep the audit log
+        // best-effort so an audit-log permission/network issue cannot falsely
+        // report that the title itself failed after it was already saved.
+      } catch (error) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر حفظ اللقب في الملف الشخصي: $error')),
+        );
+        controller.dispose();
+        iconController.dispose();
+        return;
+      }
+
+      try {
         await FirebaseFirestore.instance.collection('adminLogs').add({
           'actorId': FirebaseAuth.instance.currentUser!.uid, 'targetId': uid, 'targetName': name,
           'action': value.isEmpty ? 'remove_custom_title' : 'set_custom_title', 'createdAt': FieldValue.serverTimestamp(),
         });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value.isEmpty ? 'تمت إزالة لقب $name' : 'تم منح $name لقب «$value»')));
       } catch (_) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر حفظ اللقب. تأكد من نشر قواعد Firestore المحدثة.')));
+        // The title is already saved; logging failure must not mask that success.
       }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value.isEmpty ? 'تمت إزالة لقب $name' : 'تم منح $name لقب «$value»')));
     }
     controller.dispose();
     iconController.dispose();
