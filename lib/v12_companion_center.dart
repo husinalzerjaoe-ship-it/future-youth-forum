@@ -181,6 +181,45 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
     }
   }
 
+  Future<void> _generateBracket(
+    DocumentSnapshot<Map<String, dynamic>> tournament,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> playerDocs,
+  ) async {
+    if (playerDocs.length < 2 || playerDocs.length > 32) {
+      _message('تكوين الجدول يحتاج من لاعبين إلى 32 مشاركاً.');
+      return;
+    }
+    final matches = <Map<String, dynamic>>[];
+    for (var i = 0; i < playerDocs.length; i += 2) {
+      final first = playerDocs[i].data();
+      if (i + 1 < playerDocs.length) {
+        final second = playerDocs[i + 1].data();
+        matches.add({
+          'round': 1,
+          'homeUid': first['uid'],
+          'homeName': first['name'],
+          'awayUid': second['uid'],
+          'awayName': second['name'],
+        });
+      } else {
+        matches.add({
+          'round': 1,
+          'byeUid': first['uid'],
+          'byeName': first['name'],
+        });
+      }
+    }
+    try {
+      await tournament.reference.update({
+        'roundOne': matches,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      _message('تم إنشاء جدول المواجهات الأولية.');
+    } on FirebaseException catch (e) {
+      _message('تعذر إنشاء الجدول: ${e.code}. انشر قواعد Firestore المحدّثة.');
+    }
+  }
+
   Future<void> _translate() async {
     final text = _translation.text.trim();
     if (text.isEmpty) {
@@ -337,6 +376,28 @@ class _V12CompanionCenterPageState extends State<V12CompanionCenterPage>
                     Wrap(spacing: 6, runSpacing: 6, children: snapshot.data!.docs.take(12).map((p) =>
                       Chip(avatar: const Icon(Icons.person, size: 15), label: Text((p.data()['name'] ?? 'عضو').toString()))).toList()),
                   ],
+                  if (data['roundOne'] is List && (data['roundOne'] as List).isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    const Text('مواجهات الدور الأول', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    ...((data['roundOne'] as List).whereType<Map>().map((m) => Padding(
+                      padding: const EdgeInsets.only(top: 5),
+                      child: Text(
+                        m['byeName'] != null
+                          ? 'تأهل مباشر: ${m['byeName']}'
+                          : '${m['homeName'] ?? 'لاعب'}  ×  ${m['awayName'] ?? 'لاعب'}',
+                        style: const TextStyle(color: _v12Aqua, fontSize: 12),
+                      ),
+                    ))),
+                  ],
+                  if (owner && open && count >= 2 && data['roundOne'] is! List)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: OutlinedButton.icon(
+                        onPressed: () => _generateBracket(doc, snapshot.data!.docs),
+                        icon: const Icon(Icons.account_tree_outlined),
+                        label: const Text('تكوين جدول المواجهات الأولية'),
+                      ),
+                    ),
                   const SizedBox(height: 8),
                   Row(children: [
                     Expanded(child: FilledButton.tonal(
