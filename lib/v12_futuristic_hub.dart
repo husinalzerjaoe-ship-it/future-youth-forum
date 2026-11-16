@@ -37,7 +37,7 @@ class _V12FuturisticHubPageState extends State<V12FuturisticHubPage>{
     setState((){_xp=p.getInt('v12_xp')??0;_high=p.getBool('v12_high')??false;_done=List<bool>.generate(4,(i)=>p.getBool('v12_mission_$i')??false);_loaded=true;});
   }
   Future<void> _save()async{final p=await SharedPreferences.getInstance();await p.setInt('v12_xp',_xp);for(var i=0;i<4;i++){await p.setBool('v12_mission_$i',_done[i]);}}
-  Future<void> _mission(int i,bool v)async{setState((){_done[i]=v;_xp=math.max(0,_xp+(v?20:-20));});await _save();}
+  Future<void> _mission(int i,bool v)async{setState((){_done[i]=v;_xp=math.max(0,_xp+(v?20:-20)).toInt();});await _save();}
   Future<void> _performance(bool v)async{setState(()=>_high=v);final p=await SharedPreferences.getInstance();await p.setBool('v12_high',v);}
   void _open(Widget page)=>Navigator.push(context,MaterialPageRoute(builder:(_)=>page));
   void _answer(int i){if(_answered)return;final ok=i==_questions[_q]['c'];setState((){_answered=true;if(ok){_correct++;_xp+=15;}});_save();ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(ok?'إجابة صحيحة! +15 XP':'مو مشكلة، جرّب تحدي باچر!')));}
