@@ -130,7 +130,6 @@ Future<String> uploadForumMedia(
         'cacheControl': '3600',
       },
       maxChunkSize: 6 * 1024 * 1024,
-      retries: 5,
     );
     try {
       await tusClient.upload(
