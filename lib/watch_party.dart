@@ -932,7 +932,7 @@ class _RoomCodeJoinCardState extends State<_RoomCodeJoinCard> {
 
   Future<void> _join() async {
     final code = _code.text.trim();
-    if (!RegExp(r'^\d{6}.hasMatch(code)) {
+    if (!RegExp(r'^\d{6}$').hasMatch(code)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('أدخل رمز الغرفة المكوّن من 6 أرقام.')),
       );
