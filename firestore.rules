@@ -135,12 +135,26 @@ service cloud.firestore {
         && request.resource.data.photoUrl.size() <= 2048
       ) || (
         isFounder()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customTitle', 'customTitleColor', 'customTitleUpdatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'customTitle', 'customTitleColor', 'customTitleEndColor', 'customTitleFont',
+          'customTitleGradient', 'customTitleGlow', 'customTitleIcon',
+          'customTitleExpiresAt', 'customTitleUpdatedAt'
+        ])
         && request.resource.data.customTitle is string
         && request.resource.data.customTitle.size() <= 32
         && request.resource.data.customTitleColor is int
         && request.resource.data.customTitleColor >= 0
         && request.resource.data.customTitleColor <= 4294967295
+        && request.resource.data.customTitleEndColor is int
+        && request.resource.data.customTitleEndColor >= 0
+        && request.resource.data.customTitleEndColor <= 4294967295
+        && request.resource.data.customTitleFont in ['default', 'serif', 'mono']
+        && request.resource.data.customTitleGradient is bool
+        && request.resource.data.customTitleGlow is bool
+        && request.resource.data.customTitleIcon is string
+        && request.resource.data.customTitleIcon.size() <= 4
+        && (request.resource.data.customTitleExpiresAt == null
+          || request.resource.data.customTitleExpiresAt is timestamp)
         && request.resource.data.customTitleUpdatedAt == request.time
       );
       allow delete: if false;
