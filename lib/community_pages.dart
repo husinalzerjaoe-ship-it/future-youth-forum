@@ -30,6 +30,7 @@ import 'jitsi_backup_calls.dart';
 import 'daily_world.dart';
 import 'v6_community_suite.dart';
 import 'knowledge_corner.dart';
+import 'v31_member_titles.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -506,31 +507,41 @@ class _RegionChatPageState extends State<RegionChatPage> {
  }
 
  Widget bubble(Map<String,dynamic> d,bool mine) {
+  final senderId=(d['senderId']??'').toString();
   final isFounder=d['senderRole']=='founder';
   final type=d['type'] as String? ?? 'text';
   final txt=d['text'] as String? ?? '';
   final url=d['imageUrl'] as String?;
   final audio=d['audioUrl'] as String?;
   final senderPhoto=d['senderPhoto'] as String?;
-  return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
-   margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
-   constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
-   decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
-    border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
-    boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
-   child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
-     CircleAvatar(radius:14,backgroundColor:const Color(0xFFEAE6FF),backgroundImage:senderPhoto!=null&&senderPhoto.startsWith('https://')?NetworkImage(senderPhoto):null,child:senderPhoto==null||!senderPhoto.startsWith('https://')?const Icon(Icons.person,size:16,color:Color(0xFF6554D9)):null),
-     const SizedBox(width:6),
-     Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
-     if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
-     if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(d['senderId'] as String? ?? '',d['senderName'] as String? ?? 'عضو'))
-    ]),
-    if(type=='voice'&&audio!=null)_RegionVoicePlayer(url:audio,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
-    if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
-    if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
-    if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
-   ])));
+  return StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(
+   stream:senderId.isEmpty?null:db2.collection('publicProfiles').doc(senderId).snapshots(),
+   builder:(context,profile){
+    final profileData=profile.data?.data()??{};
+    final title=(profileData['customTitle']??'').toString().trim();
+    final titleColor=profileData['customTitleColor'] is int?profileData['customTitleColor'] as int:null;
+    final photo=profileData['photoUrl'] as String? ?? senderPhoto;
+    return Align(alignment:mine?Alignment.centerRight:Alignment.centerLeft,child:Container(
+     margin:const EdgeInsets.symmetric(vertical:5),padding:const EdgeInsets.all(11),
+     constraints:BoxConstraints(maxWidth:MediaQuery.of(context).size.width*.8),
+     decoration:BoxDecoration(color:mine?const Color(0xFFE8E2FF):Colors.white,borderRadius:BorderRadius.circular(16),
+      border:Border.all(color:isFounder?const Color(0xFFE0A72E):const Color(0xFFB9B9C8),width:isFounder?2:1),
+      boxShadow:const [BoxShadow(color:Color(0x14000000),blurRadius:5,offset:Offset(0,2))]),
+     child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      if(!mine)Row(mainAxisSize:MainAxisSize.min,children:[
+       CircleAvatar(radius:14,backgroundColor:const Color(0xFFEAE6FF),backgroundImage:photo!=null&&photo.startsWith('https://')?NetworkImage(photo):null,child:photo==null||!photo.startsWith('https://')?const Icon(Icons.person,size:16,color:Color(0xFF6554D9)):null),
+       const SizedBox(width:6),
+       Flexible(child:Text(d['senderName'] as String? ?? 'عضو',style:TextStyle(color:isFounder?const Color(0xFF8A5A00):const Color(0xFF4532A8),fontWeight:FontWeight.bold,fontSize:14))),
+       if(isFounder)const Padding(padding:EdgeInsets.only(right:4),child:Icon(Icons.workspace_premium,color:Color(0xFFFFB52E),size:15)),
+       if(founder)IconButton(visualDensity:VisualDensity.compact,tooltip:'إدارة العضو',icon:const Icon(Icons.admin_panel_settings,size:18),onPressed:()=>moderate(senderId,d['senderName'] as String? ?? 'عضو'))
+      ]),
+      if(!mine&&title.isNotEmpty)Padding(padding:const EdgeInsets.only(bottom:6),child:MemberTitleBadge(title:title,colorValue:titleColor,compact:true)),
+      if(type=='voice'&&audio!=null)_RegionVoicePlayer(url:audio,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
+      if(type=='image'&&url!=null)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(url,width:230,fit:BoxFit.cover,errorBuilder:(c,e,s)=>const Text('تعذر عرض الصورة'))),
+      if(type=='sticker')Center(child:Text(txt,style:const TextStyle(fontSize:46))),
+      if(type!='sticker'&&txt.isNotEmpty)Text(txt,style:const TextStyle(fontSize:18,height:1.65,color:Color(0xFF171717),fontWeight:FontWeight.w500))
+     ])));
+   });
  }
 
  @override void dispose(){t.dispose();voiceRecorder.dispose();super.dispose();}
