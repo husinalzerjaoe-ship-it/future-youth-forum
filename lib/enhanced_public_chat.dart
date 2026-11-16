@@ -665,12 +665,20 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
                             itemCount: pinned.length,
                             itemBuilder: (c, index) {
                               final d = pinned[index].data();
+                              final messageText = d['text'] as String? ?? (d['type'] == 'image' ? '📷 صورة' : d['type'] == 'voice' ? '🎙️ رسالة صوتية' : 'مرفق');
                               return ListTile(dense: true,
                                 leading: const Icon(Icons.bookmark_outline_rounded, color: _chatBrand, size: 19),
                                 title: Text(d['senderName'] as String? ?? 'عضو',
                                   style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text(d['text'] as String? ?? (d['type'] == 'image' ? '📷 صورة' : d['type'] == 'voice' ? '🎙️ رسالة صوتية' : 'مرفق'),
-                                  maxLines: 2, overflow: TextOverflow.ellipsis),
+                                subtitle: Text(messageText, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+                                    title: Text(d['senderName'] as String? ?? 'رسالة مثبتة'),
+                                    content: Text(messageText),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+                                  ));
+                                },
                               );
                             },
                           )),
