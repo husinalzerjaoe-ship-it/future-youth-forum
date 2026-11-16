@@ -44,6 +44,7 @@ import 'v14_command_center.dart';
 import 'v17_smart_hub.dart';
 import 'v31_member_titles.dart';
 import 'v32_future_growth.dart';
+import 'v33_future_universe.dart';
 import 'v22_cinema_discovery.dart';
 
 const brand = Color(0xFF6554D9);
@@ -551,6 +552,25 @@ class _HomePageState extends State<HomePage> {
                 case 'growth':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureGrowthPage()));
                   break;
+                case 'universe':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => FutureUniversePage(onOpen: (route) {
+                    Navigator.pop(context);
+                    switch (route) {
+                      case 'growth': Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureGrowthPage())); break;
+                      case 'communityPlus': Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage())); break;
+                      case 'knowledge': Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeCornerPage())); break;
+                      case 'futureArcade': Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureArcadePage())); break;
+                      case 'studio': Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureStudioPage())); break;
+                      case 'events': Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityEventsPage())); break;
+                      case 'media': Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage())); break;
+                      case 'safety': Navigator.push(context, MaterialPageRoute(builder: (_) => const MemberSafetyPage())); break;
+                      case 'engagement': Navigator.push(context, MaterialPageRoute(builder: (_) => const EngagementHubPage())); break;
+                      case 'friendsArena': Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsBattleArenaPage())); break;
+                      case 'expansion': Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityExpansionPage())); break;
+                      case 'polls': Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPollsPage())); break;
+                    }
+                  })));
+                  break;
                 case 'achievements':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const AchievementHubPage()));
                   break;
@@ -616,6 +636,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'arcadeHub', child: ListTile(leading: Icon(Icons.videogame_asset_rounded), title: Text('ألعاب الأركيد والتحديات الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'friendsArena', child: ListTile(leading: Icon(Icons.people_alt_rounded), title: Text('منافسات الأصدقاء'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'growth', child: ListTile(leading: Icon(Icons.track_changes_rounded), title: Text('مسار تطوري والأهداف اليومية'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'universe', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('كون المستقبل V33 – مركز التخصيص'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'achievements', child: ListTile(leading: Icon(Icons.workspace_premium_rounded), title: Text('الإنجازات والأوسمة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'engagement', child: ListTile(leading: Icon(Icons.emoji_events_rounded), title: Text('النشاط والنقاط ولوحة الصدارة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'expansion', child: ListTile(leading: Icon(Icons.event_available_rounded), title: Text('الفعاليات وغرف المشاهدة والمجتمعات'), contentPadding: EdgeInsets.zero)),
