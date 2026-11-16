@@ -642,7 +642,15 @@ service cloud.firestore {
       // containing the signed-in user. Do not require members.size() here:
       // Firestore rules are not filters and cannot prove an array's size from
       // that query, which otherwise makes the entire inbox query fail.
-      allow read: if request.auth != null
+      // The app first checks whether a deterministic conversation document
+      // exists before creating it. Permit authenticated get() of a missing
+      // document (there is no data to disclose), but keep existing documents
+      // and all inbox list queries restricted to their two members.
+      allow get: if request.auth != null && (
+        resource == null
+        || (resource.data.members is list && request.auth.uid in resource.data.members)
+      );
+      allow list: if request.auth != null
         && resource.data.members is list
         && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && accountNotBanned()
