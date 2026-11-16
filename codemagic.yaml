@@ -1,11 +1,9 @@
 workflows:
   android-apk:
     name: ملتقى شباب المستقبل - Android APK
-    max_build_duration: 90
+    max_build_duration: 120
     environment:
-      # Pin the last stable Flutter line before the 3.50 Android toolchain
-      # transition so CI does not silently change the generated AGP/Gradle stack.
-      flutter: 3.47.9
+      flutter: stable
     scripts:
       - name: Generate Android platform files
         script: flutter create --platforms=android --org com.futureyouth --project-name forum .
@@ -36,11 +34,12 @@ workflows:
       - name: Print toolchain versions
         script: |
           flutter --version
+          flutter doctor -v
           java -version
       - name: Resolve dependencies
         script: flutter pub get
-      - name: Build release APK
-        script: cd android && ./gradlew assembleRelease -x lintVitalAnalyzeRelease --stacktrace
+      - name: Build release APK with Flutter
+        script: flutter build apk --release --no-pub --verbose
       - name: Verify APK artifact
         script: |
           test -s build/app/outputs/flutter-apk/app-release.apk
