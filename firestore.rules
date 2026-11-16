@@ -1559,5 +1559,52 @@ service cloud.firestore {
       }
     }
 
+
+    // V25 coin wallets: only the founder can mint/grant coins; members may only spend.
+    match /coinWallets/{userId} {
+      allow read: if request.auth != null
+        && (request.auth.uid == userId || isFounder());
+      allow create: if isFounder()
+        && request.resource.data.keys().hasOnly(['coins', 'updatedAt', 'grantedBy'])
+        && request.resource.data.coins is int
+        && request.resource.data.coins >= 0
+        && request.resource.data.updatedAt == request.time;
+      allow update: if (
+          isFounder()
+          && request.resource.data.keys().hasOnly(['coins', 'updatedAt', 'grantedBy'])
+          && request.resource.data.coins is int
+          && request.resource.data.coins >= 0
+          && request.resource.data.updatedAt == request.time
+        ) || (
+          request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'updatedAt'])
+          && request.resource.data.coins is int
+          && request.resource.data.coins >= 0
+          && request.resource.data.coins <= resource.data.coins
+          && request.resource.data.updatedAt == request.time
+        );
+      allow delete: if false;
+    }
+
+    // Top-up is a review request only. No payment is processed by the app.
+    match /coinTopupRequests/{requestId} {
+      allow create: if request.auth != null
+        && accountNotBanned()
+        && request.resource.data.keys().hasOnly(['uid', 'amount', 'status', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.amount is int
+        && request.resource.data.amount in [100, 250, 500, 1000]
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+      allow read: if request.auth != null
+        && (resource.data.uid == request.auth.uid || isFounder());
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected']
+        && request.resource.data.reviewedAt == request.time;
+      allow delete: if false;
+    }
+
   }
 }
