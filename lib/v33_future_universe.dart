@@ -10,6 +10,7 @@ class FutureUniversePage extends StatefulWidget {
 
 class _FutureUniversePageState extends State<FutureUniversePage> {
   String mode = 'balanced', theme = 'violet', query = '';
+  List<String> order = [];
   bool loading = true;
   Set<String> visible = {'growth','communityPlus','knowledge','futureArcade','studio','events','media','safety','engagement','friendsArena','expansion','polls'};
   final entries = const <_Entry>[
@@ -36,6 +37,7 @@ class _FutureUniversePageState extends State<FutureUniversePage> {
       mode = p.getString('v33_mode') ?? 'balanced';
       theme = p.getString('v33_theme') ?? 'violet';
       visible = (p.getStringList('v33_cards') ?? visible.toList()).toSet();
+      order = p.getStringList('v33_order') ?? [];
       loading = false;
     });
     applyMode(mode, save: false);
@@ -54,7 +56,7 @@ class _FutureUniversePageState extends State<FutureUniversePage> {
 
   @override Widget build(BuildContext context) {
     final found = entries.where((e) => (e.title + e.subtitle).contains(query.trim())).toList();
-    final shown = found.where((e) => visible.contains(e.route)).toList();
+    final shown = found.where((e) => visible.contains(e.route)).toList()..sort((a,b) { final ai = order.indexOf(a.route); final bi = order.indexOf(b.route); return (ai < 0 ? 999 : ai).compareTo(bi < 0 ? 999 : bi); });
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('كون المستقبل V33'), backgroundColor: const Color(0xFF171936), foregroundColor: Colors.white,
         actions: [IconButton(onPressed: cardsSheet, icon: const Icon(Icons.tune), tooltip: 'تخصيص البطاقات')]),
@@ -89,15 +91,27 @@ class _FutureUniversePageState extends State<FutureUniversePage> {
 
   Widget themeChip(String value,String label,Color color)=>ChoiceChip(selected:theme==value,label:Text(label),avatar:CircleAvatar(backgroundColor:color,radius:8),onSelected:(_)async{await (await SharedPreferences.getInstance()).setString('v33_theme',value);if(mounted)setState(()=>theme=value);});
 
+  Future<void> _shiftEntry(String route, int delta) async {
+    final unique = entries.map((e) => e.route).toSet().toList();
+    final current = <String>[...order.where(unique.contains), ...unique.where((r) => !order.contains(r))];
+    final index = current.indexOf(route);
+    final nextIndex = (index + delta).clamp(0, current.length - 1);
+    if (index < 0 || nextIndex == index) return;
+    final item = current.removeAt(index);
+    current.insert(nextIndex, item);
+    await (await SharedPreferences.getInstance()).setStringList('v33_order', current);
+    if (mounted) setState(() => order = current);
+  }
+
   Future<void> cardsSheet() async {
     await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(ctx)=>StatefulBuilder(builder:(ctx,refresh)=>SafeArea(child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
       const Text('تخصيص لوحة الكون',style:TextStyle(fontSize:20,fontWeight:FontWeight.bold)),
       const Text('اختار الأقسام التي تريد ظهورها.'),
-      Flexible(child:ListView(shrinkWrap:true,children:entries.map((e)=>CheckboxListTile(value:visible.contains(e.route),title:Text(e.title),onChanged:(v)async{
+      Flexible(child:ListView(shrinkWrap:true,children:entries.map((e)=>ListTile(key:ValueKey('${e.route}_${e.title}'),dense:true,title:Text(e.title),leading:Checkbox(value:visible.contains(e.route),onChanged:(v)async{
         final next={...visible}; if(v==true){next.add(e.route);}else{next.remove(e.route);}
         await (await SharedPreferences.getInstance()).setStringList('v33_cards',next.toList());
         if(mounted)setState(()=>visible=next);refresh(()=>{});
-      })).toList())),
+      }),trailing:Row(mainAxisSize:MainAxisSize.min,children:[IconButton(tooltip:'للأعلى',onPressed:()=>_shiftEntry(e.route,-1),icon:const Icon(Icons.keyboard_arrow_up)),IconButton(tooltip:'للأسفل',onPressed:()=>_shiftEntry(e.route,1),icon:const Icon(Icons.keyboard_arrow_down))]))).toList())),
     ])))));
   }
 }
