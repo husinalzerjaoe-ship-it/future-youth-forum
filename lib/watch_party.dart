@@ -210,20 +210,65 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
         const SizedBox(height: 12),
         _RoomCodeJoinCard(onJoin: (code) async {
           try {
-            final found = await _watchDb.collection('watchRooms')
+            // Public rooms remain joinable by code. Private rooms can be found
+            // only by a signed-in host/invitee; _enterRoom then asks for the
+            // room password when the host enabled it.
+            final publicFound = await _watchDb.collection('watchRooms')
               .where('roomCode', isEqualTo: code)
               .where('visibility', isEqualTo: 'public')
               .limit(1).get();
-            if (found.docs.isEmpty) {
-              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ما لقينا غرفة عامة بهذا الرمز. الغرف الخاصة تحتاج دعوة من صاحبها.')));
+            if (publicFound.docs.isNotEmpty) {
+              if (context.mounted) Navigator.push(context, MaterialPageRoute(
+                builder: (_) => WatchPartyRoomPage(roomId: publicFound.docs.first.id)));
               return;
             }
-            if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyRoomPage(roomId: found.docs.first.id)));
-          } catch (_) {
-            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر البحث عن الغرفة.')));
+            final privateFound = await _watchDb.collection('watchRooms')
+              .where('roomCode', isEqualTo: code)
+              .where('invitedUids', arrayContains: _uid)
+              .limit(1).get();
+            if (privateFound.docs.isEmpty) {
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('ما لقينا غرفة بهذا الرمز، أو أن صاحبها ما دعاك إلها.')));
+              return;
+            }
+            if (context.mounted) Navigator.push(context, MaterialPageRoute(
+              builder: (_) => WatchPartyRoomPage(roomId: privateFound.docs.first.id)));
+          } catch (error) {
+            if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('تعذر البحث عن الغرفة: $error')));
           }
         }),
         const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _watchDb.collection('watchRooms')
+            .where('active', isEqualTo: true)
+            .where('invitedUids', arrayContains: _uid)
+            .limit(40).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const SizedBox.shrink();
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
+            final docs = snapshot.data!.docs;
+            return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Padding(
+                padding: EdgeInsets.only(top: 8, bottom: 4),
+                child: Text('غرفك الخاصة والدعوات 🔒', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              ...docs.map((doc) {
+                final d = doc.data();
+                return Card(
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.lock_rounded)),
+                    title: Text(d['name'] as String? ?? 'غرفة خاصة'),
+                    subtitle: Text('رمز: ${d['roomCode'] ?? '—'} • دعوة خاصة'),
+                    trailing: const Icon(Icons.chevron_left),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => WatchPartyRoomPage(roomId: doc.id))),
+                  ),
+                );
+              }),
+            ]);
+          },
+        ),
         const Text('الغرف المباشرة', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').where('active', isEqualTo: true).where('visibility', isEqualTo: 'public').limit(40).snapshots(),
