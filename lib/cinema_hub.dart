@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'watch_party.dart';
+import 'v22_cinema_discovery.dart';
 
 const _cinemaAccent = Color(0xFFB68CFF);
 
@@ -170,6 +171,11 @@ class _CinemaHubPageState extends State<CinemaHubPage> {
                     icon: const Icon(Icons.auto_awesome), label: const Text('عالم الأنمي • نحو 1000 عنوان'),
                   ),
                   const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white54)),
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const V22CinemaDiscoveryPage())),
+                    icon: const Icon(Icons.calendar_month_rounded), label: const Text('مكتبة 2025 و2026'),
+                  ),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CinemaRoomsPage())),
                       icon: const Icon(Icons.meeting_room), label: const Text('غرف السينما')),
