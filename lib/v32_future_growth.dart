@@ -55,7 +55,6 @@ class _FutureGrowthPageState extends State<FutureGrowthPage> {
   Future<void> _saveGoals() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, jsonEncode(_goals));
-    await prefs.setString(_dayKey, _today);
   }
 
   Future<void> _addGoal() async {
