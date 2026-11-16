@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'future_arcade.dart';
+import 'arcade_duel_room.dart';
 
 const _bg = Color(0xFF0B1020);
 const _panel = Color(0xFF171F35);
@@ -47,7 +48,7 @@ class ArcadeGamesHubV2Screen extends StatelessWidget {
                 SizedBox(height: 9),
                 Text('تحدياتك تبدأ من هنا 🎮', style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
                 SizedBox(height: 7),
-                Text('12 لعبة مصغّرة • نتائج قياسية محفوظة • تحديات ثنائية على نفس الجهاز', style: TextStyle(color: Colors.white70, height: 1.5)),
+                Text('12 لعبة مصغّرة • تحديات فردية • غرف منافسة متزامنة مع الأصدقاء', style: TextStyle(color: Colors.white70, height: 1.5)),
               ]),
             ),
           )),
@@ -61,11 +62,13 @@ class ArcadeGamesHubV2Screen extends StatelessWidget {
               padding: const EdgeInsets.all(15),
               decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                const Text('اللعب مع الأصدقاء', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                const Text('اللعب المتزامن مع الأصدقاء', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                const Text('غرف الأصدقاء الموجودة بالتطبيق تبقى منفصلة وتحتفظ بالدردشة والفويس الحالية. لم نغيّر غرف المشاهدة أو الاتصال.', style: TextStyle(color: Colors.white70, height: 1.5)),
+                const Text('أنشئ غرفة خاصة وشارك الرمز مع فاطمة. الحركات والنتائج تتحدث مباشرة على الجهازين، مع دردشة وفويس للغرفة.', style: TextStyle(color: Colors.white70, height: 1.5)),
                 const SizedBox(height: 10),
-                FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureArcadePage())), icon: const Icon(Icons.groups_rounded), label: const Text('غرف الأصدقاء والدردشة والفويس')),
+                FilledButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ArcadeDuelLobbyPage())), icon: const Icon(Icons.wifi_tethering_rounded), label: const Text('إنشاء مباراة متزامنة / الانضمام برمز')),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureArcadePage())), icon: const Icon(Icons.groups_rounded), label: const Text('غرف Future Arcade الحالية')),
               ]),
             ),
           )),
