@@ -3,10 +3,10 @@ import 'dart:math';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:jitsi_meet_flutter_sdk/jitsi_meet_flutter_sdk.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-/// Optional Jitsi route for calls when the configured LiveKit service is unavailable.
-/// The public meet.jit.si service is best-effort and is not an unlimited/private hosted service.
+/// Browser-based Jitsi fallback. Keeping Jitsi outside the native app avoids
+/// bundling a second incompatible WebRTC engine alongside LiveKit.
 class JitsiBackupCallsPage extends StatefulWidget {
   const JitsiBackupCallsPage({super.key});
 
@@ -16,7 +16,6 @@ class JitsiBackupCallsPage extends StatefulWidget {
 
 class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
   final _roomController = TextEditingController();
-  final _jitsi = JitsiMeet();
   bool _videoEnabled = false;
   bool _joining = false;
 
@@ -60,34 +59,15 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
 
     setState(() => _joining = true);
     try {
-      final options = JitsiMeetConferenceOptions(
-        serverURL: 'https://meet.jit.si',
-        room: room,
-        userInfo: JitsiMeetUserInfo(
-          displayName: (user.displayName?.trim().isNotEmpty ?? false)
-              ? user.displayName!.trim()
-              : 'عضو الملتقى',
-        ),
-        configOverrides: {
-          'subject': 'ملتقى شباب المستقبل',
-          'startWithAudioMuted': false,
-          'startWithVideoMuted': !_videoEnabled,
-          'prejoinPageEnabled': true,
-          'disableDeepLinking': true,
-        },
-        featureFlags: {
-          FeatureFlags.chatEnabled: true,
-          FeatureFlags.audioOnlyButtonEnabled: true,
-          FeatureFlags.videoMuteEnabled: true,
-          FeatureFlags.audioMuteButtonEnabled: true,
-          FeatureFlags.tileViewEnabled: true,
-          FeatureFlags.pipEnabled: true,
-          FeatureFlags.meetingPasswordEnabled: true,
-          FeatureFlags.preJoinPageEnabled: true,
-          FeatureFlags.toolboxAlwaysVisible: true,
-        },
+      final uri = Uri.parse(
+        'https://meet.jit.si/$room#config.startWithVideoMuted=${!_videoEnabled}',
       );
-      await _jitsi.join(options);
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر فتح Jitsi. تأكد من اتصال الإنترنت أو افتح الرابط يدوياً.')),
+        );
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -135,7 +115,7 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'مكالمة صوت وصورة مع دردشة الاجتماع ومشاركة رمز الغرفة. يعمل هذا الخيار كمسار احتياطي مستقل.',
+                    'مكالمة صوت وصورة احتياطية عبر Jitsi في المتصفح، مع دردشة الاجتماع وأدواته حسب دعم المتصفح.',
                     style: TextStyle(color: Colors.white70, height: 1.5),
                   ),
                 ],
@@ -164,8 +144,8 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
             const SizedBox(height: 10),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('تشغيل الفيديو'),
-              subtitle: const Text('أوقفه للانضمام بالصوت فقط، ويمكن تشغيل الكاميرا من داخل الاجتماع'),
+              title: const Text('تشغيل الفيديو عند الدخول'),
+              subtitle: const Text('تگدر تغيّر الكاميرا والمايك من داخل اجتماع Jitsi'),
               value: _videoEnabled,
               onChanged: (value) => setState(() => _videoEnabled = value),
             ),
@@ -175,14 +155,14 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
               icon: _joining
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.call_rounded),
-              label: Text(_joining ? 'جارٍ فتح الاتصال...' : 'دخول مكالمة Jitsi'),
+              label: Text(_joining ? 'جارٍ فتح الاتصال...' : 'فتح غرفة Jitsi'),
             ),
             const SizedBox(height: 18),
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(14),
                 child: Text(
-                  'تنبيه مهم: هذا الخيار يستخدم الخادم العام meet.jit.si وليس خادماً خاصاً بالملتقى. حسب سياسة الخدمة، أول شخص يبدأ الغرفة يحتاج تسجيل الدخول بحساب Google أو GitHub أو Facebook إذا طُلب منه ذلك؛ بقية الأصدقاء يستطيعون الانضمام بعد بدء الغرفة دون حساب Jitsi. الاجتماعات العامة محدودة حالياً إلى 95 دقيقة. رمز الغرفة الطويل لا يعادل كلمة مرور أو غرفة خاصة؛ فعّل كلمة مرور الاجتماع من أدوات Jitsi ولا تستخدم الخادم العام للمحادثات الحساسة.',
+                  'تنبيه: المكالمة تفتح في المتصفح أو تطبيق Jitsi إن كان مثبتاً، وليست مدمجة داخل واجهة الملتقى. الخادم meet.jit.si عام وبأفضل جهد، وقد يطلب من منشئ الغرفة تسجيل الدخول. رمز الغرفة ليس بديلاً عن كلمة مرور الاجتماع؛ لا تستخدم الخادم العام للمحادثات الحساسة.',
                   style: TextStyle(height: 1.5, fontSize: 12),
                 ),
               ),
