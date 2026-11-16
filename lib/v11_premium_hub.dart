@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'advanced_features.dart';
 import 'achievement_hub.dart';
-import 'community_expansion.dart';
+import 'community_expansion.dart' hide CommunityEventsPage;
 import 'community_events.dart';
 import 'community_polls.dart';
 import 'community_plus.dart';
