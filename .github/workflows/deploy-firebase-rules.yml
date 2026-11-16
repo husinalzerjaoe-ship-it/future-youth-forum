@@ -23,19 +23,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for rules tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Firebase CLI and rules test dependencies
+        run: |
+          npm install --global firebase-tools
+          npm --prefix rules-tests install --no-audit --no-fund
+
+      - name: Run Firestore security rules emulator tests
+        run: firebase emulators:exec --only firestore --project demo-futureyouth-rules "npm --prefix rules-tests test"
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-
-      - name: Install Firebase CLI
-        run: npm install --global firebase-tools
 
       - name: Validate Firebase project configuration
         run: |
           test -f firebase.json
           test -f firestore.rules
 
+      # V27 is manual-dispatch only: pushing this branch never changes live rules.
+      # The selected branch is checked out, emulator tests run, then only Firestore rules deploy.
       # This Firebase project has no Storage bucket provisioned yet.
       # Deploy Firestore rules independently; keep storage.rules in source control
       # and deploy it only after Firebase Storage is initialized in the console.
