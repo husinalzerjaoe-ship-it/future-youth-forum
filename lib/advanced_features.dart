@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import 'package:http/http.dart' as http;
 import 'package:gal/gal.dart';
 import 'media_upload_service.dart';
+import 'v31_member_titles.dart';
 
 const _brand = Color(0xFF6554D9);
 final _db = FirebaseFirestore.instance;
@@ -568,13 +569,18 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         final senderId = d['senderId'] as String;
                         final name = p['name'] as String? ?? d['senderName'] as String? ?? 'عضو';
                         final photo = p['photoUrl'] as String?;
+                        final customTitle = (p['customTitle'] ?? '').toString().trim();
+                        final customTitleColor = p['customTitleColor'] is int ? p['customTitleColor'] as int : null;
                         return InkWell(
                           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _MemberMiniProfilePage(uid: senderId, fallbackName: name))),
                           child: Padding(padding: const EdgeInsets.only(bottom: 6), child: Row(mainAxisSize: MainAxisSize.min, children: [
                             CircleAvatar(radius: 13, backgroundImage: photo != null && photo.startsWith('https://') ? NetworkImage(photo) : null,
                               child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 15) : null),
                             const SizedBox(width: 6),
-                            Text(name, style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)),
+                            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(name, style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)),
+                              if (customTitle.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: MemberTitleBadge(title: customTitle, colorValue: customTitleColor, compact: true)),
+                            ]),
                             if (d['senderRole'] == 'founder') ...[
                               const SizedBox(width: 5),
                               const Icon(Icons.workspace_premium, size: 15, color: Color(0xFFFFB52E)),
@@ -641,6 +647,8 @@ class _MemberMiniProfilePage extends StatelessWidget {
               child: photo == null || !photo.startsWith('https://') ? const Icon(Icons.person, size: 48) : null)),
             const SizedBox(height: 12),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+            if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
+              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge(title: (d['customTitle'] as String).trim(), colorValue: d['customTitleColor'] is int ? d['customTitleColor'] as int : null))),
             const SizedBox(height: 8),
             const Text('السيرة الذاتية', style: TextStyle(fontWeight: FontWeight.bold)),
             Text((d['bio'] as String?)?.trim().isNotEmpty == true ? d['bio'] as String : 'لم يضف العضو سيرة ذاتية بعد'),
