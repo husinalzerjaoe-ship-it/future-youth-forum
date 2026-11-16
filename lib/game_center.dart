@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
   final TextEditingController _search = TextEditingController();
   String _filter = 'الكل';
   late final List<_GameEntry> _games = [
+    _GameEntry('صالة ألعاب 2D + 3D','10 ألعاب جديدة • تحديات فردية وثنائية','جديد',Icons.videogame_asset_rounded,const ArcadeGamesHubScreen(),const Color(0xFF38D9E6)),
     _GameEntry('Future Arcade','14 لعبة جديدة • تحديات • ألعاب 2D','جديد',Icons.sports_esports_rounded,const FutureArcadePage(),const Color(0xFF13A89E)),
     _GameEntry('كنز الأصدقاء 2D','خريطة مباشرة • جواهر • غرف ودعوات','2D أونلاين',Icons.map_rounded,const TreasureLobbyPage(),const Color(0xFF13A89E)),
     _GameEntry('ساحة منافسات الأصدقاء','12 تصنيف أسئلة • نقاط • جولات','تحديات',Icons.emoji_events_rounded,const FriendsBattleArenaPage(),const Color(0xFF6554D9)),
@@ -423,3 +425,173 @@ class _GameInvitesPageState extends State<GameInvitesPage>{
  Future<void> answer(String id,bool accept)async=>gameDb.collection('gameInvites').doc(id).update({'status':accept?'accepted':'declined'});
  @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('دعوات اللعب'),actions:[IconButton(onPressed:invite,icon:const Icon(Icons.person_add_alt_1))]),body:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:gameDb.collection('gameInvites').where('to',isEqualTo:gameUid).orderBy('createdAt',descending:true).limit(40).snapshots(),builder:(c,s){if(s.hasError)return const Center(child:Text('تعذر تحميل الدعوات؛ قد تحتاج قواعد Firestore الجديدة.'));if(!s.hasData)return const Center(child:CircularProgressIndicator());if(s.data!.docs.isEmpty)return const Center(child:Text('ما عندك دعوات حالياً. اضغط + لدعوة عضو.'));return ListView(children:s.data!.docs.map((d){final x=d.data();return Card(child:ListTile(title:Text('دعوة من ${x['fromName']??'عضو'}'),subtitle:Text('الحالة: ${x['status']}'),trailing:x['status']=='pending'?Wrap(children:[IconButton(onPressed:()=>answer(d.id,true),icon:const Icon(Icons.check,color:Colors.green)),IconButton(onPressed:()=>answer(d.id,false),icon:const Icon(Icons.close,color:Colors.red))]):null));}).toList());})));
  }
+
+class ArcadeGamesHubScreen extends StatelessWidget {
+  const ArcadeGamesHubScreen({super.key});
+  static const games = [
+    ['ضربات الجزاء','3D رياضة','⚽','penalty'],
+    ['سباق النفق','3D سرعة','🚀','tunnel'],
+    ['صياد النجوم','3D فضاء','🌌','stars'],
+    ['صائد القلوب','2D مهارة','💗','hearts'],
+    ['معركة النقر','2D لاعبان','⚡','tap'],
+    ['رد الفعل','2D لاعبان','⏱️','reaction'],
+    ['كاسر الشفرة','2D ذكاء','🔐','code'],
+    ['الثعبان النيون','2D كلاسيك','🐍','snake'],
+    ['2048 السريع','2D أرقام','🔢','2048'],
+    ['قنّاص الهدف','2D دقة','🎯','target'],
+  ];
+  @override Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      backgroundColor: const Color(0xFF0C1020),
+      appBar: AppBar(title: const Text('صالة ألعاب 2D + 3D'), backgroundColor: const Color(0xFF151B31), foregroundColor: Colors.white),
+      body: CustomScrollView(slivers: [
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(colors: [Color(0xFF352B78), Color(0xFF126D79)])),
+            child: const Text('صالة ألعاب الملتقى 🎮\n10 ألعاب خفيفة وفورية، منها تحديات لشخصين على نفس الجهاز.', style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold, height: 1.6)),
+          ),
+        )),
+        SliverPadding(padding: const EdgeInsets.all(14), sliver: SliverGrid(
+          delegate: SliverChildBuilderDelegate((context, i) {
+            final g = games[i];
+            return InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ArcadeHubGamePage(title: g[0], mode: g[3]))),
+              child: Container(
+                decoration: BoxDecoration(color: const Color(0xFF171D32), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Text(g[2], style: const TextStyle(fontSize: 38)),
+                  const SizedBox(height: 8),
+                  Text(g[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Text(g[1], style: const TextStyle(color: Colors.cyanAccent, fontSize: 12)),
+                  const SizedBox(height: 8),
+                  const Text('العب الآن ←', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                ]),
+              ),
+            );
+          }, childCount: games.length),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: .95),
+        )),
+        SliverToBoxAdapter(child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: FilledButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureArcadePage())),
+            icon: const Icon(Icons.groups_rounded),
+            label: const Text('غرف الأصدقاء والدردشة والفويس'),
+          ),
+        )),
+      ]),
+    ),
+  );
+}
+
+class ArcadeHubGamePage extends StatefulWidget {
+  final String title, mode;
+  const ArcadeHubGamePage({super.key, required this.title, required this.mode});
+  @override State<ArcadeHubGamePage> createState() => _ArcadeHubGamePageState();
+}
+
+class _ArcadeHubGamePageState extends State<ArcadeHubGamePage> {
+  final random = Random();
+  final guess = TextEditingController();
+  int score = 0, secret = 0, taps = 0, snake = 20;
+  bool started = false, green = false, ended = false;
+  String note = 'اضغط ابدأ للعب';
+  @override void initState() { super.initState(); secret = 1000 + random.nextInt(8999); }
+  @override void dispose() { guess.dispose(); super.dispose(); }
+  void reset() => setState(() { score = 0; taps = 0; started = false; green = false; ended = false; secret = 1000 + random.nextInt(8999); note = 'اضغط ابدأ للعب'; });
+  void begin() {
+    setState(() { started = true; note = 'يلا نبدأ!'; });
+    if (widget.mode == 'reaction') {
+      Future.delayed(Duration(milliseconds: 1400 + random.nextInt(2500)), () {
+        if (mounted && !ended) setState(() { green = true; note = 'اضغط الآن!'; });
+      });
+    }
+  }
+  void hit() {
+    if (!started) { begin(); return; }
+    if (ended) return;
+    setState(() {
+      score++;
+      note = widget.mode == 'penalty' ? 'هدف! ⚽' : widget.mode == 'hearts' ? 'جمعت قلب! 💗' : 'إصابة ممتازة!';
+    });
+  }
+  Widget action(String text, VoidCallback fn) => FilledButton(onPressed: fn, child: Text(text));
+  @override Widget build(BuildContext context) {
+    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+      backgroundColor: const Color(0xFF0C1020),
+      appBar: AppBar(title: Text(widget.title), backgroundColor: const Color(0xFF151B31), foregroundColor: Colors.white),
+      body: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+        Text('النقاط: ' + score.toString(), style: const TextStyle(color: Colors.cyanAccent, fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 14),
+        Expanded(child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(color: const Color(0xFF171D32), borderRadius: BorderRadius.circular(22)),
+          child: _board(),
+        )),
+        const SizedBox(height: 12),
+        Text(note, style: const TextStyle(color: Colors.cyanAccent, fontSize: 17, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        if (ended) action('إعادة اللعب', reset)
+        else if (!started) action('ابدأ اللعب', begin)
+        else if (widget.mode == 'tap') Row(children: [
+          Expanded(child: action('فاطمة 💗', () { setState(() { taps++; if (taps >= 10) { ended = true; note = 'فازت فاطمة!'; } }) ;})),
+          const SizedBox(width: 8),
+          Expanded(child: action('حسون ⚡', () { setState(() { taps--; if (taps <= -10) { ended = true; note = 'فاز حسون!'; } }) ;})),
+        ])
+        else if (widget.mode == 'reaction') Row(children: [
+          Expanded(child: action('فاطمة', () => _react('فاطمة'))),
+          const SizedBox(width: 8),
+          Expanded(child: action('حسون', () => _react('حسون'))),
+        ])
+        else if (widget.mode == 'code') _codeControls()
+        else action('جولة جديدة', reset),
+      ])),
+    ));
+  }
+  void _react(String who) {
+    if (!green) { setState(() { ended = true; note = 'تسرّع ' + who + '!'; }); }
+    else { setState(() { ended = true; note = 'فاز ' + who + ' برد الفعل! 🏆'; }); }
+  }
+  Widget _codeControls() => Row(children: [
+    Expanded(child: TextField(controller: guess, keyboardType: TextInputType.number, maxLength: 4, style: const TextStyle(color: Colors.white), decoration: const InputDecoration(counterText: '', hintText: 'أربعة أرقام'))),
+    action('تحقق', () {
+      final n = int.tryParse(guess.text);
+      if (n == null) { setState(() => note = 'أدخل أربعة أرقام'); return; }
+      setState(() => note = n == secret ? 'كسرت الشفرة! 🎉' : n < secret ? 'الشفرة أكبر ↑' : 'الشفرة أصغر ↓');
+      if (n == secret) setState(() => ended = true);
+      guess.clear();
+    }),
+  ]);
+  Widget _board() {
+    if (widget.mode == 'tap') return const Center(child: Text('كل لاعب يضغط على زره بالأسفل\\nأول من يصل 10 نقاط يفوز', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontSize: 20)));
+    if (widget.mode == 'reaction') return GestureDetector(onTap: () => _react('اللاعب'), child: Container(color: green ? Colors.green : Colors.red.shade900, alignment: Alignment.center, child: Text(green ? 'اضغط الآن!' : 'انتظر اللون الأخضر', style: const TextStyle(color: Colors.white, fontSize: 24))));
+    if (widget.mode == 'code') return const Center(child: Text('خمّن الرقم السري من 4 خانات', style: TextStyle(color: Colors.white, fontSize: 20)));
+    if (widget.mode == 'snake') return Center(child: Text('🐍\\n' + '■ ' * (score + 3), style: const TextStyle(color: Colors.lightGreenAccent, fontSize: 26)));
+    if (widget.mode == '2048') return GestureDetector(onHorizontalDragEnd: (_) => setState(() => score += 2), child: Center(child: Text('2048\\n' + score.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.bold))));
+    return GestureDetector(onTap: hit, onHorizontalDragEnd: (_) => hit(), child: Stack(children: [
+      Positioned.fill(child: CustomPaint(painter: _ArcadeHubPainter(widget.mode))),
+      Center(child: Text(widget.mode == 'hearts' ? '💗' : widget.mode == 'penalty' ? '⚽' : widget.mode == 'tunnel' ? '🚧' : '✦', style: const TextStyle(fontSize: 65))),
+      const Align(alignment: Alignment.bottomCenter, child: Padding(padding: EdgeInsets.all(14), child: Text('المس الشاشة أو اسحب للتحدي', style: TextStyle(color: Colors.white70)))),
+    ]));
+  }
+}
+
+class _ArcadeHubPainter extends CustomPainter {
+  final String mode;
+  _ArcadeHubPainter(this.mode);
+  @override void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = Colors.cyanAccent.withOpacity(.22)..style = PaintingStyle.stroke..strokeWidth = 2;
+    for (int i = 1; i < 7; i++) {
+      final inset = i * size.width / 16;
+      canvas.drawRect(Rect.fromLTWH(inset, inset, size.width - inset * 2, size.height - inset * 2), p);
+    }
+    if (mode == 'penalty') canvas.drawRect(Rect.fromLTWH(size.width * .2, size.height * .18, size.width * .6, size.height * .3), Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 4);
+    if (mode == 'stars') for (int i = 0; i < 35; i++) canvas.drawCircle(Offset((i * 73 % 997) / 997 * size.width, (i * 131 % 991) / 991 * size.height), 1.5, Paint()..color = Colors.white70);
+  }
+  @override bool shouldRepaint(covariant _ArcadeHubPainter oldDelegate) => oldDelegate.mode != mode;
+}
