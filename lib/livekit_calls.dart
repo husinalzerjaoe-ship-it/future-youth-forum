@@ -80,8 +80,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     );
     if (saved == null) return;
     final uri = Uri.tryParse(saved);
-    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
-      setState(() => _error = 'أدخل رابط HTTPS صحيحاً لخادم المكالمات.');
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty || uri.host.toLowerCase() == 'meet.jit.si') {
+      setState(() => _error = 'هذا ليس رابط خادم LiveKit. رابط Jitsi يُستخدم في صفحة المكالمات الاحتياطية، أما هنا فأدخل رابط Cloudflare Worker الذي ينتهي بـ workers.dev.');
       return;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -126,7 +126,16 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
           'videoEnabled': _videoEnabled,
         }),
       ).timeout(const Duration(seconds: 25));
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+      final responseBody = response.body.trimLeft();
+      if (!contentType.contains('application/json') || responseBody.startsWith('<')) {
+        throw Exception('خادم المكالمات رجّع صفحة HTML بدل JSON. تأكد أن الرابط هو Cloudflare Worker الخاص بـ LiveKit وليس رابط meet.jit.si أو صفحة ويب.');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('استجابة خادم المكالمات غير مفهومة.');
+      }
+      final data = decoded;
       if (response.statusCode != 200) {
         throw Exception(data['error']?.toString() ?? 'تعذر إصدار رمز المكالمة.');
       }

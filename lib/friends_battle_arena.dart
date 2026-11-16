@@ -166,7 +166,7 @@ class FriendsBattleArenaPage extends StatelessWidget {
         const Text('اختر تحدياً وابدأ جولة تنافسية محلية', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         const SizedBox(height: 8),
         ..._arenaSets.entries.toList().asMap().entries.map((entry) {
-          final icons = [Icons.public,Icons.science,Icons.flag,Icons.account_balance,Icons.sports_soccer,Icons.animation,Icons.security,Icons.calculate,Icons.menu_book,Icons.movie,Icons.extension,Icons.palette];
+          final icons = [Icons.public, Icons.science, Icons.flag, Icons.account_balance, Icons.sports_soccer, Icons.animation, Icons.security, Icons.calculate, Icons.menu_book, Icons.movie, Icons.extension, Icons.palette, Icons.rocket_launch, Icons.pets, Icons.videogame_asset, Icons.restaurant, Icons.account_balance_wallet, Icons.psychology];
           return Card(child: ListTile(
             leading: CircleAvatar(backgroundColor: _arenaPurple.withValues(alpha: .12), child: Icon(icons[entry.key], color: _arenaPurple)),
             title: Text(entry.value.key, style: const TextStyle(fontWeight: FontWeight.bold)),

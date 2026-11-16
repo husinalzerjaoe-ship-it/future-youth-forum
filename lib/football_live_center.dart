@@ -26,11 +26,16 @@ class _FootballLiveCenterPageState extends State<FootballLiveCenterPage> {
     'الدوري السعودي': 'ksa.1',
   };
   static const channels = <_Channel>[
-    _Channel('beIN SPORTS', 'https://www.beinsports.com/ar-mena', 'موقع القنوات الرياضية'),
-    _Channel('SSC الرياضية', 'https://ssc.tv', 'الموقع الرسمي للقنوات'),
+    _Channel('beIN SPORTS', 'https://www.beinsports.com/ar-mena', 'الموقع الرسمي • تحقق من اشتراك وحقوق العراق'),
+    _Channel('SSC الرياضية', 'https://ssc.tv', 'الموقع الرسمي للقنوات الرياضية'),
     _Channel('أبوظبي الرياضية', 'https://www.adsports.ae', 'الموقع الرسمي للقناة'),
     _Channel('دبي الرياضية', 'https://www.dubaisports.ae', 'الموقع الرسمي للقناة'),
     _Channel('العراقية الرياضية', 'https://imn.iq', 'شبكة الإعلام العراقي'),
+  ];
+  static const familyChannels = <_Channel>[
+    _Channel('MBC3', 'https://shahid.mbc.net/ar/livestream/mbc3/livechannel-816771', 'بث MBC3 الرسمي عبر شاهد • قد يتطلب اشتراكاً'),
+    _Channel('MBC شاهد • البث المباشر', 'https://shahid.mbc.net/ar/livestream', 'قنوات MBC والقنوات المتاحة رسمياً على شاهد'),
+    _Channel('Spacetoon • سبيستون', 'https://www.youtube.com/@Spacetoonyoutube', 'القناة الرسمية على YouTube • حلقات ومقاطع عربية'),
   ];
 
   String league = 'eng.1';
@@ -216,6 +221,9 @@ class _FootballLiveCenterPageState extends State<FootballLiveCenterPage> {
           const Text('افتح موقع القناة وتحقق من جدول البث وحقوق العراق. هذه روابط رسمية وليست تأكيداً أن كل مباراة منقولة أو مجانية.',
             style: TextStyle(color: Colors.grey, fontSize: 12, height: 1.5)),
           const SizedBox(height: 10),
+          const Text('قنوات ترفيهية وعائلية', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          ...familyChannels.map(channelCard),
+          const SizedBox(height: 8),
           ...channels.map(channelCard),
         ])),
       ),
@@ -438,6 +446,12 @@ class _FootballLiveCenterPageState extends State<FootballLiveCenterPage> {
             const Text('روابط رسمية للتحقق من البث والحقوق المتاحة في العراق.', style: TextStyle(color: Colors.grey, fontSize: 12)),
             const SizedBox(height: 8),
             ...channels.map(channelCard),
+            const SizedBox(height: 14),
+            const Text('قنوات الأطفال والترفيه', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 5),
+            const Text('روابط رسمية للقنوات والمحتوى العربي. بعض البثوث تحتاج حساباً أو اشتراكاً حسب بلدك.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 8),
+            ...familyChannels.map(channelCard),
             Card(child: ListTile(
               leading: const CircleAvatar(child: Icon(Icons.groups)),
               title: const Text('غرفة مشاهدة متزامنة'),

@@ -26,6 +26,7 @@ import 'arcade_hub.dart';
 import 'inspiration_hub.dart';
 import 'match_center.dart';
 import 'livekit_calls.dart';
+import 'jitsi_backup_calls.dart';
 import 'daily_world.dart';
 import 'v6_community_suite.dart';
 import 'knowledge_corner.dart';
@@ -50,6 +51,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
   (title:'يوتيوب والترفيه',subtitle:'أغانٍ وفيديوهات وروابط أفلام رسمية',category:'الترفيه',icon:Icons.play_circle_fill,page:const YouTubeShelfPage()),
   (title:'مكالمات الصوت والفيديو',subtitle:'اتصلوا بالصوت وانتقلوا بين الأقسام والمكالمة مستمرة',category:'التواصل',icon:Icons.video_call_rounded,page:LiveKitCallsPage(onContinue:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>const CommunityHubPage())))),
+  (title:'اتصال احتياطي Jitsi',subtitle:'بديل للصوت والفيديو مع دردشة الاجتماع ورمز غرفة',category:'التواصل',icon:Icons.video_camera_front_rounded,page:const JitsiBackupCallsPage()),
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),

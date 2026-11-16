@@ -28,7 +28,7 @@ service cloud.firestore {
     function roomNotBanned(roomId) {
       return !exists(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid))
         || (get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.permanent != true
-          && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt < request.time);
+          && get(/databases/$(database)/documents/regionalChats/$(roomId)/bans/$(request.auth.uid)).data.expiresAt <= request.time);
     }
     // Private account data, including email, is visible only to its owner.
     match /users/{userId} {
@@ -41,6 +41,21 @@ service cloud.firestore {
         allow update: if request.auth != null && request.auth.uid == userId
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && request.resource.data.status in ['planned', 'watching', 'watched'];
+      }
+
+      // Cinema favourites are private to the signed-in account, just like the anime watchlist.
+      match /cinemaFavorites/{filmId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['title', 'year', 'addedAt'])
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.year is string
+          && request.resource.data.year.size() <= 12
+          && request.resource.data.addedAt is timestamp;
+        allow delete: if request.auth != null && request.auth.uid == userId;
       }
     }
 
@@ -195,7 +210,16 @@ service cloud.firestore {
           || (room.invitedUids is list && request.auth.uid in room.invitedUids)
         );
       }
-      allow read: if canAccessRoom();
+      // Use the queried document's own fields for top-level room reads.
+      // Firestore queries are not filters: a get() of the same document here
+      // prevents public/invited room queries from proving their read access.
+      // Keep canAccessRoom() below for nested collections, where the parent
+      // room must be loaded explicitly.
+      allow read: if request.auth != null && (
+        !('visibility' in resource.data) || resource.data.visibility != 'private'
+        || resource.data.hostUid == request.auth.uid
+        || (resource.data.invitedUids is list && request.auth.uid in resource.data.invitedUids)
+      );
       allow create: if request.auth != null
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.name is string
@@ -562,13 +586,14 @@ service cloud.firestore {
 
     match /regionalChats/{roomId}/bans/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
-      allow create, update: if isFounder()
+      // Founder and assigned chat moderators can manage regional-room bans.
+      allow create, update: if isChatStaff()
         && request.resource.data.permanent is bool
         && request.resource.data.by == request.auth.uid
         && (request.resource.data.permanent == true
           ? request.resource.data.expiresAt == null
           : request.resource.data.expiresAt is timestamp);
-      allow delete: if isFounder();
+      allow delete: if isChatStaff();
     }
 
     match /regionalChats/{roomId}/messages/{messageId} {
@@ -595,7 +620,8 @@ service cloud.firestore {
             && request.resource.data.videoUrl is string
             && request.resource.data.videoUrl.matches('https://.*'))
         );
-      allow update, delete: if isFounder();
+      // Keep regional-room moderation consistent with the public chat staff role.
+      allow update, delete: if isChatStaff();
     }
 
     match /userBlocks/{blockId} {
@@ -618,7 +644,15 @@ service cloud.firestore {
       // containing the signed-in user. Do not require members.size() here:
       // Firestore rules are not filters and cannot prove an array's size from
       // that query, which otherwise makes the entire inbox query fail.
-      allow read: if request.auth != null
+      // The app first checks whether a deterministic conversation document
+      // exists before creating it. Permit authenticated get() of a missing
+      // document (there is no data to disclose), but keep existing documents
+      // and all inbox list queries restricted to their two members.
+      allow get: if request.auth != null && (
+        resource == null
+        || (resource.data.members is list && request.auth.uid in resource.data.members)
+      );
+      allow list: if request.auth != null
         && resource.data.members is list
         && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && accountNotBanned()
