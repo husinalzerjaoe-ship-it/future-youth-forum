@@ -1,31 +1,54 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'media_upload_service.dart';
 
 const _watchBrand = Color(0xFF6554D9);
 final _watchDb = FirebaseFirestore.instance;
 
 class WatchPartyLobbyPage extends StatefulWidget {
-  const WatchPartyLobbyPage({super.key});
+  final String? initialUrl;
+  final String? initialName;
+  final bool cinemaMode;
+  const WatchPartyLobbyPage({super.key, this.initialUrl, this.initialName, this.cinemaMode = false});
   @override State<WatchPartyLobbyPage> createState() => _WatchPartyLobbyPageState();
 }
 
 class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
-  final _url = TextEditingController();
-  final _name = TextEditingController(text: 'غرفة مشاهدة');
+  late final TextEditingController _url;
+  late final TextEditingController _name;
+  final _roomPassword = TextEditingController();
   bool _creating = false;
   bool _privateRoom = false;
+  bool _passwordProtected = false;
   final Set<String> _invitedUids = <String>{};
   String? _error;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   @override
-  void dispose() { _url.dispose(); _name.dispose(); super.dispose(); }
+  void initState() {
+    super.initState();
+    _url = TextEditingController(text: widget.initialUrl ?? '');
+    _name = TextEditingController(text: widget.initialName ?? 'غرفة مشاهدة');
+    _privateRoom = widget.cinemaMode;
+    _passwordProtected = widget.cinemaMode;
+  }
+
+  @override
+  void dispose() { _url.dispose(); _name.dispose(); _roomPassword.dispose(); super.dispose(); }
 
   Future<void> _chooseFriends() async {
     final profiles = await _watchDb.collection('publicProfiles').limit(100).get();
@@ -74,20 +97,32 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     final path = uri.path.toLowerCase();
     final isDirect = path.endsWith('.mp4') || path.endsWith('.m3u8') ||
         path.endsWith('.m4v') || path.endsWith('.mov') || path.endsWith('.webm');
-    if (videoId == null && !isDirect) {
-      setState(() => _error = 'الرابط لازم يكون يوتيوب أو رابط فيديو مباشر MP4 / M3U8 / MOV / WEBM.');
+    final sourceType = videoId != null ? 'youtube' : isDirect ? 'direct' : 'web';
+    if (_passwordProtected && _roomPassword.text.trim().length < 4) {
+      setState(() => _error = 'كلمة المرور لازم تكون 4 أحرف على الأقل.');
       return;
     }
+    final passwordSalt = _passwordProtected
+        ? List<int>.generate(16, (_) => Random.secure().nextInt(256)).map((b) => b.toRadixString(16).padLeft(2, '0')).join()
+        : null;
+    final passwordHash = _passwordProtected
+        ? crypto.sha256.convert(utf8.encode('$passwordSalt|${_roomPassword.text.trim()}')).toString()
+        : null;
     setState(() { _creating = true; _error = null; });
     try {
       final ref = await _watchDb.collection('watchRooms').add({
         'name': _name.text.trim().isEmpty ? 'غرفة مشاهدة' : _name.text.trim(),
+        'roomType': widget.cinemaMode ? 'cinema' : 'watch',
+        if (widget.cinemaMode) 'contentTitle': _name.text.trim(),
         'url': raw,
-        'sourceType': videoId == null ? 'direct' : 'youtube',
+        'sourceType': sourceType,
         if (videoId != null) 'videoId': videoId,
         'hostUid': _uid,
         'visibility': _privateRoom ? 'private' : 'public',
         'invitedUids': _privateRoom ? <String>{_uid, ..._invitedUids}.toList() : <String>[],
+        'passwordProtected': _passwordProtected && _privateRoom,
+        if (_passwordProtected && _privateRoom) 'passwordSalt': passwordSalt,
+        if (_passwordProtected && _privateRoom) 'passwordHash': passwordHash,
         'status': 'paused',
         'positionSeconds': 0,
         'updatedAt': FieldValue.serverTimestamp(),
@@ -125,7 +160,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Text('أنشئ غرفة وشاهدوا معاً', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('يدعم روابط YouTube وروابط الفيديو المباشرة المصرّح بها مثل MP4 وM3U8.'),
+            const Text('يدعم YouTube وروابط MP4 / M3U8 والمواقع الخارجية. تشغيل المواقع الخارجية يكون بفتحها على كل جهاز وقد لا يتزامن الفيديو.'),
             const SizedBox(height: 12),
             TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم الغرفة', border: OutlineInputBorder())),
             const SizedBox(height: 10),
@@ -135,7 +170,19 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
               contentPadding: EdgeInsets.zero, value: _privateRoom,
               title: const Text('غرفة خاصة للأصدقاء'),
               subtitle: const Text('لا تظهر للعامة؛ فقط أنت والأصدقاء الذين تختارهم'),
-              onChanged: (value) => setState(() { _privateRoom = value; if (!value) _invitedUids.clear(); }),
+              onChanged: (value) => setState(() { _privateRoom = value; if (!value) { _invitedUids.clear(); _passwordProtected = false; _roomPassword.clear(); } }),
+            ),
+            if (_privateRoom) SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _passwordProtected,
+              title: const Text('حماية الغرفة بكلمة مرور'),
+              subtitle: const Text('الدخول للمدعوين فقط، ويحتاجون كلمة المرور أيضاً'),
+              onChanged: (value) => setState(() { _passwordProtected = value; if (!value) _roomPassword.clear(); }),
+            ),
+            if (_privateRoom && _passwordProtected) Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TextField(controller: _roomPassword, obscureText: true, maxLength: 64,
+                decoration: const InputDecoration(labelText: 'كلمة مرور الغرفة (4 أحرف على الأقل)', border: OutlineInputBorder(), counterText: '')),
             ),
             if (_privateRoom) OutlinedButton.icon(
               onPressed: _chooseFriends, icon: const Icon(Icons.group_add),
@@ -191,7 +238,14 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   bool _viewerPlaybackUnlocked = false;
   Map<String, dynamic> _room = {};
   final _chatText = TextEditingController();
+  final _roomPicker = ImagePicker();
+  final _roomRecorder = AudioRecorder();
+  final _roomVoicePlayer = AudioPlayer();
+  bool _recordingRoomVoice = false;
+  DateTime? _roomVoiceStarted;
+  String? _roomVoicePath;
   bool _sendingChat = false;
+  double _playbackSpeed = 1.0;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool get _isHost => _room['hostUid'] == _uid;
   bool get _isYoutube => _room['sourceType'] == 'youtube';
@@ -199,15 +253,50 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   @override
   void initState() {
     super.initState();
-    _joinRoom();
-    _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
-      if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
-      final data = snap.data()!;
-      final changed = data['url'] != _loadedUrl;
-      if (mounted) setState(() => _room = data);
-      if (changed) _setupPlayer(data);
-      else if (!_isHost) _applyRemoteState(data);
-    }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+    _enterRoom();
+  }
+
+  Future<void> _enterRoom() async {
+    try {
+      final first = await _watchDb.collection('watchRooms').doc(widget.roomId).get();
+      if (!first.exists) throw StateError('الغرفة غير موجودة.');
+      final data = first.data() ?? <String, dynamic>{};
+      if (data['active'] == false) throw StateError('الغرفة مغلقة.');
+      if (data['passwordProtected'] == true && data['hostUid'] != _uid) {
+        final passController = TextEditingController();
+        final entered = await showDialog<String>(context: context, barrierDismissible: false,
+          builder: (dialogContext) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+            title: const Text('غرفة محمية بكلمة مرور'),
+            content: TextField(controller: passController, obscureText: true, autofocus: true,
+              decoration: const InputDecoration(labelText: 'أدخل كلمة المرور', border: OutlineInputBorder()),
+              onSubmitted: (value) => Navigator.pop(dialogContext, value)),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, passController.text), child: const Text('دخول'))],
+          )));
+        passController.dispose();
+        if (entered == null) { if (mounted) Navigator.pop(context); return; }
+        final salt = (data['passwordSalt'] ?? '').toString();
+        final expected = (data['passwordHash'] ?? '').toString();
+        final actual = crypto.sha256.convert(utf8.encode('${salt}|${entered.trim()}')).toString();
+        if (salt.isEmpty || expected.isEmpty || actual != expected) {
+          if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('كلمة المرور غير صحيحة.'))); Navigator.pop(context); }
+          return;
+        }
+      }
+      await _joinRoom();
+      if (!mounted) return;
+      setState(() => _room = data);
+      _roomSub = _watchDb.collection('watchRooms').doc(widget.roomId).snapshots().listen((snap) {
+        if (!snap.exists) { if (mounted) setState(() => _error = 'الغرفة لم تعد موجودة.'); return; }
+        final updated = snap.data()!;
+        final changed = updated['url'] != _loadedUrl;
+        if (mounted) setState(() => _room = updated);
+        if (changed) _setupPlayer(updated);
+        else _applyRemoteState(updated);
+      }, onError: (_) { if (mounted) setState(() => _error = 'تعذر الاتصال بغرفة المشاهدة.'); });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString().replaceFirst('Bad state: ', ''));
+    }
   }
 
   Future<void> _joinRoom() async {
@@ -235,6 +324,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     _youtube = null; _video = null;
     final url = data['url'] as String? ?? '';
     _loadedUrl = url;
+    if (data['sourceType'] == 'web') { if (mounted) setState(() => _error = null); return; }
     try {
       if (data['sourceType'] == 'youtube') {
         final id = data['videoId'] as String? ?? YoutubePlayerController.convertUrlToId(url);
@@ -242,11 +332,11 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         final controller = YoutubePlayerController.fromVideoId(
           videoId: id,
           autoPlay: false,
-          params: const YoutubePlayerParams(showControls: false, showFullscreenButton: true, strictRelatedVideos: true),
+          params: const YoutubePlayerParams(showControls: true, showFullscreenButton: true, strictRelatedVideos: true),
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
-          if (!_isHost || _applyingRemote) return;
+          if (_applyingRemote) return;
           if (value.playerState == PlayerState.playing) _publish('playing');
           if (value.playerState == PlayerState.paused) _publish('paused');
         });
@@ -274,7 +364,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _applyRemoteState(Map<String, dynamic> data) async {
-    if (_isHost || _loadedUrl != data['url']) return;
+    if (data['controlUid'] == _uid || _loadedUrl != data['url']) return;
     _applyingRemote = true;
     try {
       final target = _targetPosition(data);
@@ -306,7 +396,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _publish(String status) async {
-    if (!_isHost || _applyingRemote || _busy) return;
+    if (_applyingRemote || _busy) return;
     _busy = true;
     try {
       final position = await _currentPosition();
@@ -314,6 +404,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         'status': status,
         'positionSeconds': position,
         'updatedAt': FieldValue.serverTimestamp(),
+        'controlUid': _uid,
       });
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذر مزامنة حالة المشاهدة.');
@@ -352,7 +443,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _togglePlayback() async {
-    if (!_isHost) return;
     if (_isYoutube && _youtube != null) {
       if (_youtube!.value.playerState == PlayerState.playing) {
         await _youtube!.pauseVideo();
@@ -374,7 +464,6 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
   Future<void> _seekBy(int seconds) async {
-    if (!_isHost) return;
     final current = await _currentPosition();
     final next = (current + seconds).clamp(0, 864000).toDouble();
     if (_isYoutube && _youtube != null) {
@@ -386,9 +475,164 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   }
 
 
+
+
+  bool _isDirectVideoUrl(Uri uri) {
+    final p = uri.path.toLowerCase();
+    return p.endsWith('.mp4') || p.endsWith('.m3u8') || p.endsWith('.m4v') || p.endsWith('.mov') || p.endsWith('.webm');
+  }
+  Future<void> _changeRoomUrl() async {
+    if (!_isHost) return;
+    final input = TextEditingController(text: _room['url'] as String? ?? '');
+    String? error;
+    final raw = await showDialog<String>(context: context, builder: (c) => StatefulBuilder(builder: (c, refresh) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(title: const Text('تغيير الحلقة أو رابط المشاهدة'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('ألصق رابط الحلقة الجديدة أو رابط موقع للمشاهدة.'),
+          const SizedBox(height: 10),
+          TextField(controller: input, keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'https://', border: OutlineInputBorder())),
+          if (error != null) Text(error!, style: const TextStyle(color: Colors.red)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
+          FilledButton(onPressed: () {
+            final u = Uri.tryParse(input.text.trim());
+            if (u == null || !u.hasScheme || !['http','https'].contains(u.scheme)) { refresh(() => error = 'الرابط غير صحيح.'); return; }
+            Navigator.pop(c, input.text.trim());
+          }, child: const Text('تحديث للجميع')),
+        ],
+      ),
+    )));
+    input.dispose();
+    if (raw == null) return;
+    final uri = Uri.parse(raw);
+    final id = YoutubePlayerController.convertUrlToId(raw);
+    final type = id != null ? 'youtube' : _isDirectVideoUrl(uri) ? 'direct' : 'web';
+    try {
+      await _watchDb.collection('watchRooms').doc(widget.roomId).update({
+        'url': raw, 'sourceType': type, 'videoId': id,
+        'status': 'paused', 'positionSeconds': 0,
+        'updatedAt': FieldValue.serverTimestamp(), 'controlUid': _uid,
+      });
+      if (mounted) setState(() => _error = null);
+    } catch (_) { if (mounted) setState(() => _error = 'تعذر تغيير الرابط. تأكد من تحديث قواعد Firestore.'); }
+  }
+  Future<void> _openRoomWebsite() async {
+    final uri = Uri.tryParse(_room['url'] as String? ?? '');
+    if (uri != null && uri.hasScheme) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+  Future<void> _setPlaybackSpeed(double speed) async {
+    try {
+      if (_isYoutube && _youtube != null) { await _youtube!.setPlaybackRate(speed); }
+      else if (_video?.value.isInitialized == true) { await _video!.setPlaybackSpeed(speed); }
+      if (mounted) setState(() => _playbackSpeed = speed);
+    } catch (_) { if (mounted) setState(() => _error = 'مصدر الفيديو لا يدعم تغيير السرعة.'); }
+  }
+  Future<void> _openFullscreen() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => _WatchPartyFullscreenPage(
+      youtube: _youtube, video: _video, isYoutube: _isYoutube,
+      onSeek: _seekBy, onToggle: _togglePlayback, onSpeed: _setPlaybackSpeed, speed: _playbackSpeed,
+    )));
+  }
+
+  Future<bool> _roomChatIsMuted() async {
+    final mute = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('roomMutes').doc(_uid).get();
+    final d = mute.data() ?? {};
+    if (d['permanent'] == true) return true;
+    final until = d['until'];
+    return until is Timestamp && until.toDate().isAfter(DateTime.now());
+  }
+
+  Future<void> _sendRoomMedia(String type, String url, {int? durationSeconds}) async {
+    if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+    final p = await _watchDb.collection('publicProfiles').doc(_uid).get();
+    final name = (p.data()?['name'] as String?) ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو';
+    await _watchDb.collection('watchRooms').doc(widget.roomId).collection('messages').add({
+      'senderUid': _uid, 'senderName': name, 'text': type == 'image' ? 'صورة' : 'رسالة صوتية',
+      'type': type, 'mediaUrl': url, if (durationSeconds != null) 'durationSeconds': durationSeconds,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> _sendRoomImage() async {
+    if (_sendingChat) return;
+    try {
+      if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+      final file = await _roomPicker.pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      if (mounted) setState(() { _sendingChat = true; _error = null; });
+      final url = await uploadForumMedia(file, folder: 'watch-rooms', roomId: widget.roomId);
+      await _sendRoomMedia('image', url);
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الصورة: $e'); }
+    finally { if (mounted) setState(() => _sendingChat = false); }
+  }
+
+  Future<void> _toggleRoomVoice() async {
+    if (_sendingChat) return;
+    if (!_recordingRoomVoice) {
+      try {
+        if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
+        if (!await _roomRecorder.hasPermission()) { if (mounted) setState(() => _error = 'اسمح للتطبيق باستخدام المايك لتسجيل الفويس.'); return; }
+        final dir = await Directory.systemTemp.createTemp('watch_room_voice_');
+        final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _roomRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100), path: path);
+        if (mounted) setState(() { _recordingRoomVoice = true; _roomVoiceStarted = DateTime.now(); _roomVoicePath = path; _error = null; });
+      } catch (e) { if (mounted) setState(() => _error = 'تعذر بدء تسجيل الفويس: $e'); }
+      return;
+    }
+    try {
+      final path = await _roomRecorder.stop();
+      final started = _roomVoiceStarted;
+      if (mounted) setState(() { _recordingRoomVoice = false; _roomVoiceStarted = null; });
+      final fp = path ?? _roomVoicePath;
+      if (fp == null || started == null) return;
+      final seconds = DateTime.now().difference(started).inSeconds;
+      if (seconds < 1 || seconds > 180) { if (mounted) setState(() => _error = 'مدة الفويس لازم تكون بين ثانية و3 دقائق.'); return; }
+      final file = File(fp);
+      if (!await file.exists() || await file.length() == 0) return;
+      if (mounted) setState(() => _sendingChat = true);
+      final url = await uploadForumMedia(XFile(fp, name: 'voice_${DateTime.now().millisecondsSinceEpoch}.m4a'), folder: 'watch-rooms', roomId: widget.roomId);
+      await _sendRoomMedia('voice', url, durationSeconds: seconds);
+      try { await file.delete(); } catch (_) {}
+    } catch (e) { if (mounted) setState(() => _error = 'تعذر إرسال الفويس: $e'); }
+    finally { if (mounted) setState(() { _sendingChat = false; _recordingRoomVoice = false; }); }
+  }
+
+  Future<void> _manageRoomMembers() async {
+    if (!_isHost && FirebaseAuth.instance.currentUser?.email?.toLowerCase() != 'husinalzerjaoe@gmail.com') return;
+    final people = await _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').get();
+    if (!mounted) return;
+    await showDialog<void>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+      title: const Text('إدارة أعضاء الغرفة'),
+      content: SizedBox(width: 360, child: ListView(shrinkWrap: true, children: people.docs.where((p) => p.id != _uid).map((p) => ListTile(
+        title: Text((p.data()['name'] ?? 'عضو').toString()), subtitle: const Text('كتم دردشة الغرفة فقط'),
+        trailing: PopupMenuButton<int>(onSelected: (mins) async {
+          final ref = _watchDb.collection('watchRooms').doc(widget.roomId).collection('roomMutes').doc(p.id);
+          if (mins == -1) { await ref.delete(); }
+          else { await ref.set({'uid': p.id, 'by': _uid, 'permanent': mins == 0, 'until': mins == 0 ? null : Timestamp.fromDate(DateTime.now().add(Duration(minutes: mins))), 'updatedAt': FieldValue.serverTimestamp()}); }
+          if (mounted) setState(() => _error = mins == -1 ? 'تم إلغاء الكتم.' : 'تم تطبيق الكتم داخل هذه الغرفة.');
+        }, itemBuilder: (_) => const [PopupMenuItem(value: 10, child: Text('10 دقائق')), PopupMenuItem(value: 60, child: Text('ساعة')), PopupMenuItem(value: 1440, child: Text('24 ساعة')), PopupMenuItem(value: 0, child: Text('دائم')), PopupMenuItem(value: -1, child: Text('إلغاء الكتم'))]),
+      )).toList())),
+      actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('إغلاق'))],
+    )));
+  }
+
+  Future<void> _deleteRoom() async {
+    if (!_isHost && FirebaseAuth.instance.currentUser?.email?.toLowerCase() != 'husinalzerjaoe@gmail.com') return;
+    final yes = await showDialog<bool>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl, child: AlertDialog(
+      title: const Text('حذف غرفة المشاهدة؟'), content: const Text('ستختفي الغرفة من القائمة ولن يستطيع الأعضاء الدخول إليها.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف'))],
+    )));
+    if (yes != true) return;
+    await _watchDb.collection('watchRooms').doc(widget.roomId).update({'active': false, 'status': 'paused'});
+    if (mounted) Navigator.pop(context);
+  }
+
   Future<void> _sendRoomMessage() async {
     final text = _chatText.text.trim();
     if (text.isEmpty || _sendingChat) return;
+    if (await _roomChatIsMuted()) { if (mounted) setState(() => _error = 'أنت مكتوم من دردشة هذه الغرفة فقط.'); return; }
     setState(() => _sendingChat = true);
     try {
       final profile = await _watchDb.collection('publicProfiles').doc(_uid).get();
@@ -398,6 +642,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
           .collection('messages').add({
         'senderUid': _uid,
         'senderName': name,
+        'type': 'text',
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -414,6 +659,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     _syncTimer?.cancel();
     _roomSub?.cancel();
     _chatText.dispose();
+    _roomRecorder.dispose();
+    _roomVoicePlayer.dispose();
     _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').doc(_uid).delete().catchError((_) {});
     _ytSub?.cancel();
     _youtube?.close();
@@ -425,7 +672,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
     child: Scaffold(
-      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة')),
+      appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost) IconButton(tooltip: 'تغيير رابط الحلقة', onPressed: _changeRoomUrl, icon: const Icon(Icons.link)), if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(
           color: Theme.of(context).colorScheme.errorContainer,
@@ -445,11 +692,13 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             ],
           )),
         ),
-        Stack(children: [
+        if (_room['sourceType'] == 'web') Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const Icon(Icons.public, size: 42), const Text('موقع مشاهدة خارجي'), const SizedBox(height: 8), const Text('افتحوا الموقع على أجهزتكم. بعض المواقع لا تسمح بالمزامنة داخل التطبيقات.'), FilledButton.icon(onPressed: _openRoomWebsite, icon: const Icon(Icons.open_in_browser), label: const Text('فتح الموقع'))]))),
+        if (_room['sourceType'] != 'web') Stack(children: [
           if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
           else if (_video?.value.isInitialized == true)
             AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
           else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
+          Positioned(top: 8, left: 8, child: IconButton.filled(onPressed: _openFullscreen, tooltip: 'ملء الشاشة', icon: const Icon(Icons.fullscreen))),
           if (!_isHost && !_viewerPlaybackUnlocked && (_youtube != null || _video?.value.isInitialized == true))
             Positioned.fill(child: Material(
               color: Colors.black54,
@@ -461,6 +710,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             )),
         ]),
         const SizedBox(height: 12),
+        if (_room['sourceType'] == 'web') Align(alignment: AlignmentDirectional.centerStart, child: TextButton.icon(onPressed: _isHost ? _changeRoomUrl : null, icon: const Icon(Icons.link), label: const Text('تغيير رابط الموقع'))),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _watchDb.collection('watchRooms').doc(widget.roomId).collection('participants').snapshots(),
           builder: (context, snapshot) {
@@ -504,11 +754,16 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             const SizedBox(width: 8),
             Expanded(child: Text(_isHost ? 'أنت مضيف الغرفة — تحكم بالتشغيل للجميع' : 'مشاهدة متزامنة مع المضيف', style: const TextStyle(fontWeight: FontWeight.bold))),
           ]),
-          if (_isHost) Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            IconButton(onPressed: () => _seekBy(-30), icon: const Icon(Icons.replay_30), tooltip: 'رجوع 30 ثانية'),
             IconButton(onPressed: () => _seekBy(-10), icon: const Icon(Icons.replay_10), tooltip: 'رجوع 10 ثوانٍ'),
             FilledButton.icon(onPressed: _togglePlayback, icon: Icon(_room['status'] == 'playing' ? Icons.pause : Icons.play_arrow), label: Text(_room['status'] == 'playing' ? 'إيقاف مؤقت' : 'تشغيل للجميع')),
             IconButton(onPressed: () => _seekBy(10), icon: const Icon(Icons.forward_10), tooltip: 'تقديم 10 ثوانٍ'),
-          ]) else const Padding(padding: EdgeInsets.only(top: 8), child: Text('المضيف وحده يتحكم بالتشغيل والتقديم حتى تبقون على نفس المقطع.')),
+            IconButton(onPressed: () => _seekBy(30), icon: const Icon(Icons.forward_30), tooltip: 'تقديم 30 ثانية'),
+           ]),
+          const Padding(padding: EdgeInsets.only(top: 4), child: Text('التحكم بالتشغيل والتقديم متاح لكل أعضاء الغرفة.', style: TextStyle(fontSize: 11))),
+          const SizedBox(height: 8),
+          Wrap(alignment: WrapAlignment.center, spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [const Text('سرعة التشغيل'), DropdownButton<double>(value: _playbackSpeed, items: const [0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((v) => DropdownMenuItem(value: v, child: Text('${v}x'))).toList(), onChanged: (v) { if (v != null) _setPlaybackSpeed(v); }), if (_isHost) TextButton.icon(onPressed: _changeRoomUrl, icon: const Icon(Icons.swap_horiz), label: const Text('الحلقة التالية'))]),
         ]))),
         const SizedBox(height: 8),
         Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
@@ -520,7 +775,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
               Text('دردشة غرفة المشاهدة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             const SizedBox(height: 8),
-            SizedBox(height: 220, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            SizedBox(height: 280, child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
               stream: _watchDb.collection('watchRooms').doc(widget.roomId)
                   .collection('messages').orderBy('createdAt', descending: true).limit(60).snapshots(),
               builder: (context, snapshot) {
@@ -547,7 +802,9 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           if (!mine) Text(item['senderName'] as String? ?? 'عضو',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                          Text(item['text'] as String? ?? ''),
+                          if (item['type'] == 'image' && (item['mediaUrl'] as String? ?? '').startsWith('https://')) ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(item['mediaUrl'] as String, width: 210, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة')))
+                          else if (item['type'] == 'voice' && (item['mediaUrl'] as String? ?? '').startsWith('https://')) Row(mainAxisSize: MainAxisSize.min, children: [IconButton(onPressed: () async { try { await _roomVoicePlayer.setUrl(item['mediaUrl'] as String); await _roomVoicePlayer.play(); } catch (_) { if (mounted) setState(() => _error = 'تعذر تشغيل الفويس.'); } }, icon: const Icon(Icons.play_circle_fill)), Text('فويس • ${item['durationSeconds'] ?? 0} ث')])
+                          else Text(item['text'] as String? ?? ''),
                         ]),
                       ),
                     );
@@ -557,6 +814,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
             )),
             const SizedBox(height: 8),
             Row(children: [
+              IconButton(tooltip: 'إرسال صورة', onPressed: _sendingChat ? null : _sendRoomImage, icon: const Icon(Icons.image_outlined)),
+              IconButton(tooltip: _recordingRoomVoice ? 'إيقاف وإرسال الفويس' : 'تسجيل فويس', onPressed: _sendingChat ? null : _toggleRoomVoice, color: _recordingRoomVoice ? Colors.red : null, icon: Icon(_recordingRoomVoice ? Icons.stop_circle : Icons.mic)),
               Expanded(child: TextField(
                 controller: _chatText,
                 minLines: 1,
@@ -580,4 +839,35 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
       ]),
     ),
   );
+}
+
+
+class _WatchPartyFullscreenPage extends StatefulWidget {
+  final YoutubePlayerController? youtube;
+  final VideoPlayerController? video;
+  final bool isYoutube;
+  final Future<void> Function(int) onSeek;
+  final Future<void> Function() onToggle;
+  final Future<void> Function(double) onSpeed;
+  final double speed;
+  const _WatchPartyFullscreenPage({required this.youtube, required this.video, required this.isYoutube, required this.onSeek, required this.onToggle, required this.onSpeed, required this.speed});
+  @override State<_WatchPartyFullscreenPage> createState() => _WatchPartyFullscreenPageState();
+}
+class _WatchPartyFullscreenPageState extends State<_WatchPartyFullscreenPage> {
+  @override
+  void initState() { super.initState(); SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky); SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]); }
+  @override
+  void dispose() { SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); SystemChrome.setPreferredOrientations(DeviceOrientation.values); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, body: SafeArea(child: Stack(children: [
+    Positioned.fill(child: Center(child: widget.isYoutube && widget.youtube != null ? YoutubePlayer(controller: widget.youtube!, aspectRatio: 16/9) : widget.video?.value.isInitialized == true ? AspectRatio(aspectRatio: widget.video!.value.aspectRatio, child: VideoPlayer(widget.video!)) : const CircularProgressIndicator())),
+    Positioned(top: 8, right: 8, child: IconButton.filledTonal(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.fullscreen_exit), tooltip: 'إغلاق ملء الشاشة')),
+    Positioned(bottom: 12, left: 12, right: 12, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+      IconButton.filledTonal(onPressed: () => widget.onSeek(-30), icon: const Icon(Icons.replay_30)),
+      IconButton.filled(onPressed: widget.onToggle, icon: const Icon(Icons.play_arrow)),
+      IconButton.filledTonal(onPressed: () => widget.onSeek(30), icon: const Icon(Icons.forward_30)),
+      const SizedBox(width: 14),
+      DropdownButton<double>(value: widget.speed, dropdownColor: Colors.black87, style: const TextStyle(color: Colors.white), items: const [0.5,0.75,1.0,1.25,1.5,2.0].map((v) => DropdownMenuItem(value:v, child: Text('${v}x'))).toList(), onChanged: (v) { if(v!=null) widget.onSpeed(v); }),
+    ])),
+  ])));
 }
