@@ -38,6 +38,7 @@ import 'future_arcade.dart';
 import 'knowledge_corner.dart';
 import 'future_dashboard.dart';
 import 'v11_premium_hub.dart';
+import 'v12_futuristic_hub.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -437,6 +438,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v12':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V12FuturisticHubPage()));
+                  break;
                 case 'v11':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V11PremiumHubPage()));
                   break;
@@ -510,6 +514,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v12', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V12 المستقبلية الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v11', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V11 الفخمة – كل المميزات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'media', child: ListTile(leading: Icon(Icons.library_music_rounded), title: Text('مكتبة ومشغّل المستقبل'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
