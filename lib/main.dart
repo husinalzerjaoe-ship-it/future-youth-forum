@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'community_pages.dart';
 import 'community_plus.dart';
 import 'enhanced_public_chat.dart';
@@ -83,8 +84,46 @@ Future<void> main() async {
   runApp(const FutureYouthApp());
 }
 
-class FutureYouthApp extends StatelessWidget {
+class FutureYouthApp extends StatefulWidget {
   const FutureYouthApp({super.key});
+  @override
+  State<FutureYouthApp> createState() => _FutureYouthAppState();
+}
+
+class _FutureYouthAppState extends State<FutureYouthApp> {
+  Color _accent = brand;
+  bool _reduceMotion = false;
+  bool _compactCards = false;
+  bool _preferencesLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVisualPreferences();
+  }
+
+  Future<void> _loadVisualPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final accent = switch (prefs.getString('v17_accent') ?? 'purple') {
+      'cyan' => const Color(0xFF26C6DA),
+      'blue' => const Color(0xFF448AFF),
+      'gold' => const Color(0xFFFFC857),
+      _ => const Color(0xFF806BFF),
+    };
+    final performance = prefs.getString('v17_performance') ?? 'balanced';
+    PaintingBinding.instance.imageCache.maximumSize = performance == 'high' ? 600 : performance == 'battery' ? 160 : 320;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = performance == 'high'
+        ? 120 * 1024 * 1024
+        : performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
+    if (!mounted) return;
+    setState(() {
+      _accent = accent;
+      _reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
+      _compactCards = prefs.getBool('v17_compact_cards') ?? false;
+      _preferencesLoaded = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -92,15 +131,21 @@ class FutureYouthApp extends StatelessWidget {
     themeMode: ThemeMode.dark,
     theme: ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.light),
+      colorScheme: ColorScheme.fromSeed(seedColor: _accent, brightness: Brightness.light),
+      visualDensity: _compactCards ? VisualDensity.compact : VisualDensity.standard,
       textTheme: GoogleFonts.notoSansArabicTextTheme(),
       appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
     ),
     darkTheme: ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: brand, brightness: Brightness.dark),
+      colorScheme: ColorScheme.fromSeed(seedColor: _accent, brightness: Brightness.dark),
+      visualDensity: _compactCards ? VisualDensity.compact : VisualDensity.standard,
       textTheme: GoogleFonts.notoSansArabicTextTheme(ThemeData.dark().textTheme),
       scaffoldBackgroundColor: const Color(0xFF111321),
+    ),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(disableAnimations: _reduceMotion),
+      child: child ?? const SizedBox.shrink(),
     ),
     home: const AnimatedIntroGate(),
   );
