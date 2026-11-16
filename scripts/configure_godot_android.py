@@ -18,20 +18,21 @@ dep_lines = [
     'implementation("androidx.fragment:fragment:1.9.1")',
 ]
 if "org.godotengine:godot:4.7.2.stable" not in text:
-    match = re.search(r"dependencies\s*\{", text)
+    match = re.search(r"dependencies\\s*\\{", text)
+    additions = "\\n".join("    " + line for line in dep_lines) + "\\n"
     if not match:
-        raise SystemExit("Gradle dependencies block not found")
-    start = match.end()
-    depth, end = 1, start
-    while end < len(text) and depth:
-        if text[end] == "{": depth += 1
-        elif text[end] == "}": depth -= 1
-        end += 1
-    if depth:
-        raise SystemExit("Unclosed Gradle dependencies block")
-    syntax = '    {}\n'
-    additions = "\n".join("    " + line for line in dep_lines) + "\n"
-    text = text[:end - 1] + additions + text[end - 1:]
+        # New Flutter Kotlin DSL templates may omit a dependencies block.
+        text = text.rstrip() + "\\n\\ndependencies {\\n" + additions + "}\\n"
+    else:
+        start_block = match.end()
+        depth, end_block = 1, start_block
+        while end_block < len(text) and depth:
+            if text[end_block] == "{": depth += 1
+            elif text[end_block] == "}": depth -= 1
+            end_block += 1
+        if depth:
+            raise SystemExit("Unclosed Gradle dependencies block")
+        text = text[:end_block - 1] + additions + text[end_block - 1:]
 
 # Preserve Godot's project metadata files inside the APK assets directory.
 assets = ANDROID / "src" / "main" / "assets"
