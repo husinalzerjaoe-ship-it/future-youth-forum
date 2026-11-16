@@ -244,10 +244,18 @@ class _FilmDetailsState extends State<_FilmDetails> {
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, size: 50))))),
         const SizedBox(height: 12),
         Text(widget.film.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(widget.film.year, style: const TextStyle(color: Colors.grey)),
+        Text(widget.film.year.isEmpty ? 'السنة غير محددة' : widget.film.year, style: const TextStyle(color: Colors.grey)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 7, children: [
+          Chip(label: Text(widget.film.isSeries ? 'مسلسل / حلقات' : 'فيلم')),
+          const Chip(label: Text('الترجمة العربية: غير مؤكدة')),
+        ]),
         const SizedBox(height: 8),
-        Text(widget.film.description.isEmpty ? 'عمل من مكتبة Internet Archive المفتوحة.' : widget.film.description,
-          maxLines: 4, overflow: TextOverflow.ellipsis),
+        Text(widget.film.description.isEmpty
+            ? 'عمل من مكتبة Internet Archive المفتوحة. تفاصيل اللغة والترجمة تحتاج التحقق من صفحة المصدر.'
+            : widget.film.description,
+          textDirection: TextDirection.rtl, textAlign: TextAlign.right,
+          maxLines: 5, overflow: TextOverflow.ellipsis),
         if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!, style: const TextStyle(color: Colors.orangeAccent))),
         if (_directUrl != null) const Text('تم العثور على فيديو مباشر يدعم مزامنة المشاهدة داخل الغرفة.',
           style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
