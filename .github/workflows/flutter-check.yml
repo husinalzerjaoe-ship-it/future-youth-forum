@@ -112,6 +112,16 @@ jobs:
           )
           PY
           flutter build apk --release --dart-define-from-file=/tmp/assistant-dart-defines.json
+      - name: Verify Godot project and native runtime inside APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/fyf-apk-contents.txt
+          grep -F "assets/project.godot" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scenes/main.tscn" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scripts/main.gd" /tmp/fyf-apk-contents.txt
+          grep -E "lib/[^ ]+/libgodot_android.so" /tmp/fyf-apk-contents.txt
+          echo "Godot project files and Android runtime library are present in the APK."
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
