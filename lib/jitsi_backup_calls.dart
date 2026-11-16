@@ -78,7 +78,7 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
         featureFlags: {
           FeatureFlags.chatEnabled: true,
           FeatureFlags.audioOnlyButtonEnabled: true,
-          FeatureFlags.videoMuteButtonEnabled: true,
+          FeatureFlags.videoMuteEnabled: true,
           FeatureFlags.audioMuteButtonEnabled: true,
           FeatureFlags.tileViewEnabled: true,
           FeatureFlags.pipEnabled: true,
