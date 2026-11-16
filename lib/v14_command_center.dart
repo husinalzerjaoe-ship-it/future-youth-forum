@@ -229,6 +229,29 @@ class _V14CommandCenterPageState extends State<V14CommandCenterPage> {
                   ),
                 ),
               ),
+              if (_recent.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 2),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('آخر ما فتحته', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 8),
+                      SizedBox(height: 42, child: ListView(scrollDirection: Axis.horizontal, children: _recent.map((title) {
+                        final matches = _tools.where((tool) => tool.title == title).toList();
+                        if (matches.isEmpty) return const SizedBox.shrink();
+                        final tool = matches.first;
+                        return Padding(
+                          padding: const EdgeInsetsDirectional.only(end: 7),
+                          child: ActionChip(
+                            avatar: Icon(tool.icon, size: 17, color: const Color(0xFFB9AEFF)),
+                            label: Text(tool.title),
+                            onPressed: () => _rememberAndOpen(tool),
+                          ),
+                        );
+                      }).toList())),
+                    ]),
+                  ),
+                ),
               if (visible.isEmpty)
                 const SliverFillRemaining(hasScrollBody: false, child: Center(child: Text('ما لقينا ميزة بهذا الاسم.', style: TextStyle(color: Colors.white70))))
               else
