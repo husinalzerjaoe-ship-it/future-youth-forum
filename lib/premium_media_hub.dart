@@ -3,12 +3,15 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 import 'local_audio_handler.dart';
+import 'media_upload_service.dart';
+import 'watch_party.dart';
 
 class PremiumMediaHubPage extends StatefulWidget {
   const PremiumMediaHubPage({super.key});
@@ -147,6 +150,67 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     }
   }
 
+  Future<void> _pickGalleryVideo() async {
+    try {
+      final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      if (picked == null) return;
+      final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : picked.path.split('.').last.toLowerCase();
+      if (!['mp4', 'mov'].contains(ext)) {
+        _toast('حالياً رفع الغرف يدعم MP4 وMOV. حوّل الفيديو إلى إحدى هاتين الصيغتين ثم جرّب.');
+        return;
+      }
+      final source = File(picked.path);
+      final bytes = await source.length();
+      if (bytes == 0) { _toast('ملف الفيديو فارغ.'); return; }
+      if (bytes > 100 * 1024 * 1024) {
+        _toast('حجم الفيديو أكبر من 100 ميغابايت حالياً.');
+        return;
+      }
+      final dir = await getApplicationDocumentsDirectory();
+      final fileName = 'gallery_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final saved = await source.copy('${dir.path}/$fileName');
+      final entry = _MediaEntry(path: saved.path, title: picked.name, kind: 'video', downloaded: true);
+      _items.insert(0, entry);
+      await _save();
+      if (mounted) setState(() {});
+      await _uploadVideoAndOpenRoom(entry);
+    } catch (e) {
+      _toast('تعذر اختيار الفيديو من الاستديو: $e');
+    }
+  }
+
+  Future<void> _uploadVideoAndOpenRoom(_MediaEntry entry) async {
+    if (entry.kind != 'video') return;
+    final ext = entry.path.split('.').last.toLowerCase();
+    if (!['mp4', 'mov'].contains(ext)) {
+      _toast('رفع الغرف يدعم حالياً فيديو MP4 وMOV.');
+      return;
+    }
+    final file = File(entry.path);
+    if (!await file.exists()) { _toast('ملف الفيديو لم يعد موجوداً على الجهاز.'); return; }
+    final size = await file.length();
+    if (size == 0 || size > 100 * 1024 * 1024) {
+      _toast(size == 0 ? 'ملف الفيديو فارغ.' : 'الحد الأعلى لرفع فيديو الغرفة 100 ميغابايت.');
+      return;
+    }
+    setState(() { _busy = true; _progress = null; _busyLabel = 'جاري رفع الفيديو لغرفة المشاهدة...'; });
+    try {
+      final remoteUrl = await uploadForumMedia(
+        XFile(entry.path, name: entry.path.split(Platform.pathSeparator).last),
+        folder: 'watch-rooms',
+      );
+      if (!mounted) return;
+      setState(() { _busy = false; _busyLabel = null; });
+      await Navigator.push(context, MaterialPageRoute(
+        builder: (_) => WatchPartyLobbyPage(initialUrl: remoteUrl, initialName: entry.title),
+      ));
+    } catch (e) {
+      _toast('تعذر رفع الفيديو: $e');
+    } finally {
+      if (mounted) setState(() { _busy = false; _progress = null; _busyLabel = null; });
+    }
+  }
+
   Future<void> _play(_MediaEntry entry) async {
     final tracks = _items.where((e) => e.kind == 'audio' && File(e.path).existsSync()).toList();
     final index = tracks.indexWhere((e) => e.path == entry.path);
@@ -200,6 +264,8 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
             const SizedBox(width: 10),
             Expanded(child: _action(Icons.download_for_offline, 'تنزيل مباشر', 'صوت وفيديو', _busy ? null : _download)),
           ]))),
+          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: _action(Icons.video_call_rounded, 'ارفع فيديو من الاستديو', 'غرفة مشاهدة متزامنة مع دردشة وفويس', _busy ? null : _pickGalleryVideo))),
           SliverToBoxAdapter(child: _heading('الصوتيات', audio.length)),
           _list(audio, Icons.headphones_rounded),
           SliverToBoxAdapter(child: _heading('الفيديوهات', videos.length)),
@@ -261,9 +327,14 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
         subtitle: Text((entry.downloaded ? 'منزّل على الجهاز' : 'ملف محلي') + ' • ' + (entry.kind == 'audio' ? 'صوت' : 'فيديو'), style: const TextStyle(fontSize: 11)),
         onTap: () => entry.kind == 'audio' ? _play(entry) : Navigator.push(context, MaterialPageRoute(builder: (_) => _LocalVideoPage(entry: entry))),
         trailing: PopupMenuButton<String>(
-          onSelected: (v) { if (v == 'favorite') _favorite(entry); if (v == 'remove') _remove(entry); },
+          onSelected: (v) {
+            if (v == 'favorite') _favorite(entry);
+            if (v == 'remove') _remove(entry);
+            if (v == 'watch') _uploadVideoAndOpenRoom(entry);
+          },
           itemBuilder: (_) => [
             PopupMenuItem(value: 'favorite', child: Text(entry.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة')),
+            if (entry.kind == 'video') const PopupMenuItem(value: 'watch', child: Text('رفع وفتح غرفة مشاهدة')),
             const PopupMenuItem(value: 'remove', child: Text('حذف')),
           ],
         ),
