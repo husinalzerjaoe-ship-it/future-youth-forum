@@ -11,7 +11,7 @@ class FutureUniversePage extends StatefulWidget {
 class _FutureUniversePageState extends State<FutureUniversePage> {
   String mode = 'balanced', theme = 'violet', query = '';
   bool loading = true;
-  Set<String> visible = {'growth','community','knowledge','games','studio','events','media','safety','scores','friends','watch'};
+  Set<String> visible = {'growth','communityPlus','knowledge','futureArcade','studio','events','media','safety','engagement','friendsArena','expansion','polls'};
   final entries = const <_Entry>[
     _Entry('مسار التطور والأهداف اليومية', Icons.track_changes, 'growth', 'أهدافك ومهامك اليومية'),
     _Entry('مجتمع الأصدقاء والنقاشات', Icons.groups, 'communityPlus', 'الأندية والمجتمعات'),
