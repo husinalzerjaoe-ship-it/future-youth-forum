@@ -890,8 +890,8 @@ class MiniNowPlayingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     // Audio service is optional and initializes after the home screen appears.
     // Never dereference its handler until initialization has completed.
+    if (!isAudioServiceInitialized) return const SizedBox.shrink();
     final handler = appAudioHandler;
-    if (handler == null) return const SizedBox.shrink();
 
     return StreamBuilder<MediaItem?>(
       stream: handler.mediaItem,
