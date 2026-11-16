@@ -12,6 +12,7 @@ import 'knowledge_corner.dart';
 import 'premium_media_hub.dart';
 import 'v6_community_suite.dart';
 import 'v12_personal_studio.dart';
+import 'v12_companion_center.dart';
 
 const _navy=Color(0xFF0B1024),_purple=Color(0xFF927CFF),_cyan=Color(0xFF42D9E8);
 
@@ -50,6 +51,7 @@ class _V12FuturisticHubPageState extends State<V12FuturisticHubPage>{
       const SizedBox(height:18),_section('تحدي المعرفة اليومي','سؤال اليوم • نقاط إضافية للإجابة الصحيحة'),_quiz(q,answers),
       const SizedBox(height:20),_section('عوالم الملتقى','مداخل سريعة إلى أقسامك المفضلة'),
       _tile('استوديو المستقبل','هويتك ومسوداتك وذكرياتك وتفضيلاتك',Icons.dashboard_customize,_cyan,()=>_open(const V12PersonalStudioPage())),
+      _tile('مركز المستقبل الشامل','صالات صوتية وبطولات وترجمة وأمان الحساب',Icons.hub,_purple,()=>_open(const V12CompanionCenterPage())),
       _tile('المجتمع والأندية','غرف واهتمامات ونقاشات',Icons.groups,_cyan,()=>_open(const V6CommunitySuitePage())),
       _tile('مركز الألعاب','ألعاب وتحديات متنوعة',Icons.sports_esports,_purple,()=>_open(const GameCenterPage())),
       _tile('منافسات الأصدقاء','تحديات ومواجهات جماعية',Icons.people_alt,Colors.greenAccent,()=>_open(const FriendsBattleArenaPage())),
