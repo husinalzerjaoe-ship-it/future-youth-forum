@@ -48,7 +48,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
 
  late final List<({String title,String subtitle,String category,IconData icon,Widget page})> _items=[
   (title:'الستوريات',subtitle:'صور وفيديوهات لمدة 24 ساعة',category:'التواصل',icon:Icons.camera_alt,page:const StoriesPage()),
-  (title:'دردشات الدول',subtitle:'العراق وسوريا وثلاث غرف أخرى',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
+  (title:'دردشات الدول',subtitle:'غرف العراق حسب المحافظات والاهتمامات وغرف عربية',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
   (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
   (title:'يوتيوب والترفيه',subtitle:'أغانٍ وفيديوهات وروابط أفلام رسمية',category:'الترفيه',icon:Icons.play_circle_fill,page:const YouTubeShelfPage()),
   (title:'مكالمات الصوت والفيديو',subtitle:'اتصلوا بالصوت وانتقلوا بين الأقسام والمكالمة مستمرة',category:'التواصل',icon:Icons.video_call_rounded,page:LiveKitCallsPage(onContinue:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>const CommunityHubPage())))),
@@ -378,11 +378,74 @@ class _StoryVideoPageState extends State<StoryVideoPage>{
  body:Center(child:v.value.isInitialized?AspectRatio(aspectRatio:v.value.aspectRatio,child:Stack(alignment:Alignment.center,children:[VideoPlayer(v),IconButton(color:Colors.white,iconSize:60,icon:Icon(v.value.isPlaying?Icons.pause_circle:Icons.play_circle),onPressed:()=>setState(()=>v.value.isPlaying?v.pause():v.play()))])):const CircularProgressIndicator(color:Colors.white)));
 }
 
-class RegionChatRoomsPage extends StatelessWidget{
+class RegionChatRoomsPage extends StatelessWidget {
  const RegionChatRoomsPage({super.key});
- static const rooms=[('iraq','دردشة أهل العراق','🇮🇶'),('syria','دردشة أهل سوريا','🇸🇾'),('palestine','دردشة فلسطين','🇵🇸'),('gulf','دردشة الخليج','🌴'),('general','دردشة الأصدقاء','🌍')];
- @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(appBar:AppBar(title:const Text('دردشات الدول')),body:ListView(padding:const EdgeInsets.all(12),children:rooms.map((r)=>Card(child:ListTile(leading:Text(r.$3,style:const TextStyle(fontSize:28)),title:Text(r.$2,style:const TextStyle(fontWeight:FontWeight.bold)),subtitle:const Text('محادثة مباشرة'),trailing:const Icon(Icons.chevron_left),onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>RegionChatPage(id:r.$1,title:r.$2)))))).toList())));
- }
+ static const iraqRooms = <(String,String,String,String)>[
+  ('iraq','العراق – الساحة العامة','🇮🇶','غرفة تجمع كل أعضاء العراق'),
+  ('iraq_baghdad','أهل بغداد','🏙️','بغداد والمحافظات القريبة'),
+  ('iraq_basra','أهل البصرة','🌊','البصرة والجنوب'),
+  ('iraq_nineveh','أهل نينوى','🏛️','الموصل ونينوى'),
+  ('iraq_erbil','أهل أربيل','⛰️','أربيل والمناطق القريبة'),
+  ('iraq_sulaymaniyah','أهل السليمانية','🌲','السليمانية وحلبجة'),
+  ('iraq_duhok','أهل دهوك','🏔️','دهوك وزاخو'),
+  ('iraq_kirkuk','أهل كركوك','🧭','كركوك والمناطق المحيطة'),
+  ('iraq_diyala','أهل ديالى','🌴','بعقوبة وديالى'),
+  ('iraq_anbar','أهل الأنبار','🏜️','الرمادي والفلوجة والأنبار'),
+  ('iraq_salahuddin','أهل صلاح الدين','🏰','تكريت وسامراء'),
+  ('iraq_babil','أهل بابل','🧱','الحلة وبابل'),
+  ('iraq_karbala','أهل كربلاء','🕌','كربلاء'),
+  ('iraq_najaf','أهل النجف','📚','النجف والكوفة'),
+  ('iraq_qadisiyah','أهل القادسية','🌾','الديوانية والقادسية'),
+  ('iraq_muthanna','أهل المثنى','🌅','السماوة والمثنى'),
+  ('iraq_dhiqar','أهل ذي قار','🏺','الناصرية وذي قار'),
+  ('iraq_maysan','أهل ميسان','🌿','العمارة وميسان'),
+  ('iraq_wasit','أهل واسط','🌾','الكوت وواسط'),
+ ];
+ static const interestRooms = <(String,String,String,String)>[
+  ('iraq_gaming','ألعاب العراق','🎮','ألعاب ومنافسات وحديث عن الألعاب'),
+  ('iraq_football','كرة القدم العراقية','⚽','الدوري العراقي والمنتخب والأندية'),
+  ('iraq_tech','تقنية ودراسة','💻','تعلم وتقنية ومساعدة دراسية'),
+  ('iraq_anime','أنمي وأوتاكو العراق','🌸','أنمي ومانغا ونقاشات'),
+ ];
+ static const otherRooms = <(String,String,String,String)>[
+  ('syria','دردشة أهل سوريا','🇸🇾','غرفة الأصدقاء من سوريا'),
+  ('palestine','دردشة فلسطين','🇵🇸','غرفة الأصدقاء من فلسطين'),
+  ('gulf','دردشة الخليج','🌴','غرفة تجمع أهل الخليج'),
+  ('general','دردشة الأصدقاء','🌍','غرفة عامة لكل الأعضاء'),
+ ];
+ Widget _roomTile(BuildContext c,(String,String,String,String) r) => Card(
+  margin:const EdgeInsets.only(bottom:7),
+  child:ListTile(
+   contentPadding:const EdgeInsets.symmetric(horizontal:14,vertical:4),
+   leading:Container(width:44,height:44,decoration:BoxDecoration(color:p.withValues(alpha:.10),borderRadius:BorderRadius.circular(14)),
+    child:Center(child:Text(r.$3,style:const TextStyle(fontSize:25)))),
+   title:Text(r.$2,style:const TextStyle(fontWeight:FontWeight.w900)),
+   subtitle:Text(r.$4,style:const TextStyle(fontSize:11)),
+   trailing:const Icon(Icons.chevron_left_rounded),
+   onTap:()=>Navigator.push(c,MaterialPageRoute(builder:(_)=>RegionChatPage(id:r.$1,title:r.$2))),
+  ),
+ );
+ @override Widget build(BuildContext c)=>Directionality(textDirection:TextDirection.rtl,child:Scaffold(
+  appBar:AppBar(title:const Text('مجتمعات العراق والدول')),
+  body:ListView(padding:const EdgeInsets.all(12),children:[
+   Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(borderRadius:BorderRadius.circular(20),
+    gradient:const LinearGradient(colors:[Color(0xFF171936),Color(0xFF6554D9),Color(0xFF168E9B)])),
+    child:const Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+     Text('مجتمعك أقرب إلك 🇮🇶',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900)),
+     SizedBox(height:5),Text('اختار محافظتك أو اهتمامك، وشارك بالدردشة والصور والرسائل الصوتية.',style:TextStyle(color:Colors.white70)),
+    ])),
+   const SizedBox(height:15),
+   const Padding(padding:EdgeInsets.only(bottom:8),child:Text('محافظات العراق الـ18',style:TextStyle(fontSize:17,fontWeight:FontWeight.w900))),
+   ...iraqRooms.map((r)=>_roomTile(c,r)),
+   const SizedBox(height:10),
+   const Padding(padding:EdgeInsets.only(bottom:8),child:Text('غرف حسب الاهتمام',style:TextStyle(fontSize:17,fontWeight:FontWeight.w900))),
+   ...interestRooms.map((r)=>_roomTile(c,r)),
+   const SizedBox(height:10),
+   const Padding(padding:EdgeInsets.only(bottom:8),child:Text('غرف عربية وعامة',style:TextStyle(fontSize:17,fontWeight:FontWeight.w900))),
+   ...otherRooms.map((r)=>_roomTile(c,r)),
+  ]),
+ ));
+}
 class RegionChatPage extends StatefulWidget {
  final String id,title;
  const RegionChatPage({super.key,required this.id,required this.title});
