@@ -451,8 +451,43 @@ class _AuthPageState extends State<AuthPage> {
                       keyboardType: TextInputType.emailAddress,
                       autofillHints: const [AutofillHints.email],
                       textInputAction: TextInputAction.next,
-                      validator: (v) => v == null ||
-                        !RegExp(r'^[^\\s@]+@[^\\s@]+\\.[^\\s@]+
+                      validator: (v) {
+                        final value = v?.trim() ?? '';
+                        final at = value.indexOf('@');
+                        return at <= 0 || at == value.length - 1 ||
+                          !value.substring(at + 1).contains('.')
+                          ? 'اكتب بريد إلكتروني صحيح' : null;
+                      }),
+                    const SizedBox(height: 14),
+                    _authField(password, 'كلمة المرور', Icons.lock_outline,
+                      obscureText: !showPassword,
+                      autofillHints: [registering ? AutofillHints.newPassword : AutofillHints.password],
+                      textInputAction: TextInputAction.done,
+                      suffixIcon: IconButton(
+                        tooltip: showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور',
+                        onPressed: () => setState(() => showPassword = !showPassword),
+                        icon: Icon(showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                          color: const Color(0xFFB7AEFF)),
+                      ),
+                      validator: (v) => v == null || v.length < 6
+                        ? 'كلمة المرور لازم تكون 6 أحرف على الأقل' : null),
+                    if (!registering) ...[
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        SizedBox(
+                          width: 28, height: 28,
+                          child: Checkbox(
+                            value: rememberEmail,
+                            activeColor: const Color(0xFF8878F2),
+                            checkColor: Colors.white,
+                            side: BorderSide(color: Colors.white.withOpacity(.55)),
+                            onChanged: busy ? null : (value) => setState(() => rememberEmail = value ?? false),
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        const Text('تذكّر بريدي الإلكتروني', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                      ]),
+                    ],
                     if (error != null) ...[
                       const SizedBox(height: 12),
                       Container(padding: const EdgeInsets.all(11),
