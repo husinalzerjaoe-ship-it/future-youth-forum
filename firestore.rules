@@ -1528,9 +1528,16 @@ service cloud.firestore {
       allow update: if request.auth != null
         && resource.data.createdBy == request.auth.uid
         && resource.data.status == 'open'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-        && request.resource.data.status == 'closed'
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'roundOne'])
+        && request.resource.data.updatedAt == request.time
+        && (
+          (request.resource.data.status == 'closed')
+          || (request.resource.data.status == 'open'
+            && !('roundOne' in resource.data)
+            && request.resource.data.roundOne is list
+            && request.resource.data.roundOne.size() > 0
+            && request.resource.data.roundOne.size() <= 16)
+        );
       allow delete: if request.auth != null
         && (resource.data.createdBy == request.auth.uid || isFounder());
 
