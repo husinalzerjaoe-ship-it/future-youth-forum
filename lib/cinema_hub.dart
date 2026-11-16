@@ -268,7 +268,8 @@ class _FilmDetailsState extends State<_FilmDetails> {
           child: Image.network('https://archive.org/services/img/${widget.film.id}', fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(color: const Color(0xFF24203B), child: const Icon(Icons.movie, size: 50))))),
         const SizedBox(height: 12),
-        Text(widget.film.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text('العنوان كما ورد في المصدر', textDirection: TextDirection.rtl, style: TextStyle(fontSize: 11, color: Colors.white60)),
+        Text(widget.film.title, textDirection: TextDirection.rtl, textAlign: TextAlign.right, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         Text(widget.film.year.isEmpty ? 'السنة غير محددة' : widget.film.year, style: const TextStyle(color: Colors.grey)),
         const SizedBox(height: 6),
         Wrap(spacing: 7, children: [
@@ -284,6 +285,7 @@ class _FilmDetailsState extends State<_FilmDetails> {
             label: const Text('فتح ملف الترجمة العربية من المصدر'),
           ),
         const SizedBox(height: 8),
+        const Text('الوصف الأصلي من المصدر:', textDirection: TextDirection.rtl, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.bold)),
         Text(widget.film.description.isEmpty
             ? 'عمل من مكتبة Internet Archive المفتوحة. تفاصيل اللغة والترجمة تحتاج التحقق من صفحة المصدر.'
             : widget.film.description,
@@ -307,6 +309,15 @@ class _FilmDetailsState extends State<_FilmDetails> {
           },
           icon: const Icon(Icons.translate),
           label: const Text('ابحث عن النسخة العربية على المنصات الرسمية'),
+        ),
+        TextButton.icon(
+          onPressed: () {
+            final title = widget.film.title;
+            final uri = Uri.https('www.google.com', '/search', {'q': '$title قصة العمل ملخص عربي'});
+            launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+          icon: const Icon(Icons.language_rounded),
+          label: const Text('ابحث عن ملخص عربي للعمل'),
         ),
         TextButton.icon(onPressed: widget.onFavorite, icon: const Icon(Icons.favorite_border), label: const Text('إضافة / إزالة من المفضلة')),
       ])))));
