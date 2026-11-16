@@ -11,6 +11,7 @@ import 'arcade_penalty.dart';
 import 'friends_quiz.dart';
 import 'friends_battle_arena.dart';
 import 'future_arcade.dart';
+import 'arcade_games_hub_v2.dart';
 
 const gameInk=Color(0xFF171936), gameViolet=Color(0xFF6554D9);
 final gameDb=FirebaseFirestore.instance;
@@ -31,7 +32,7 @@ class _GameCenterPageState extends State<GameCenterPage> {
   final TextEditingController _search = TextEditingController();
   String _filter = 'الكل';
   late final List<_GameEntry> _games = [
-    _GameEntry('صالة ألعاب 2D + 3D','10 ألعاب جديدة • تحديات فردية وثنائية','جديد',Icons.videogame_asset_rounded,const ArcadeGamesHubScreen(),const Color(0xFF38D9E6)),
+    _GameEntry('صالة ألعاب 2D + 3D','10 ألعاب جديدة • تحديات فردية وثنائية','جديد',Icons.videogame_asset_rounded,const ArcadeGamesHubV2Screen(),const Color(0xFF38D9E6)),
     _GameEntry('Future Arcade','14 لعبة جديدة • تحديات • ألعاب 2D','جديد',Icons.sports_esports_rounded,const FutureArcadePage(),const Color(0xFF13A89E)),
     _GameEntry('كنز الأصدقاء 2D','خريطة مباشرة • جواهر • غرف ودعوات','2D أونلاين',Icons.map_rounded,const TreasureLobbyPage(),const Color(0xFF13A89E)),
     _GameEntry('ساحة منافسات الأصدقاء','12 تصنيف أسئلة • نقاط • جولات','تحديات',Icons.emoji_events_rounded,const FriendsBattleArenaPage(),const Color(0xFF6554D9)),
