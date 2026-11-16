@@ -6,6 +6,7 @@ on:
     branches:
       - feature/v10-jitsi-backup-calls
       - feature/v22-cinema-2025-2026-discovery
+      - feature/v35-comprehensive-community-upgrade
     paths:
       - 'firestore.rules'
       - 'storage.rules'
