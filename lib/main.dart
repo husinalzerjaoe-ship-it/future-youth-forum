@@ -41,6 +41,7 @@ import 'future_dashboard.dart';
 import 'v11_premium_hub.dart';
 import 'v12_futuristic_hub.dart';
 import 'v14_command_center.dart';
+import 'v17_smart_hub.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -94,12 +95,31 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
   Color _accent = brand;
   bool _reduceMotion = false;
   bool _compactCards = false;
-  bool _preferencesLoaded = false;
-
+  
   @override
   void initState() {
     super.initState();
+    v17AccentNotifier.addListener(_visualPreferencesChanged);
+    v17ReduceMotionNotifier.addListener(_visualPreferencesChanged);
+    v17CompactCardsNotifier.addListener(_visualPreferencesChanged);
     _loadVisualPreferences();
+  }
+
+  void _visualPreferencesChanged() {
+    if (!mounted) return;
+    setState(() {
+      _accent = v17AccentNotifier.value;
+      _reduceMotion = v17ReduceMotionNotifier.value;
+      _compactCards = v17CompactCardsNotifier.value;
+    });
+  }
+
+  @override
+  void dispose() {
+    v17AccentNotifier.removeListener(_visualPreferencesChanged);
+    v17ReduceMotionNotifier.removeListener(_visualPreferencesChanged);
+    v17CompactCardsNotifier.removeListener(_visualPreferencesChanged);
+    super.dispose();
   }
 
   Future<void> _loadVisualPreferences() async {
@@ -120,8 +140,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
       _accent = accent;
       _reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
       _compactCards = prefs.getBool('v17_compact_cards') ?? false;
-      _preferencesLoaded = true;
-    });
+      });
   }
 
   @override
