@@ -1443,7 +1443,7 @@ service cloud.firestore {
         && (arcadeMember() || resource.data.status == 'waiting');
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.hostId == request.auth.uid
-        && request.resource.data.gameId in ['arcade_ludo','arcade_jackaroo','arcade_chess','arcade_mafia','arcade_racing','arcade_snake','arcade_space','arcade_platform','arcade_tower','arcade_fishing','arcade_millionaire','arcade_sudoku','arcade_wordsearch','arcade_bomb','arcade_duel_hub']
+        && request.resource.data.gameId in ['arcade_ludo','arcade_jackaroo','arcade_chess','arcade_mafia','arcade_racing','arcade_snake','arcade_space','arcade_platform','arcade_tower','arcade_fishing','arcade_millionaire','arcade_sudoku','arcade_wordsearch','arcade_bomb','arcade_duel_hub','arcade_friend_world']
         && request.resource.data.members is list
         && request.resource.data.members.size() == 1
         && request.resource.data.members[0] == request.auth.uid
