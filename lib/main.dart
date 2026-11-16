@@ -129,6 +129,11 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
       'gold' => const Color(0xFFFFC857),
       _ => const Color(0xFF806BFF),
     };
+    final reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
+    final compactCards = prefs.getBool('v17_compact_cards') ?? false;
+    v17AccentNotifier.value = accent;
+    v17ReduceMotionNotifier.value = reduceMotion;
+    v17CompactCardsNotifier.value = compactCards;
     final performance = prefs.getString('v17_performance') ?? 'balanced';
     PaintingBinding.instance.imageCache.maximumSize = performance == 'high' ? 600 : performance == 'battery' ? 160 : 320;
     PaintingBinding.instance.imageCache.maximumSizeBytes = performance == 'high'
@@ -137,8 +142,8 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
     if (!mounted) return;
     setState(() {
       _accent = accent;
-      _reduceMotion = prefs.getBool('v17_reduce_motion') ?? false;
-      _compactCards = prefs.getBool('v17_compact_cards') ?? false;
+      _reduceMotion = reduceMotion;
+      _compactCards = compactCards;
     });
   }
 
