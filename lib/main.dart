@@ -78,26 +78,122 @@ Future<void> _notifyContentMentions({
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await Supabase.initialize(
-    url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
-    anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
-    // Forward the signed-in Firebase ID token so Supabase Storage RLS can
-    // identify the same user. Configure Firebase as a Supabase Third-party Auth
-    // provider; the current storage policies validate Firebase issuer, audience and UID.
-    accessToken: () async => FirebaseAuth.instance.currentUser?.getIdToken(),
-  );
-  // Launch the app as soon as core Firebase/Supabase setup is ready.
-  // Audio service startup is optional and must never block the login screen.
-  runApp(const FutureYouthApp());
-  Future<void>(() async {
+  // Render a Flutter-owned loading/error screen immediately. A slow network
+  // service must never leave Android's native splash covering the whole app.
+  runApp(const FutureYouthBootstrap());
+}
+
+class FutureYouthBootstrap extends StatefulWidget {
+  const FutureYouthBootstrap({super.key});
+  @override
+  State<FutureYouthBootstrap> createState() => _FutureYouthBootstrapState();
+}
+
+class _FutureYouthBootstrapState extends State<FutureYouthBootstrap> {
+  bool _ready = false;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    if (mounted) setState(() { _loading = true; _error = null; });
     try {
-      await initializeLocalAudioService();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 25));
+      if (!mounted) return;
+      setState(() { _ready = true; _loading = false; });
+
+      // Supabase Storage and the local audio player are optional services.
+      // Start them after the app UI is visible so neither can block sign-in.
+      Future<void>(() async {
+        try {
+          await Supabase.initialize(
+            url: 'https://xwfzdiftlzrjsprnbwpf.supabase.co',
+            anonKey: 'sb_publishable_kra9SFgnuh5CtvV2-2n4mQ_7q_iJzbY',
+            accessToken: () async =>
+                FirebaseAuth.instance.currentUser?.getIdToken(),
+          ).timeout(const Duration(seconds: 20));
+        } catch (error, stackTrace) {
+          debugPrint('Supabase initialization failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      });
+      Future<void>(() async {
+        try {
+          await initializeLocalAudioService().timeout(
+            const Duration(seconds: 12),
+          );
+        } catch (error, stackTrace) {
+          debugPrint('Audio service initialization failed: $error');
+          debugPrintStack(stackTrace: stackTrace);
+        }
+      });
     } catch (error, stackTrace) {
-      debugPrint('Audio service initialization failed: $error');
+      debugPrint('Firebase startup failed: $error');
       debugPrintStack(stackTrace: stackTrace);
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'تعذر تشغيل خدمات التطبيق. تحقق من الإنترنت ثم اضغط إعادة المحاولة.';
+      });
     }
-  });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const FutureYouthApp();
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF111321),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: brand,
+          brightness: Brightness.dark,
+        ),
+      ),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.groups_rounded, size: 64, color: Color(0xFFB9AEFF)),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'ملتقى شباب المستقبل',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error ?? 'جاري تجهيز الملتقى...',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 22),
+                  if (_loading)
+                    const CircularProgressIndicator()
+                  else
+                    FilledButton.icon(
+                      onPressed: _initialize,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('إعادة المحاولة'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class FutureYouthApp extends StatefulWidget {
