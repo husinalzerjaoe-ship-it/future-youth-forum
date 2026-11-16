@@ -10,6 +10,7 @@ import 'game_center.dart';
 import 'inspiration_hub.dart';
 import 'local_bot.dart';
 import 'match_center.dart';
+import 'v12_companion_center.dart';
 
 const _v17Purple = Color(0xFF806BFF);
 final ValueNotifier<Color> v17AccentNotifier = ValueNotifier<Color>(_v17Purple);
@@ -31,6 +32,7 @@ class _V17SmartHubPageState extends State<V17SmartHubPage> {
     _Destination('مركز المباريات', 'البطولات والنتائج وشعارات الأندية', Icons.scoreboard_rounded, () => const MatchCenterPage(), 'نتائج دوري جدول'),
     _Destination('مركز الألعاب', 'تحديات وأسئلة وألعاب متنوعة', Icons.sports_esports_rounded, () => const GameCenterPage(), 'لعبة مسابقة أسئلة'),
     _Destination('الفعاليات والمسابقات', 'أنشطة الملتقى والتسجيل', Icons.event_available_rounded, () => const CommunityEventsPage(), 'فعالية حدث بطولة'),
+    _Destination('بطولات الأصدقاء', 'إنشاء بطولة وتحديات بين أعضاء الملتقى', Icons.emoji_events_rounded, () => const V12CompanionCenterPage(), 'بطولة تحدي أصدقاء مسابقة'),
     _Destination('الإنجازات والأوسمة', 'النقاط وسلاسل النشاط والشارات', Icons.military_tech_rounded, () => const AchievementHubPage(), 'إنجاز شارة نقاط'),
     _Destination('التصويتات', 'استطلاعات المجتمع', Icons.poll_rounded, () => const CommunityPollsPage(), 'تصويت استطلاع'),
     _Destination('عالم الأنمي', 'قائمة المشاهدة وخلفيات الأنمي', Icons.animation_rounded, () => const AnimeExperiencePage(), 'أنمي اوتاكو'),
