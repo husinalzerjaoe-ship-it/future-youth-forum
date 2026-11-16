@@ -24,6 +24,7 @@ Future<String> uploadForumMedia(
     case 'private-chat':
     case 'chat-backgrounds':
     case 'profiles':
+    case 'watch-rooms':
     case 'shared-files':
       prefix = '$folder/${user.uid}/';
       break;
