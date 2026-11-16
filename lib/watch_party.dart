@@ -17,6 +17,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'media_upload_service.dart';
 
 const _watchBrand = Color(0xFF6554D9);
+// Use a normal Android Chrome mobile identity for the official YouTube iframe.
+// This improves WebView compatibility; it does not extract or bypass protected streams.
+const _watchYoutubeUserAgent = 'Mozilla/5.0 (Linux; Android 15; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
 final _watchDb = FirebaseFirestore.instance;
 
 class WatchPartyLobbyPage extends StatefulWidget {
@@ -362,7 +365,14 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         final controller = YoutubePlayerController.fromVideoId(
           videoId: id,
           autoPlay: false,
-          params: const YoutubePlayerParams(showControls: true, showFullscreenButton: true, strictRelatedVideos: true),
+          params: const YoutubePlayerParams(
+            showControls: true,
+            showFullscreenButton: true,
+            strictRelatedVideos: true,
+            enableCaption: true,
+            captionLanguage: 'ar',
+            interfaceLanguage: 'ar',
+          ),
         );
         _youtube = controller;
         _ytSub = controller.listen((value) {
@@ -732,7 +742,7 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
         ),
         if (_room['sourceType'] == 'web') Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [const Icon(Icons.public, size: 42), const Text('موقع مشاهدة خارجي'), const SizedBox(height: 8), const Text('افتحوا الموقع على أجهزتكم. بعض المواقع لا تسمح بالمزامنة داخل التطبيقات.'), FilledButton.icon(onPressed: _openRoomWebsite, icon: const Icon(Icons.open_in_browser), label: const Text('فتح الموقع'))]))),
         if (_room['sourceType'] != 'web') Stack(children: [
-          if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9)
+          if (_youtube != null) YoutubePlayer(controller: _youtube!, aspectRatio: 16 / 9, userAgent: _watchYoutubeUserAgent)
           else if (_video?.value.isInitialized == true)
             AspectRatio(aspectRatio: _video!.value.aspectRatio, child: VideoPlayer(_video!))
           else const AspectRatio(aspectRatio: 16 / 9, child: Center(child: CircularProgressIndicator())),
@@ -899,7 +909,7 @@ class _WatchPartyFullscreenPageState extends State<_WatchPartyFullscreenPage> {
   void dispose() { SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); SystemChrome.setPreferredOrientations(DeviceOrientation.values); super.dispose(); }
   @override
   Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, body: SafeArea(child: Stack(children: [
-    Positioned.fill(child: Center(child: widget.isYoutube && widget.youtube != null ? YoutubePlayer(controller: widget.youtube!, aspectRatio: 16/9) : widget.video?.value.isInitialized == true ? AspectRatio(aspectRatio: widget.video!.value.aspectRatio, child: VideoPlayer(widget.video!)) : const CircularProgressIndicator())),
+    Positioned.fill(child: Center(child: widget.isYoutube && widget.youtube != null ? YoutubePlayer(controller: widget.youtube!, aspectRatio: 16/9, userAgent: _watchYoutubeUserAgent) : widget.video?.value.isInitialized == true ? AspectRatio(aspectRatio: widget.video!.value.aspectRatio, child: VideoPlayer(widget.video!)) : const CircularProgressIndicator())),
     Positioned(top: 8, right: 8, child: IconButton.filledTonal(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.fullscreen_exit), tooltip: 'إغلاق ملء الشاشة')),
     Positioned(bottom: 12, left: 12, right: 12, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
       IconButton.filledTonal(onPressed: () => widget.onSeek(-30), icon: const Icon(Icons.replay_30)),

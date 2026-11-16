@@ -24,6 +24,8 @@ class EnhancedPublicChatPage extends StatefulWidget {
 
 class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with WidgetsBindingObserver {
   final _text = TextEditingController();
+  final _searchController = TextEditingController();
+  bool _showSearchBar = false;
   final _picker = ImagePicker();
   bool _sending = false;
   bool _mentionPickerOpen = false;
@@ -53,7 +55,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
   Future<void> _loadBackground() async {
     try { final d=await _chatDb.collection('chatPreferences').doc(_uid).get(); final c=d.data()?['background']; if(mounted && c is int && _backgrounds.contains(c)) setState(()=>_background=c); } catch (_) {}
   }
-  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); _voiceRecorder.dispose(); super.dispose(); }
+  @override void dispose() { WidgetsBinding.instance.removeObserver(this); _setPresence(false); _chatDb.collection('chatTyping').doc(_uid).delete().catchError((_){}); _text.dispose(); _searchController.dispose(); _voiceRecorder.dispose(); super.dispose(); }
 
   Future<String> _name() async {
     final p=await _chatDb.collection('publicProfiles').doc(_uid).get();
@@ -548,171 +550,289 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     ))));
   }
 
-  @override Widget build(BuildContext context)=>Directionality(textDirection:TextDirection.rtl,child:Column(children:[
-    Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [Color(0xFF11162F), Color(0xFF30286F), Color(0xFF6554D9)],
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Color(0x260F1230), blurRadius: 12, offset: Offset(0, 4))],
-      ),
-      child: Row(children: [
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Column(children: [
         Container(
-          width: 43, height: 43,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white24),
+          height: 52,
+          padding: const EdgeInsetsDirectional.only(start: 12, end: 6),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft,
+              colors: [Color(0xFF11162F), Color(0xFF30286F), Color(0xFF6554D9)]),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(14)),
+            boxShadow: [BoxShadow(color: Color(0x200F1230), blurRadius: 7, offset: Offset(0, 2))],
           ),
-          child: const Icon(Icons.forum_rounded, color: Colors.white, size: 23),
+          child: Row(children: [
+            const Icon(Icons.forum_rounded, color: Colors.white, size: 21),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('الساحة العامة', maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: _chatDb.collection('chatPresence').where('online', isEqualTo: true).snapshots(),
+              builder: (c, s) => Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF63E6A5), shape: BoxShape.circle)),
+                const SizedBox(width: 4),
+                Text('${s.data?.docs.length ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+              ]),
+            ),
+            IconButton(
+              tooltip: _showSearchBar ? 'إغلاق البحث' : 'بحث في الدردشة',
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints.tightFor(width: 38, height: 38),
+              onPressed: () => setState(() {
+                _showSearchBar = !_showSearchBar;
+                if (!_showSearchBar) { _searchController.clear(); _searchQuery = ''; }
+              }),
+              icon: Icon(_showSearchBar ? Icons.search_off_rounded : Icons.search_rounded, color: Colors.white, size: 20),
+            ),
+            PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert, color: Colors.white, size: 21),
+              onSelected: (value) {
+                if (value == 'background') {
+                  showModalBottomSheet<void>(
+                    context: context, showDragHandle: true,
+                    builder: (c) => Directionality(textDirection: TextDirection.rtl,
+                      child: SafeArea(child: Wrap(children: _backgrounds.map((color) => ListTile(
+                        dense: true,
+                        leading: CircleAvatar(radius: 13, backgroundColor: Color(color)),
+                        title: const Text('اختيار خلفية الدردشة'),
+                        onTap: () {
+                          Navigator.pop(c);
+                          setState(() => _background = color);
+                          _chatDb.collection('chatPreferences').doc(_uid).set({'background': color}, SetOptions(merge: true));
+                        },
+                      )).toList())),
+                    ),
+                  );
+                } else if (value == 'admin') { _founderTools(); }
+              },
+              itemBuilder: (c) => [
+                const PopupMenuItem(value: 'background', child: Text('تغيير الخلفية')),
+                if (_isFounder) const PopupMenuItem(value: 'admin', child: Text('لوحة المؤسس')),
+              ],
+            ),
+          ]),
         ),
-        const SizedBox(width: 10),
-        const Expanded(child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('الساحة العامة', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-            SizedBox(height: 3),
-            Text('دردشة مباشرة • اسحب الرسالة للرد', style: TextStyle(color: Color(0xFFDCD7FF), fontSize: 11)),
-          ],
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          child: _showSearchBar ? Padding(
+            padding: const EdgeInsets.fromLTRB(8, 5, 8, 2),
+            child: SizedBox(height: 36, child: TextField(
+              controller: _searchController, autofocus: true,
+              onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
+              decoration: InputDecoration(
+                isDense: true, hintText: 'ابحث باسم العضو أو نص الرسالة...',
+                prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 32),
+                suffixIcon: IconButton(visualDensity: VisualDensity.compact,
+                  onPressed: () { _searchController.clear(); setState(() => _searchQuery = ''); },
+                  icon: const Icon(Icons.close_rounded, size: 17)),
+                contentPadding: const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+                filled: true, fillColor: const Color(0xFFF1EEFF),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(11), borderSide: BorderSide.none),
+              ),
+            )),
+          ) : const SizedBox.shrink(),
+        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _chatDb.collection('messages').where('isPinned', isEqualTo: true).limit(5).snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
+            final pinned = snapshot.data!.docs;
+            return Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(8, 3, 8, 3),
+              child: Align(alignment: AlignmentDirectional.centerStart,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => showModalBottomSheet<void>(
+                    context: context, isScrollControlled: true, showDragHandle: true,
+                    builder: (sheetContext) => Directionality(textDirection: TextDirection.rtl,
+                      child: SafeArea(child: SizedBox(
+                        height: MediaQuery.of(sheetContext).size.height * .48,
+                        child: Column(children: [
+                          const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+                            child: Row(children: [
+                              Icon(Icons.push_pin_rounded, color: _chatBrand, size: 18),
+                              SizedBox(width: 7),
+                              Text('الرسائل المثبتة', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                            ])),
+                          Expanded(child: ListView.builder(
+                            itemCount: pinned.length,
+                            itemBuilder: (c, index) {
+                              final d = pinned[index].data();
+                              final messageText = d['text'] as String? ?? (d['type'] == 'image' ? '📷 صورة' : d['type'] == 'voice' ? '🎙️ رسالة صوتية' : 'مرفق');
+                              return ListTile(dense: true,
+                                leading: const Icon(Icons.bookmark_outline_rounded, color: _chatBrand, size: 19),
+                                title: Text(d['senderName'] as String? ?? 'عضو',
+                                  style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text(messageText, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+                                    title: Text(d['senderName'] as String? ?? 'رسالة مثبتة'),
+                                    content: Text(messageText),
+                                    actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+                                  ));
+                                },
+                              );
+                            },
+                          )),
+                        ]),
+                      )),
+                    ),
+                  ),
+                  child: Container(height: 29, padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(color: const Color(0xFFEDE8FF), borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: _chatBrand.withValues(alpha: .22))),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.push_pin_rounded, color: _chatBrand, size: 15),
+                      const SizedBox(width: 5),
+                      Text('المثبتة ${pinned.length}', style: const TextStyle(color: Color(0xFF34266F), fontSize: 11, fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 3),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: _chatBrand, size: 16),
+                    ]),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: _chatDb.collection('weeklyContests').where('status', isEqualTo: 'open').limit(3).snapshots(),
+          builder: (c, s) {
+            if (!s.hasData || s.data!.docs.isEmpty) return const SizedBox.shrink();
+            return SizedBox(height: 39, child: ListView(
+              scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              children: s.data!.docs.map((d) {
+                final data = d.data();
+                return Padding(padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: ActionChip(
+                    visualDensity: VisualDensity.compact,
+                    avatar: const Icon(Icons.emoji_events_rounded, color: Colors.orange, size: 16),
+                    label: Text(data['title'] as String? ?? 'مسابقة الأسبوع', maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                    onPressed: () => _join(d.id),
+                  ));
+              }).toList(),
+            ));
+          },
+        ),
+        Expanded(child: AnimatedContainer(
+          duration: const Duration(milliseconds: 450), curve: Curves.easeInOutCubic,
+          decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft,
+            colors: [Color(_background), Color(_background).withOpacity(.78), Color(_background).withOpacity(.92)])),
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: _chatDb.collection('userBlocks').where('blockerId', isEqualTo: _uid).snapshots(),
+            builder: (context, blocks) {
+              if (blocks.hasError) return const Center(child: Text('تعذر تحميل قائمة الحظر.'));
+              if (!blocks.hasData) return const Center(child: CircularProgressIndicator());
+              final blockedIds = blocks.data!.docs.map((d) => (d.data()['blockedId'] ?? '').toString())
+                .where((id) => id.isNotEmpty).toSet();
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: _chatDb.collection('messages').orderBy('createdAt', descending: true).limit(100).snapshots(),
+                builder: (c, s) {
+                  if (s.hasError) return const Center(child: Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
+                  if (!s.hasData) return const Center(child: CircularProgressIndicator());
+                  final visible = s.data!.docs.where((d) {
+                    final data = d.data();
+                    if (blockedIds.contains((data['senderId'] ?? '').toString())) return false;
+                    if (_searchQuery.isEmpty) return true;
+                    final text = '${data['text'] ?? ''} ${data['senderName'] ?? ''}'.toLowerCase();
+                    return text.contains(_searchQuery);
+                  }).toList();
+                  if (visible.isEmpty) return Center(child: Text(_searchQuery.isEmpty ? 'ابدأ أول محادثة في الساحة ✨' : 'ما لقينا رسائل تطابق بحثك 🔎'));
+                  return ListView(reverse: true, padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+                    children: visible.map(_bubble).toList());
+                },
+              );
+            },
+          ),
         )),
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _chatDb.collection('chatPresence').where('online', isEqualTo: true).snapshots(),
-          builder: (c, s) => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: .12), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white24)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 7, height: 7, decoration: const BoxDecoration(color: Color(0xFF63E6A5), shape: BoxShape.circle)),
-              const SizedBox(width: 5),
-              Text('${s.data?.docs.length ?? 0} متصل', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-            ]),
-          ),
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: Colors.white),
-          onSelected: (value) {
-            if (value == 'background') {
-              showModalBottomSheet<void>(
-                context: context,
-                showDragHandle: true,
-                builder: (c) => Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: SafeArea(child: Wrap(children: _backgrounds.map((color) => ListTile(
-                    leading: CircleAvatar(backgroundColor: Color(color)),
-                    title: const Text('اختيار خلفية الدردشة'),
-                    onTap: () {
-                      Navigator.pop(c);
-                      setState(() => _background = color);
-                      _chatDb.collection('chatPreferences').doc(_uid).set({'background': color}, SetOptions(merge: true));
-                    },
-                  )).toList())),
-                ),
-              );
-            } else if (value == 'admin') {
-              _founderTools();
-            }
+          stream: _chatDb.collection('chatTyping').where('typing', isEqualTo: true).snapshots(),
+          builder: (c, s) {
+            final n = (s.data?.docs ?? []).where((d) => d.id != _uid).length;
+            return n > 0 ? const Padding(padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Align(alignment: AlignmentDirectional.centerStart,
+                child: Text('أحد الأعضاء يكتب الآن...', style: TextStyle(fontSize: 10, color: _chatBrand))))
+              : const SizedBox.shrink();
           },
-          itemBuilder: (c) => [
-            const PopupMenuItem(value: 'background', child: Text('تغيير الخلفية')),
-            if (_isFounder) const PopupMenuItem(value: 'admin', child: Text('لوحة المؤسس')),
-          ],
+        ),
+        if (_reply != null) Container(height: 30, padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
+          color: const Color(0xFFEDE8FF), child: Row(children: [
+            const Icon(Icons.reply_rounded, size: 16, color: _chatBrand), const SizedBox(width: 5),
+            Expanded(child: Text('الرد على ${(_reply!.data()?['senderName'] ?? 'عضو')}',
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF34266F)))),
+            IconButton(visualDensity: VisualDensity.compact, constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+              onPressed: () => setState(() => _reply = null), icon: const Icon(Icons.close, size: 16)),
+          ])),
+        if (_error != null) Padding(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 10))),
+        Container(
+          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Colors.white, Color(0xFFF1EDFF)]),
+            border: Border(top: BorderSide(color: _chatBrand, width: 1))),
+          padding: const EdgeInsets.fromLTRB(5, 3, 5, 3),
+          child: SafeArea(top: false, child: Row(children: [
+            PopupMenuButton<String>(
+              tooltip: 'مرفقات وخيارات الرسالة', padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 42, minHeight: 42),
+              icon: Icon(_recordingVoice ? Icons.stop_circle_rounded : Icons.add_circle_outline_rounded,
+                color: _recordingVoice ? Colors.red : _chatBrand, size: 25),
+              onSelected: (value) {
+                if (value == 'image') _sendImage();
+                if (value == 'video') _sendVideo();
+                if (value == 'stickers') _showStickers();
+                if (value == 'voice') _toggleVoiceRecording();
+              },
+              itemBuilder: (c) => [
+                const PopupMenuItem(value: 'image', child: Row(children: [Icon(Icons.image_outlined, size: 19), SizedBox(width: 9), Text('إرسال صورة')])),
+                const PopupMenuItem(value: 'video', child: Row(children: [Icon(Icons.video_library_outlined, size: 19), SizedBox(width: 9), Text('إرسال فيديو')])),
+                const PopupMenuItem(value: 'stickers', child: Row(children: [Icon(Icons.emoji_emotions_outlined, size: 19), SizedBox(width: 9), Text('ملصقات وإيموجي')])),
+                PopupMenuItem(value: 'voice', child: Row(children: [
+                  Icon(_recordingVoice ? Icons.stop_circle : Icons.mic_none, color: _recordingVoice ? Colors.red : _chatBrand, size: 19),
+                  const SizedBox(width: 9), Text(_recordingVoice ? 'إيقاف وإرسال الفويس' : 'تسجيل رسالة صوتية'),
+                ])),
+              ],
+            ),
+            Expanded(child: Container(
+              constraints: const BoxConstraints(minHeight: 40, maxHeight: 68),
+              margin: const EdgeInsets.symmetric(horizontal: 4), padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: _chatBrand.withValues(alpha: .20)),
+                boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 5, offset: Offset(0, 1))]),
+              alignment: Alignment.center,
+              child: TextField(
+                controller: _text, maxLength: 1000, minLines: 1, maxLines: 2,
+                textInputAction: TextInputAction.send,
+                onChanged: (v) {
+                  _chatDb.collection('chatTyping').doc(_uid).set({
+                    'uid': _uid, 'typing': v.trim().isNotEmpty, 'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true)).catchError((_) {});
+                  if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
+                },
+                onSubmitted: (_) => _send(body: _text.text),
+                decoration: const InputDecoration(hintText: 'اكتب رسالتك...', counterText: '',
+                  isDense: true, border: InputBorder.none, contentPadding: EdgeInsets.symmetric(vertical: 8)),
+              ),
+            )),
+            SizedBox(width: 39, height: 39, child: IconButton.filled(
+              padding: EdgeInsets.zero, onPressed: _sending ? null : () => _send(body: _text.text),
+              style: IconButton.styleFrom(backgroundColor: _chatBrand, foregroundColor: Colors.white),
+              icon: _sending
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.send_rounded, size: 19),
+            )),
+          ])),
         ),
       ]),
-    ),
-    Padding(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
-      child: TextField(
-        onChanged: (value) => setState(() => _searchQuery = value.trim().toLowerCase()),
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: 'ابحث في رسائل الساحة وأسماء الأعضاء...',
-          prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: _searchQuery.isEmpty ? null : IconButton(
-            tooltip: 'مسح البحث', onPressed: () => setState(() => _searchQuery = ''),
-            icon: const Icon(Icons.close_rounded),
-          ),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: .92),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-        ),
-      ),
-    ),
-    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-      stream:_chatDb.collection('messages').where('isPinned',isEqualTo:true).limit(5).snapshots(),
-      builder:(context,s){
-        if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
-        final pinned=s.data!.docs;
-        return Container(margin:const EdgeInsets.fromLTRB(10,6,10,4),decoration:BoxDecoration(color:const Color(0xFFEDE8FF),borderRadius:BorderRadius.circular(13),border:Border.all(color:_chatBrand.withValues(alpha:.35))),child:ExpansionTile(
-          dense:true,leading:const Icon(Icons.push_pin_rounded,color:_chatBrand),title:Text('الرسائل المثبتة (${pinned.length})',style:const TextStyle(color:Color(0xFF34266F),fontWeight:FontWeight.w900)),
-          subtitle:const Text('اضغط لعرض الإعلانات والرسائل المهمة',style:TextStyle(fontSize:10,color:Color(0xFF6554A8))),
-          children:pinned.map((doc){final d=doc.data();return ListTile(dense:true,leading:const Icon(Icons.bookmark,color:_chatBrand,size:18),title:Text(d['senderName'] as String? ?? 'عضو',style:const TextStyle(fontWeight:FontWeight.bold,color:Color(0xFF34266F))),subtitle:Text(d['text'] as String? ?? (d['type']=='image'?'📷 صورة':d['type']=='voice'?'🎙️ رسالة صوتية':'مرفق'),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Color(0xFF34266F))),onTap:()=>showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('رسالة مثبتة'),content:Text(d['text'] as String? ?? 'رسالة مرفقة'),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))])));}).toList(),
-        ));
-      },
-    ),
-    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('weeklyContests').where('status',isEqualTo:'open').limit(3).snapshots(),builder:(c,s){
-      if(!s.hasData||s.data!.docs.isEmpty)return const SizedBox.shrink();
-      return Column(children:s.data!.docs.map((d)=>Container(color:const Color(0xFFFFF3CD),child:ListTile(dense:true,leading:const Icon(Icons.emoji_events,color:Colors.orange),title:Text(d.data()['title'] as String? ?? 'مسابقة الأسبوع'),subtitle:Text(d.data()['details'] as String? ?? 'شارك واربح عضوية'),trailing:TextButton(onPressed:()=>_join(d.id),child:const Text('اشترك')),onLongPress:_isFounder?()=>_entries(d.id):null))).toList());
-    }),
-    Expanded(child:AnimatedContainer(
-      duration: const Duration(milliseconds: 850),
-      curve: Curves.easeInOutCubic,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight, end: Alignment.bottomLeft,
-          colors: [Color(_background), Color(_background).withOpacity(.78), Color(_background).withOpacity(.92)],
-        ),
-      ),
-      child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-      stream:_chatDb.collection('userBlocks').where('blockerId',isEqualTo:_uid).snapshots(),
-      builder:(context,blocks){
-        if(blocks.hasError)return const Center(child:Text('تعذر تحميل قائمة الحظر.'));
-        if(!blocks.hasData)return const Center(child:CircularProgressIndicator());
-        final blockedIds=blocks.data!.docs.map((d)=>(d.data()['blockedId']??'').toString()).where((id)=>id.isNotEmpty).toSet();
-        return StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(
-          stream:_chatDb.collection('messages').orderBy('createdAt',descending:true).limit(100).snapshots(),
-          builder:(c,s){
-            if(s.hasError)return const Center(child:Text('تعذر تحميل الدردشة. راجع قواعد Firestore.'));
-            if(!s.hasData)return const Center(child:CircularProgressIndicator());
-            final visible=s.data!.docs.where((d) {
-              final data=d.data();
-              if(blockedIds.contains((data['senderId']??'').toString())) return false;
-              if(_searchQuery.isEmpty) return true;
-              final text = "${data['text'] ?? ''} ${data['senderName'] ?? ''}".toLowerCase();
-              return text.contains(_searchQuery);
-            }).toList();
-            if(visible.isEmpty)return Center(child:Text(_searchQuery.isEmpty?'ابدأ أول محادثة في الساحة ✨':'ما لقينا رسائل تطابق بحثك 🔎'));
-            return ListView(reverse:true,padding:const EdgeInsets.all(12),children:visible.map(_bubble).toList());
-          },
-        );
-      },
-    ))),
-    StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:_chatDb.collection('chatTyping').where('typing',isEqualTo:true).snapshots(),builder:(c,s){
-      final n=(s.data?.docs??[]).where((d)=>d.id!=_uid).length;
-      return n>0?const Padding(padding:EdgeInsets.all(3),child:Text('أحد الأعضاء يكتب الآن...',style:TextStyle(fontSize:11,color:_chatBrand))):const SizedBox.shrink();
-    }),
-    if(_reply!=null)ListTile(dense:true,leading:const Icon(Icons.reply),title:Text('الرد على '+(_reply!.data()?['senderName']??'عضو').toString()),trailing:IconButton(onPressed:()=>setState(()=>_reply=null),icon:const Icon(Icons.close))),
-    if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.red,fontSize:11)),
-    Container(decoration:const BoxDecoration(gradient:LinearGradient(colors:[Colors.white,Color(0xFFF1EDFF)]),border:Border(top:BorderSide(color:_chatBrand,width:1.2))),padding:const EdgeInsets.symmetric(horizontal:5,vertical:4),child:SafeArea(top:false,child:Row(children:[
-      IconButton(onPressed:_sending?null:_sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:_chatBrand)),
-       IconButton(onPressed:_sending?null:_sendVideo,tooltip:'إرسال فيديو',icon:const Icon(Icons.video_library_rounded,color:Color(0xFF168A83))),
-      IconButton(onPressed:_sending?null:_showStickers,icon:const Icon(Icons.emoji_emotions,color:Colors.orange)),
-      IconButton(onPressed:_sending?null:_toggleVoiceRecording,tooltip:_recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(_recordingVoice?Icons.stop_circle:Icons.mic,color:_recordingVoice?Colors.red:_chatBrand)),
-      Expanded(child:Container(
-        margin:const EdgeInsets.symmetric(vertical:4),
-        padding:const EdgeInsets.symmetric(horizontal:12,vertical:2),
-        decoration:BoxDecoration(color:Colors.white,borderRadius:BorderRadius.circular(22),border:Border.all(color:_chatBrand.withValues(alpha:.20)),boxShadow:const [BoxShadow(color:Color(0x10000000),blurRadius:7,offset:Offset(0,2))]),
-        child:TextField(controller:_text,maxLength:1000,minLines:1,maxLines:4,textInputAction:TextInputAction.send,
-          onChanged:(v) {
-            _chatDb.collection('chatTyping').doc(_uid).set({'uid':_uid,'typing':v.trim().isNotEmpty,'updatedAt':FieldValue.serverTimestamp()},SetOptions(merge:true)).catchError((_) {});
-            if (v.endsWith('@') && !_mentionPickerOpen) _showMentionPicker();
-          },
-          onSubmitted:(_)=>_send(body:_text.text),decoration:const InputDecoration(hintText:'اكتب رسالتك... استخدم @ للإشارة',counterText:'',border:InputBorder.none,contentPadding:EdgeInsets.symmetric(vertical:10))))),
-      IconButton.filled(onPressed:_sending?null:()=>_send(body:_text.text),style:IconButton.styleFrom(backgroundColor:_chatBrand,foregroundColor:Colors.white),icon:_sending?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2,color:Colors.white)):const Icon(Icons.send_rounded)),
-    ]))),
-  ]));
+    );
+  }
 }
 
 
