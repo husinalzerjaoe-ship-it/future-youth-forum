@@ -920,8 +920,31 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class MiniNowPlayingBar extends StatelessWidget {
+class MiniNowPlayingBar extends StatefulWidget {
   const MiniNowPlayingBar({super.key});
+
+  @override
+  State<MiniNowPlayingBar> createState() => _MiniNowPlayingBarState();
+}
+
+class _MiniNowPlayingBarState extends State<MiniNowPlayingBar> {
+  bool _checkingAudio = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeAudio();
+  }
+
+  Future<void> _initializeAudio() async {
+    try {
+      await initializeLocalAudioService();
+    } catch (error) {
+      debugPrint('Mini player audio initialization failed: $error');
+    } finally {
+      if (mounted) setState(() => _checkingAudio = false);
+    }
+  }
 
   String _clock(Duration value) {
     final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -933,7 +956,7 @@ class MiniNowPlayingBar extends StatelessWidget {
   Widget build(BuildContext context) {
     // Audio service is optional and initializes after the home screen appears.
     // Never dereference its handler until initialization has completed.
-    if (!isAudioServiceInitialized) return const SizedBox.shrink();
+    if (_checkingAudio || !isAudioServiceInitialized) return const SizedBox.shrink();
     final handler = appAudioHandler;
 
     return StreamBuilder<MediaItem?>(
