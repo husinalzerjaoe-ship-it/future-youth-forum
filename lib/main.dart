@@ -19,6 +19,7 @@ import 'local_audio_handler.dart';
 import 'youtube_video_player.dart';
 import 'firebase_options.dart';
 import 'football_news.dart';
+import 'football_live_center.dart';
 import 'watch_party.dart';
 import 'cinema_hub.dart';
 import 'match_center.dart';
@@ -722,6 +723,19 @@ class PostsPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Container(
+                decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF102B24), Color(0xFF176B4A), Color(0xFF171936)])),
+                child: ListTile(
+                  leading: const CircleAvatar(backgroundColor: Color(0x33FFFFFF), child: Icon(Icons.sports_soccer_rounded, color: Color(0xFFFFD66B), size: 28)),
+                  title: const Text('مركز الكرة المباشر', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+                  subtitle: const Text('مباريات • قنوات ناقلة • معلّقون • مشغل سريع وغرف متزامنة', style: TextStyle(color: Colors.white70)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 16),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FootballLiveCenterPage())),
+                ),
+              ),
+            ),
             Card(
               child: ListTile(
                 leading: const CircleAvatar(backgroundColor: Color(0xFFEDE9FF), child: Icon(Icons.sports_soccer_rounded, color: Color(0xFF6554D9))),
