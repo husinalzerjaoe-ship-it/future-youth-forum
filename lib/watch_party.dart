@@ -673,7 +673,15 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
     textDirection: TextDirection.rtl,
     child: Scaffold(
       appBar: AppBar(title: Text(_room['name'] as String? ?? 'غرفة مشاهدة'), actions: [if (_isHost) IconButton(tooltip: 'تغيير رابط الحلقة', onPressed: _changeRoomUrl, icon: const Icon(Icons.link)), if (_isHost || FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com') PopupMenuButton<String>(onSelected: (v) { if (v == 'members') _manageRoomMembers(); if (v == 'delete') _deleteRoom(); }, itemBuilder: (_) => const [PopupMenuItem(value: 'members', child: Text('إدارة الأعضاء والكتم')), PopupMenuItem(value: 'delete', child: Text('حذف الغرفة'))])]),
-      body: ListView(padding: const EdgeInsets.all(12), children: [
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+            colors: [Color(0xFF101326), Color(0xFF211A3C), Color(0xFF101923)],
+          ),
+        ),
+        child: ListView(padding: const EdgeInsets.all(12), children: [
         if (_error != null) Card(
           color: Theme.of(context).colorScheme.errorContainer,
           child: Padding(padding: const EdgeInsets.all(12), child: Column(
@@ -836,7 +844,8 @@ class _WatchPartyRoomPageState extends State<WatchPartyRoomPage> {
           ],
         ))),
         const Padding(padding: EdgeInsets.all(8), child: Text('ملاحظة: المزامنة تعتمد على سرعة الإنترنت، وقد يظهر فرق بسيط بين الأجهزة. بعض مقاطع YouTube تمنع التضمين، وروابط البث يجب أن تكون مباشرة ومصرّحاً بمشاركتها.', style: TextStyle(fontSize: 12))),
-      ]),
+        ]),
+      ),
     ),
   );
 }
