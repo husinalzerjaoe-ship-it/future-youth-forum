@@ -203,6 +203,16 @@ service cloud.firestore {
         && request.resource.data.sourceType in ['youtube', 'direct', 'web']
         && request.resource.data.status == 'paused'
         && request.resource.data.active == true
+        && request.resource.data.roomCode is string
+        && request.resource.data.roomCode.matches('^[0-9]{6}$')
+        && (!('roomType' in request.resource.data) || request.resource.data.roomType in ['watch', 'cinema'])
+        && (!('passwordProtected' in request.resource.data) || request.resource.data.passwordProtected is bool)
+        && (!('passwordProtected' in request.resource.data) || request.resource.data.passwordProtected != true
+          || (request.resource.data.visibility == 'private'
+            && request.resource.data.passwordSalt is string
+            && request.resource.data.passwordSalt.size() >= 16
+            && request.resource.data.passwordHash is string
+            && request.resource.data.passwordHash.size() == 64))
         && (!('visibility' in request.resource.data) || request.resource.data.visibility in ['public', 'private'])
         && (!('invitedUids' in request.resource.data) || (request.resource.data.invitedUids is list && request.resource.data.invitedUids.size() <= 50))
         && (!('visibility' in request.resource.data) || request.resource.data.visibility != 'private'
@@ -260,10 +270,11 @@ service cloud.firestore {
           && request.resource.data.senderUid == request.auth.uid
           && request.resource.data.senderName is string
           && request.resource.data.senderName.size() <= 60
-          && roomChatNotMuted() && accountNotBanned()
+          && roomChatNotMuted() && accountNotBanned() && chatNotMuted()
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 500
           && request.resource.data.type in ['text', 'image', 'voice']
+          && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map)
           && ((request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
             || (request.resource.data.type == 'image' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
             || (request.resource.data.type == 'voice' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*') && request.resource.data.durationSeconds is int && request.resource.data.durationSeconds >= 1 && request.resource.data.durationSeconds <= 180));
