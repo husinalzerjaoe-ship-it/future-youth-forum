@@ -12,6 +12,9 @@ import 'local_bot.dart';
 import 'match_center.dart';
 
 const _v17Purple = Color(0xFF806BFF);
+final ValueNotifier<Color> v17AccentNotifier = ValueNotifier<Color>(_v17Purple);
+final ValueNotifier<bool> v17ReduceMotionNotifier = ValueNotifier<bool>(false);
+final ValueNotifier<bool> v17CompactCardsNotifier = ValueNotifier<bool>(false);
 
 class V17SmartHubPage extends StatefulWidget {
   const V17SmartHubPage({super.key});
@@ -308,6 +311,9 @@ class _V17DeviceSettingsPageState extends State<V17DeviceSettingsPage> {
       _reduceMotion = p.getBool('v17_reduce_motion') ?? false;
       _compactCards = p.getBool('v17_compact_cards') ?? false;
       _loaded = true;
+      v17AccentNotifier.value = _colors[_accent] ?? _v17Purple;
+      v17ReduceMotionNotifier.value = _reduceMotion;
+      v17CompactCardsNotifier.value = _compactCards;
     });
   }
 
@@ -319,6 +325,11 @@ class _V17DeviceSettingsPageState extends State<V17DeviceSettingsPage> {
     await p.setString('v17_accent', _accent);
     await p.setBool('v17_reduce_motion', _reduceMotion);
     await p.setBool('v17_compact_cards', _compactCards);
+    v17AccentNotifier.value = _colors[_accent] ?? _v17Purple;
+    v17ReduceMotionNotifier.value = _reduceMotion;
+    v17CompactCardsNotifier.value = _compactCards;
+    PaintingBinding.instance.imageCache.maximumSize = _performance == 'high' ? 600 : _performance == 'battery' ? 160 : 320;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = _performance == 'high' ? 120 * 1024 * 1024 : _performance == 'battery' ? 24 * 1024 * 1024 : 64 * 1024 * 1024;
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ تفضيلات V17 على هذا الجهاز.')));
   }
 
