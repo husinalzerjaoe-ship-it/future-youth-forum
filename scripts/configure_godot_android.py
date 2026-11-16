@@ -76,6 +76,22 @@ ns = "{http://schemas.android.com/apk/res/android}"
 app = root.find("application")
 if app is None:
     raise SystemExit("Android application element not found")
+
+# Keep the host app explicitly on Flutter Android embedding v2. Some generated
+# manifest variants omit this marker, which makes recent Flutter tooling reject
+# the project as a removed v1-embedding application.
+embedding_meta = next(
+    (node for node in app.findall("meta-data")
+     if node.get(ns + "name") == "flutterEmbedding"),
+    None,
+)
+if embedding_meta is None:
+    ET.SubElement(app, "meta-data", {
+        ns + "name": "flutterEmbedding",
+        ns + "value": "2",
+    })
+else:
+    embedding_meta.set(ns + "value", "2")
 for activity in app.findall("activity"):
     if activity.get(ns + "name") == "com.ryanheise.audioservice.AudioServiceActivity":
         activity.set(ns + "name", ".MainActivity")
