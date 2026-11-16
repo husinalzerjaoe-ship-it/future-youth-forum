@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _v12Ink=Color(0xFF11162D),_v12Violet=Color(0xFF927CFF),_v12Aqua=Color(0xFF42D9E8);
@@ -37,7 +39,49 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
     await p.setString('v12_profile_bio',_bio.text.trim());
     await p.setString('v12_profile_title',_title.text.trim());
     await p.setInt('v12_profile_frame',_frame);
-    if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ معاينة ملفك محلياً على هذا الجهاز')));
+    final user=FirebaseAuth.instance.currentUser;
+    if(user!=null){
+      try{
+        final ref=FirebaseFirestore.instance.collection('publicProfiles').doc(user.uid);
+        final snap=await ref.get();
+        final payload={
+          'name':_name.text.trim().isEmpty?(user.displayName??'عضو'):_name.text.trim(),
+          'bio':_bio.text.trim(),
+          'photoUrl':(snap.data()?['photoUrl']??'').toString(),
+        };
+        if(snap.exists){
+          await ref.update(payload);
+        }else{
+          await ref.set({...payload,'createdAt':FieldValue.serverTimestamp()});
+        }
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ الاسم والنبذة في ملفك العام، والإطار واللقب محلياً.')));
+      }catch(error){
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حُفظت المعاينة على الجهاز، لكن تعذرت مزامنة الملف العام. تحقق من قواعد Firestore.')));
+      }
+    }else if(mounted){
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم حفظ معاينة ملفك محلياً على هذا الجهاز')));
+    }
+  }
+  Future<void> _publishDraft(int index)async{
+    if(index<0||index>=_drafts.length)return;
+    final user=FirebaseAuth.instance.currentUser;
+    if(user==null){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('سجّل الدخول أولاً حتى تنشر المسودة.')));return;}
+    final value=_drafts[index].trim();
+    if(value.isEmpty||value.length>1000){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('المنشور لازم يكون بين حرف واحد و1000 حرف.')));return;}
+    try{
+      await FirebaseFirestore.instance.collection('posts').add({
+        'authorId':user.uid,
+        'authorName':user.displayName??_name.text.trim().isNotEmpty?_name.text.trim():'عضو',
+        'text':value,
+        'createdAt':FieldValue.serverTimestamp(),
+      });
+      setState(()=>_drafts.removeAt(index));
+      final p=await SharedPreferences.getInstance();
+      await p.setStringList('v12_creator_drafts',_drafts);
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر المسودة في المنشورات وإزالتها من قائمة المسودات.')));
+    }catch(error){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر نشر المسودة. تحقق من قواعد Firestore.')));
+    }
   }
   Future<void> _addDraft()async{
     final value=_draft.text.trim();if(value.isEmpty)return;
@@ -75,15 +119,15 @@ class _V12PersonalStudioPageState extends State<V12PersonalStudioPage> with Sing
     const Text('لون إطار البطاقة',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold)),
     const SizedBox(height:8),Wrap(spacing:12,children:List.generate(_frames.length,(i)=>InkWell(onTap:(){setState(()=>_frame=i);},child:CircleAvatar(radius:19,backgroundColor:_frames[i],child:_frame==i?const Icon(Icons.check,color:Colors.white):null)))),
     const SizedBox(height:16),FilledButton.icon(onPressed:_saveProfile,icon:const Icon(Icons.save),label:const Text('حفظ الهوية على هذا الجهاز')),
-    const Padding(padding:EdgeInsets.only(top:8),child:Text('هذه معاينة محلية مستقلة؛ لا تغيّر صورة أو اسم الملف العام للأعضاء إلى أن نربطها بملف Firebase بأمان.',style:TextStyle(color:Colors.white54,fontSize:11))),
+    const Padding(padding:EdgeInsets.only(top:8),child:Text('الاسم والنبذة يتزامنان مع ملفك العام عند نجاح الاتصال؛ اللقب ولون الإطار محفوظان محلياً.',style:TextStyle(color:Colors.white54,fontSize:11))),
   ]);
-  Widget _field(TextEditingController c,String label,IconData icon,{int max=1})=>Padding(padding:const EdgeInsets.only(bottom:10),child:TextField(controller:c,maxLines:max,style:const TextStyle(color:Colors.white),decoration:InputDecoration(labelText:label,labelStyle:const TextStyle(color:Colors.white60),prefixIcon:Icon(icon,color:_v12Aqua),filled:true,fillColor:const Color(0xFF1B223E),border:OutlineInputBorder(borderRadius:BorderRadius.circular(14),borderSide:BorderSide.none))));
+  Widget _field(TextEditingController c,String label,IconData icon,{int max=1})=>Padding(padding:const EdgeInsets.only(bottom:10),child:TextField(controller:c,maxLines:max,style:const TextStyle(color:Colors.white),decoration:InputDecoration(labelText:label,labelStyle:const TextStyle(color:Colors.white60),prefixIcon:Icon(icon,color:_v12Aqua),onChanged:(_)=>setState((){}),filled:true,fillColor:const Color(0xFF1B223E),border:OutlineInputBorder(borderRadius:BorderRadius.circular(14),borderSide:BorderSide.none))));
   Widget _creatorTab()=>ListView(padding:const EdgeInsets.all(16),children:[
     const Text('ورشة صناعة المحتوى',style:TextStyle(color:Colors.white,fontSize:19,fontWeight:FontWeight.w900)),
     const Text('اكتب أفكار منشورات أو سيناريوهات أو مسابقات واحفظ مسوداتك محلياً.',style:TextStyle(color:Colors.white60)),
     const SizedBox(height:14),TextField(controller:_draft,maxLines:4,style:const TextStyle(color:Colors.white),decoration:InputDecoration(hintText:'اكتب فكرتك هنا...',hintStyle:const TextStyle(color:Colors.white38),filled:true,fillColor:const Color(0xFF1B223E),border:OutlineInputBorder(borderRadius:BorderRadius.circular(16)))),
     const SizedBox(height:10),FilledButton.icon(onPressed:_addDraft,icon:const Icon(Icons.add),label:const Text('حفظ المسودة')),
-    const SizedBox(height:16),..._drafts.asMap().entries.map((e)=>Card(color:const Color(0xFF1B223E),child:ListTile(title:Text(e.value,style:const TextStyle(color:Colors.white)),leading:const Icon(Icons.lightbulb_outline,color:_v12Aqua),trailing:IconButton(icon:const Icon(Icons.delete_outline,color:Colors.white54),onPressed:()async{setState(()=>_drafts.removeAt(e.key));final p=await SharedPreferences.getInstance();await p.setStringList('v12_creator_drafts',_drafts);}))))
+    const SizedBox(height:16),..._drafts.asMap().entries.map((e)=>Card(color:const Color(0xFF1B223E),child:ListTile(title:Text(e.value,style:const TextStyle(color:Colors.white)),leading:const Icon(Icons.lightbulb_outline,color:_v12Aqua),trailing:Wrap(children:[IconButton(tooltip:'نشر المسودة',icon:const Icon(Icons.send_rounded,color:_v12Aqua),onPressed:()=>_publishDraft(e.key)),IconButton(icon:const Icon(Icons.delete_outline,color:Colors.white54),onPressed:()async{setState(()=>_drafts.removeAt(e.key));final p=await SharedPreferences.getInstance();await p.setStringList('v12_creator_drafts',_drafts);})]))))
   ]);
 
   Widget _notificationsTab()=>ListView(padding:const EdgeInsets.all(16),children:[
