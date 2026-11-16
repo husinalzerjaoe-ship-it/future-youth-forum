@@ -95,13 +95,19 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
         .timeout(const Duration(seconds: 27));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('استجابة الخادم ${response.statusCode}');
+      final detail = response.body.trim();
+      final shortDetail = detail.length > 220 ? '${detail.substring(0, 220)}…' : detail;
+      throw HttpException(
+        'خادم المساعد رجّع ${response.statusCode}${shortDetail.isEmpty ? '' : ': $shortDetail'}',
+      );
     }
 
     final answer = _extractAnswer(response.body);
     if (answer == null) {
-      throw const FormatException(
-        'وصل رد فارغ. تأكد أن آخر خطوة في Flow هي Return Response وتعيد جواب ChatGPT.',
+      final detail = response.body.trim();
+      final shortDetail = detail.length > 220 ? '${detail.substring(0, 220)}…' : detail;
+      throw FormatException(
+        'وصل رد بدون نص جواب. راجع Return Response في Flow. الرد المستلم: $shortDetail',
       );
     }
     return answer;
@@ -132,8 +138,11 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
       reply = 'تأخر رد المساعد أكثر من الوقت المسموح. جرّب مرة ثانية.';
     } on FormatException catch (error) {
       reply = 'وصل رد غير مفهوم من Flow. ${error.message}';
-    } catch (_) {
-      reply = 'تعذر الاتصال بمساعد الذكاء الاصطناعي حالياً. تأكد من الإنترنت وأن Flow منشور ويحتوي خطوة Return Response، ثم حاول مجدداً.';
+    } on HttpException catch (error) {
+      reply = 'تعذر إكمال طلب المساعد: ${error.message}';
+    } catch (error) {
+      final detail = error.toString();
+      reply = 'تعذر الاتصال بمساعد الذكاء الاصطناعي: ${detail.length > 220 ? detail.substring(0, 220) : detail}';
     }
 
     if (!mounted) return;
