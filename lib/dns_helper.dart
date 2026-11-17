@@ -18,7 +18,6 @@ class _DnsHelperPageState extends State<DnsHelperPage> {
   static const _providers = <_DnsProvider>[
     _DnsProvider('Cloudflare', 'one.one.one.one', 'https://cloudflare-dns.com/dns-query'),
     _DnsProvider('Google DNS', 'dns.google', 'https://dns.google/resolve'),
-    _DnsProvider('Quad9', 'dns.quad9.net', 'https://dns.quad9.net/dns-query'),
   ];
   final _domain = TextEditingController(text: 'example.com');
   _DnsProvider _provider = _providers.first;
@@ -39,7 +38,7 @@ class _DnsHelperPageState extends State<DnsHelperPage> {
 
   Future<void> _testDns() async {
     final domain = _domain.text.trim().toLowerCase();
-    final valid = RegExp(r'^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$');
+    final valid = RegExp(r'^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$');
     if (!valid.hasMatch(domain)) {
       setState(() { _success = false; _result = 'اكتب اسم نطاق صحيح مثل example.com'; });
       return;
@@ -59,7 +58,7 @@ class _DnsHelperPageState extends State<DnsHelperPage> {
               .where((value) => value.isNotEmpty).toList()
           : <String>[];
       if (status == 0 && answers.isNotEmpty) {
-        setState(() { _success = true; _result = 'نجح اختبار DNS للنطاق $domain\\nالعناوين: ${answers.take(4).join('، ')}'; });
+        setState(() { _success = true; _result = 'نجح اختبار DNS للنطاق $domain\nالعناوين: ${answers.take(4).join('، ')}'; });
       } else if (status == 0) {
         setState(() { _success = true; _result = 'استجاب خادم DNS، لكن لم يُرجع عنوان IPv4 لهذا النطاق.'; });
       } else {
