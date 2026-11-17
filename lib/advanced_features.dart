@@ -280,6 +280,11 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                   final me = FirebaseAuth.instance.currentUser!;
                   final myProfile = await _db.collection('publicProfiles').doc(_uid).get();
                   try {
+                    final controls = (await _db.collection('chatControls').doc('main').get()).data() ?? {};
+                    if (controls['directMessagesEnabled'] == false) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المحادثات الخاصة متوقفة مؤقتاً من الإدارة.')));
+                      return;
+                    }
                     final conversation = _db.collection('conversations').doc(id);
                     // Avoid reading a missing conversation: Firestore denies get()
                     // on a non-existent private chat, preventing first-time DMs.
@@ -378,6 +383,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
     if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null && gifUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      final controls = (await _db.collection('chatControls').doc('main').get()).data() ?? {};
+      if (controls['directMessagesEnabled'] == false) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المحادثات الخاصة متوقفة مؤقتاً من الإدارة.')));
+        return;
+      }
+      final hasMedia = imageUrl != null || audioUrl != null || videoUrl != null || gifUrl != null;
+      if (hasMedia && controls['allowMedia'] == false) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('إرسال الوسائط متوقف حالياً من الإدارة.')));
+        return;
+      }
+      if (controls['allowLinks'] == false && RegExp(r'https?://', caseSensitive: false).hasMatch(value)) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نشر الروابط متوقف حالياً من الإدارة.')));
+        return;
+      }
       // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
       final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
       if (myBlock.exists) {
