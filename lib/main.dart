@@ -1574,7 +1574,7 @@ class MyProfilePage extends StatelessWidget {
                   width: 4,
                 ),
               ),
-              child: UserAvatar(url: d['photoUrl'] as String?),
+              child: ProfileIdentityAvatar(profile:d,radius:39),
             )),
           ),
           const SizedBox(height: 8),
