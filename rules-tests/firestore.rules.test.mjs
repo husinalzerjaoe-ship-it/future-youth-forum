@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
+  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp, deleteField
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -179,6 +179,35 @@ test('a conversation member can send a message, a non-member and blocked pair ca
   await seed('userBlocks/alice_bob', { blockerId: 'alice', blockedId: 'bob' });
   await assertFails(setDoc(doc(user('alice'), 'conversations/dm-2/messages/m-3'), {
     ...message, text: 'blocked'
+  }));
+});
+
+test('private message owners can edit text and pinning is limited to the participant who pinned', async () => {
+  await seed('conversations/dm-edit-pin', { members: ['alice', 'bob'] });
+  await seed('conversations/dm-edit-pin/messages/text-1', {
+    senderId: 'alice', senderRole: 'member', type: 'text', text: 'before edit'
+  });
+
+  const aliceMessage = doc(user('alice'), 'conversations/dm-edit-pin/messages/text-1');
+  const bobMessage = doc(user('bob'), 'conversations/dm-edit-pin/messages/text-1');
+  await assertSucceeds(updateDoc(aliceMessage, {
+    text: 'after edit', edited: true, editedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(bobMessage, {
+    text: 'unauthorized edit', edited: true, editedAt: serverTimestamp()
+  }));
+
+  await assertSucceeds(updateDoc(aliceMessage, {
+    isPinned: true, pinnedBy: 'alice', pinnedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(bobMessage, {
+    isPinned: false, pinnedBy: deleteField(), pinnedAt: deleteField()
+  }));
+  await assertSucceeds(updateDoc(aliceMessage, {
+    isPinned: false, pinnedBy: deleteField(), pinnedAt: deleteField()
+  }));
+  await assertFails(updateDoc(doc(user('mallory'), 'conversations/dm-edit-pin/messages/text-1'), {
+    isPinned: true, pinnedBy: 'mallory', pinnedAt: serverTimestamp()
   }));
 });
 
