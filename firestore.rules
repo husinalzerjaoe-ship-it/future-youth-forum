@@ -757,6 +757,21 @@ service cloud.firestore {
     }
 
     match /conversations/{conversationId} {
+      function otherConversationMember() {
+        return resource.data.members[0] == request.auth.uid
+          ? resource.data.members[1]
+          : resource.data.members[0];
+      }
+      // Per-user pin/mute state is stored on the conversation for efficient inbox sorting.
+      // A member may change only their own entry, never the other participant's.
+      function selfOnlyMemberFlag(field) {
+        let oldValues = resource.data.get(field, []);
+        let newValues = request.resource.data.get(field, []);
+        let otherUid = otherConversationMember();
+        return oldValues is list && newValues is list
+          && newValues.size() <= 2
+          && ((otherUid in oldValues) == (otherUid in newValues));
+      }
       // The array-contains query in the app already targets conversations
       // containing the signed-in user. Do not require members.size() here:
       // Firestore rules are not filters and cannot prove an array's size from
@@ -789,8 +804,10 @@ service cloud.firestore {
         // Allow only reordering of the same two members for legacy DMs.
         && request.resource.data.members.hasAll(resource.data.members)
         && resource.data.members.hasAll(request.resource.data.members)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'lastMessage', 'updatedAt', 'memberNames', 'backgrounds'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'lastMessage', 'updatedAt', 'memberNames', 'backgrounds', 'pinnedBy', 'mutedBy'])
         && (!('backgrounds' in request.resource.data) || request.resource.data.backgrounds is map)
+        && selfOnlyMemberFlag('pinnedBy')
+        && selfOnlyMemberFlag('mutedBy')
         && usersNotBlocked(resource.data.members[0], resource.data.members[1]);
       allow delete: if false;
 
