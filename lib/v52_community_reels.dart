@@ -25,24 +25,79 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
   Future<void> _publishClip() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _uploading) return;
-    final picker = ImagePicker();
-    final file = await picker.pickVideo(
-      source: ImageSource.gallery,
-      maxDuration: const Duration(seconds: 120),
+
+    final kind = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ListTile(title: Text('شنو تريد تنشر بالريلز؟')),
+              ListTile(
+                leading: const Icon(Icons.video_library_outlined),
+                title: const Text('فيديو'),
+                onTap: () => Navigator.pop(sheetContext, 'video'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.image_outlined),
+                title: const Text('صورة'),
+                onTap: () => Navigator.pop(sheetContext, 'image'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.gif_box_outlined),
+                title: const Text('GIF متحرك'),
+                onTap: () => Navigator.pop(sheetContext, 'gif'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+    if (kind == null || !mounted) return;
+
+    XFile? file;
+    try {
+      if (kind == 'video') {
+        file = await ImagePicker().pickVideo(
+          source: ImageSource.gallery,
+          maxDuration: const Duration(seconds: 120),
+        );
+      } else if (kind == 'image') {
+        file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      } else {
+        final picked = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['gif'],
+          withData: false,
+        );
+        final path = picked?.files.single.path;
+        if (path != null) {
+          file = XFile(path, name: picked!.files.single.name);
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر اختيار الملف: $error')),
+        );
+      }
+      return;
+    }
     if (file == null || !mounted) return;
 
     final caption = TextEditingController();
     final publish = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('نشر مقطع للملتقى'),
+        title: const Text('نشر في مقاطع الملتقى'),
         content: TextField(
           controller: caption,
           maxLength: 500,
           maxLines: 3,
           decoration: const InputDecoration(
-            hintText: 'اكتب وصفاً للمقطع (اختياري)',
+            hintText: 'اكتب وصفاً (اختياري)',
             border: OutlineInputBorder(),
           ),
         ),
@@ -53,7 +108,7 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('متابعة'),
+            child: const Text('نشر'),
           ),
         ],
       ),
@@ -65,28 +120,35 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
 
     setState(() => _uploading = true);
     try {
+      // The existing Supabase policy allows member-owned media under stories/{uid}.
       final url = await uploadForumMedia(file, folder: 'stories');
       final profile = await FirebaseFirestore.instance
           .collection('publicProfiles')
           .doc(user.uid)
           .get();
-      await FirebaseFirestore.instance.collection('communityClips').add({
+      final clip = <String, dynamic>{
         'authorId': user.uid,
         'authorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
         'authorPhoto': profile.data()?['photoUrl'] ?? '',
         'caption': caption.text.trim(),
-        'videoUrl': url,
+        'mediaType': kind,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
+      if (kind == 'video') {
+        clip['videoUrl'] = url;
+      } else {
+        clip['mediaUrl'] = url;
+      }
+      await FirebaseFirestore.instance.collection('communityClips').add(clip);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم نشر المقطع في مقاطع الملتقى')),
+          const SnackBar(content: Text('تم نشر المحتوى في مقاطع الملتقى')),
         );
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذر نشر المقطع: $error')),
+          SnackBar(content: Text('تعذر النشر: $error')),
         );
       }
     } finally {
@@ -94,7 +156,6 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
       if (mounted) setState(() => _uploading = false);
     }
   }
-
   @override
   void dispose() {
     _pages.dispose();
@@ -241,7 +302,13 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   }
 
   Future<void> _initializeVideo() async {
-    final url = (widget.clip.data()['videoUrl'] ?? '').toString();
+    final data = widget.clip.data();
+    final mediaType = (data['mediaType'] ?? 'video').toString();
+    if (mediaType != 'video') {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    final url = (data['videoUrl'] ?? '').toString();
     if (!url.startsWith('https://')) {
       if (mounted) setState(() => _loading = false);
       return;
@@ -485,19 +552,33 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
     final me = await db.collection('publicProfiles').doc(_uid).get();
     final myName = (me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو').toString();
     final conversation = db.collection('conversations').doc(conversationId);
-    await conversation.set({
+    final clipData = widget.clip.data();
+    final mediaType = (clipData['mediaType'] ?? 'video').toString();
+    final message = <String, dynamic>{
+      'text': '🎬 تمت مشاركة محتوى من مقاطع ملتقى شباب المستقبل',
+      'type': mediaType == 'gif' ? 'gif' : mediaType == 'image' ? 'image' : 'video',
+      'senderId': _uid,
+      'senderRole': 'member',
+      'senderName': myName,
+      'createdAt': FieldValue.serverTimestamp(),
+      'sharedClipId': widget.clip.id,
+    };
+    if (mediaType == 'gif') {
+      message['gifUrl'] = clipData['mediaUrl'] ?? clipData['gifUrl'];
+    } else if (mediaType == 'image') {
+      message['imageUrl'] = clipData['mediaUrl'] ?? clipData['imageUrl'];
+    } else {
+      message['videoUrl'] = clipData['videoUrl'];
+    }
+    final batch = db.batch();
+    batch.set(conversation, {
       'members': members, 'memberA': members[0], 'memberB': members[1],
       'memberNames': {_uid: myName, otherUid: otherName},
       'lastMessage': '🎬 تمت مشاركة مقطع من مقاطع الملتقى',
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    await conversation.collection('messages').add({
-      'text': '🎬 شاهد هذا المقطع من ملتقى شباب المستقبل',
-      'type': 'video', 'videoUrl': widget.clip.data()['videoUrl'],
-      'senderId': _uid, 'senderRole': 'member', 'senderName': myName,
-      'createdAt': FieldValue.serverTimestamp(),
-      'sharedClipId': widget.clip.id,
-    });
+    batch.set(conversation.collection('messages').doc(), message);
+    await batch.commit();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('تمت مشاركة المقطع مع $otherName')));
   }
@@ -647,6 +728,18 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
               child: VideoPlayer(_video!),
             ),
           )
+        else if ((data['mediaType'] == 'image' || data['mediaType'] == 'gif')
+            && ((data['mediaUrl'] ?? '').toString().startsWith('https://')))
+          Center(
+            child: Image.network(
+              (data['mediaUrl'] ?? '').toString(),
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.broken_image_outlined, color: Colors.white54, size: 64),
+            ),
+          )
         else if (_loading)
           const Center(
               child: CircularProgressIndicator(color: Colors.white))
@@ -789,17 +882,17 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                                 },
                           icon: const Icon(Icons.delete_outline),
                         ),
-                      IconButton(
-                        color: Colors.white,
-                        tooltip: _muted ? 'تشغيل الصوت' : 'كتم الصوت',
-                        onPressed: () async {
-                          _muted = !_muted;
-                          await _video?.setVolume(_muted ? 0 : 1);
-                          if (mounted) setState(() {});
-                        },
-                        icon: Icon(
-                            _muted ? Icons.volume_off : Icons.volume_up),
-                      ),
+                      if ((data['mediaType'] ?? 'video') == 'video')
+                        IconButton(
+                          color: Colors.white,
+                          tooltip: _muted ? 'تشغيل الصوت' : 'كتم الصوت',
+                          onPressed: () async {
+                            _muted = !_muted;
+                            await _video?.setVolume(_muted ? 0.0 : 1.0);
+                            if (mounted) setState(() {});
+                          },
+                          icon: Icon(_muted ? Icons.volume_off : Icons.volume_up),
+                        ),
                     ],
                   ),
                 ],
