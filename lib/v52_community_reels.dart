@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'media_upload_service.dart';
@@ -308,7 +309,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final url = (data['videoUrl'] ?? '').toString();
+    final url = (data['videoUrl'] ?? data['mediaUrl'] ?? '').toString();
     if (!url.startsWith('https://')) {
       if (mounted) setState(() => _loading = false);
       return;
@@ -438,24 +439,33 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                       return ListView(
                         children: snapshot.data!.docs.map((doc) {
                           final data = doc.data();
+                          final founder = FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
+                          final mine = data['authorId'] == _uid;
                           return ListTile(
-                            leading: const CircleAvatar(
-                                child: Icon(Icons.person_outline)),
-                            title: Text(
-                                (data['authorName'] ?? 'عضو').toString()),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if ((data['text'] ?? '').toString().isNotEmpty)
-                                  Text((data['text'] ?? '').toString()),
-                                if (data['mediaType'] == 'audio' && data['audioUrl'] is String)
-                                  _ReelCommentAudio(url: data['audioUrl'] as String),
-                                if ((data['mediaType'] == 'image' || data['mediaType'] == 'gif') && data['mediaUrl'] is String)
-                                  Padding(padding: const EdgeInsets.only(top: 6),
-                                    child: ClipRRect(borderRadius: BorderRadius.circular(10),
-                                      child: Image.network(data['mediaUrl'] as String, width: 190, height: 150,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (_, __, ___) => const Text('تعذر عرض المرفق')))),
+                            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                            title: Text((data['authorName'] ?? 'عضو').toString()),
+                            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              if ((data['text'] ?? '').toString().isNotEmpty) Text((data['text'] ?? '').toString()),
+                              if (data['mediaType'] == 'audio' && data['audioUrl'] is String)
+                                _ReelCommentAudio(url: data['audioUrl'] as String),
+                              if ((data['mediaType'] == 'image' || data['mediaType'] == 'gif') && data['mediaUrl'] is String)
+                                Padding(padding: const EdgeInsets.only(top: 6), child: ClipRRect(borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(data['mediaUrl'] as String, width: 190, height: 150, fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const Text('تعذر عرض المرفق')))),
+                            ]),
+                            trailing: PopupMenuButton<String>(
+                              tooltip: 'خيارات التعليق',
+                              onSelected: (action) async {
+                                if (action == 'copy') {
+                                  await Clipboard.setData(ClipboardData(text: (data['text'] ?? '').toString()));
+                                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ التعليق')));
+                                } else if (action == 'delete' && (mine || founder)) {
+                                  await doc.reference.delete();
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(value: 'copy', child: Text('نسخ التعليق')),
+                                if (mine || founder) const PopupMenuItem(value: 'delete', child: Text('حذف التعليق')),
                               ],
                             ),
                           );
@@ -558,7 +568,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
       'text': '🎬 تمت مشاركة محتوى من مقاطع ملتقى شباب المستقبل',
       'type': mediaType == 'gif' ? 'gif' : mediaType == 'image' ? 'image' : 'video',
       'senderId': _uid,
-      'senderRole': 'member',
+      'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member',
       'senderName': myName,
       'createdAt': FieldValue.serverTimestamp(),
       'sharedClipId': widget.clip.id,
@@ -568,7 +578,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
     } else if (mediaType == 'image') {
       message['imageUrl'] = clipData['mediaUrl'] ?? clipData['imageUrl'];
     } else {
-      message['videoUrl'] = clipData['videoUrl'];
+      message['videoUrl'] = clipData['videoUrl'] ?? clipData['mediaUrl'];
     }
     final batch = db.batch();
     batch.set(conversation, {
@@ -717,6 +727,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
     final data = widget.clip.data();
     final authorId = (data['authorId'] ?? '').toString();
     final isOwner = authorId == _uid;
+    final isFounder = FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -867,7 +878,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                         onPressed: _reportClip,
                         icon: const Icon(Icons.flag_outlined),
                       ),
-                      if (isOwner)
+                      if (isOwner || isFounder)
                         IconButton(
                           color: Colors.white,
                           onPressed: _busy
