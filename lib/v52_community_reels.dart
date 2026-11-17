@@ -16,6 +16,7 @@ class CommunityReelsPage extends StatefulWidget {
 class _CommunityReelsPageState extends State<CommunityReelsPage> {
   final _pages = PageController();
   bool _uploading = false;
+  int _activeIndex = 0;
 
   Future<void> _publishClip() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -170,9 +171,11 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
                 controller: _pages,
                 scrollDirection: Axis.vertical,
                 itemCount: clips.length,
+                onPageChanged: (index) => setState(() => _activeIndex = index),
                 itemBuilder: (context, index) => _CommunityReelTile(
                   key: ValueKey(clips[index].id),
                   clip: clips[index],
+                  active: index == _activeIndex,
                 ),
               );
             },
@@ -183,7 +186,8 @@ class _CommunityReelsPageState extends State<CommunityReelsPage> {
 
 class _CommunityReelTile extends StatefulWidget {
   final QueryDocumentSnapshot<Map<String, dynamic>> clip;
-  const _CommunityReelTile({super.key, required this.clip});
+  final bool active;
+  const _CommunityReelTile({super.key, required this.clip, required this.active});
 
   @override
   State<_CommunityReelTile> createState() => _CommunityReelTileState();
@@ -210,7 +214,21 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   @override
   void initState() {
     super.initState();
-    _initializeVideo();
+    if (widget.active) _initializeVideo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommunityReelTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.active != widget.active) {
+      if (widget.active) {
+        _initializeVideo();
+      } else {
+        _video?.pause();
+        _video?.dispose();
+        _video = null;
+      }
+    }
   }
 
   Future<void> _initializeVideo() async {
@@ -424,7 +442,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
       fit: StackFit.expand,
       children: [
         const ColoredBox(color: Colors.black),
-        if (_video?.value.isInitialized == true)
+        if (widget.active && _video?.value.isInitialized == true)
           Center(
             child: AspectRatio(
               aspectRatio: _video!.value.aspectRatio,
