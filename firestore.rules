@@ -773,18 +773,24 @@ service cloud.firestore {
       }
     }
 
-    // Permanent vertical community clips are separate from 24-hour stories.
+    // Permanent vertical community clips support video, still images and animated GIFs.
     match /communityClips/{clipId} {
       allow read: if request.auth != null && accountNotBanned();
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.authorName.size() <= 80
-        && request.resource.data.videoUrl is string
-        && request.resource.data.videoUrl.matches('https://.*')
         && request.resource.data.caption is string
         && request.resource.data.caption.size() <= 500
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        && (
+          ((!('mediaType' in request.resource.data) || request.resource.data.mediaType == 'video')
+            && request.resource.data.videoUrl is string
+            && request.resource.data.videoUrl.matches('https://.*'))
+          || (request.resource.data.mediaType in ['image', 'gif']
+            && request.resource.data.mediaUrl is string
+            && request.resource.data.mediaUrl.matches('https://.*'))
+        );
       allow update: if false;
       allow delete: if request.auth != null
         && (resource.data.authorId == request.auth.uid || isChatStaff());
@@ -814,9 +820,24 @@ service cloud.firestore {
           && request.resource.data.authorName is string
           && request.resource.data.authorName.size() <= 80
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 300
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && (
+            (request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 300)
+            || (request.resource.data.text == ''
+              && request.resource.data.mediaType == 'audio'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*')
+              && request.resource.data.audioUrl.size() <= 2048
+              && request.resource.data.durationSeconds is int
+              && request.resource.data.durationSeconds >= 1
+              && request.resource.data.durationSeconds <= 180)
+            || (request.resource.data.text == ''
+              && request.resource.data.mediaType in ['image', 'gif']
+              && request.resource.data.mediaUrl is string
+              && request.resource.data.mediaUrl.matches('https://.*')
+              && request.resource.data.mediaUrl.size() <= 2048)
+          );
         allow update: if request.auth != null
           && resource.data.authorId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text'])
