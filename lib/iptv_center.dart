@@ -54,13 +54,13 @@ class IptvCenterPage extends StatefulWidget {
 class _IptvCenterPageState extends State<IptvCenterPage> {
   static const _key='future_youth_iptv_channels_v1';
   static const _epgKey='future_youth_iptv_epg_v1';
-  final _url=TextEditingController(),_name=TextEditingController(),_search=TextEditingController();
+  final _url=TextEditingController(),_name=TextEditingController(),_search=TextEditingController(),_epgUrl=TextEditingController();
   final List<IptvChannel> _channels=[]; final List<IptvChannel> _sharedChannels=[]; final Set<String> _favorites={};
   StreamSubscription<QuerySnapshot<Map<String,dynamic>>>? _sharedSub;
   final List<IptvProgram> _programs=[];
   bool _loading=true,_busy=false; String _category='الكل',_query='';
   @override void initState(){super.initState();_load();_listenShared();}
-  @override void dispose(){_sharedSub?.cancel();_url.dispose();_name.dispose();_search.dispose();super.dispose();}
+  @override void dispose(){_sharedSub?.cancel();_url.dispose();_name.dispose();_search.dispose();_epgUrl.dispose();super.dispose();}
   void _listenShared() {
     _sharedSub = FirebaseFirestore.instance.collection('iptvSharedPlaylists')
       .orderBy('updatedAt', descending:true).snapshots().listen((snapshot) async {
@@ -162,11 +162,83 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       _toast('تم استيراد دليل البرامج: '+parsed.length.toString()+' برنامج.');
     } catch(e){_toast('تعذر استيراد دليل البرامج: '+e.toString());}
   }
+  Future<void> _importEpgFromUrl() async {
+    final controller = TextEditingController(text: _epgUrl.text);
+    final url = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('استيراد دليل XMLTV من رابط'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'رابط XMLTV',
+                  hintText: 'https://example.com/epg.xml',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'استخدم رابط دليل برامج مسموح لك باستخدامه. لا تضع كلمات مرور أو رموز دخول خاصة في الرابط.',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('استيراد')),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null || !{'http', 'https'}.contains(uri.scheme) || uri.host.isEmpty) {
+      _toast('أدخل رابط XMLTV صحيح يبدأ بـ http أو https.');
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final response = await http.get(
+        uri,
+        headers: const {'Accept': 'application/xml, text/xml, */*'},
+      ).timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) {
+        throw Exception('استجابة المصدر ' + response.statusCode.toString());
+      }
+      if (response.bodyBytes.length > 8 * 1024 * 1024) {
+        throw Exception('ملف الدليل أكبر من 8 ميغابايت.');
+      }
+      final parsed = IptvEpgParser.parse(
+        utf8.decode(response.bodyBytes, allowMalformed: true),
+      );
+      if (parsed.isEmpty) throw Exception('لم نعثر على برامج XMLTV صالحة.');
+      setState(() {
+        _programs
+          ..clear()
+          ..addAll(parsed);
+        _epgUrl.text = uri.toString();
+      });
+      await _save();
+      _toast('تم استيراد دليل البرامج من الرابط: ' + parsed.length.toString() + ' برنامج.');
+    } catch (e) {
+      _toast('تعذر استيراد دليل البرامج: ' + e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _showEpgGuide() async {
     final now=DateTime.now();
     await showModalBottomSheet<void>(context:context,isScrollControlled:true,showDragHandle:true,builder:(ctx)=>Directionality(textDirection:TextDirection.rtl,child:SafeArea(child:SizedBox(height:MediaQuery.of(ctx).size.height*.78,child:Column(children:[
-      Padding(padding:const EdgeInsets.all(14),child:Row(children:[const Expanded(child:Text('دليل البرامج EPG',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900))),TextButton.icon(onPressed:(){Navigator.pop(ctx);_importEpg();},icon:const Icon(Icons.file_upload_outlined),label:const Text('استيراد XMLTV'))])),
-      Expanded(child:_programs.isEmpty?const Center(child:Text('استورد ملف XMLTV لعرض البرامج الحالية والقادمة.')):ListView.builder(itemCount:_channels.length,itemBuilder:(_,i){final c=_channels[i];final current=c.tvgId.isEmpty?null:IptvEpgParser.current(_programs,c.tvgId,now);final next=c.tvgId.isEmpty?null:IptvEpgParser.next(_programs,c.tvgId,now);return ListTile(leading:const Icon(Icons.live_tv),title:Text(c.name),subtitle:Text(current==null?'لا يوجد برنامج حالي':('الآن: '+current.title+' • '+TimeOfDay.fromDateTime(current.start.toLocal()).format(context)+' - '+TimeOfDay.fromDateTime(current.stop.toLocal()).format(context))+'\\n'+(next==null?'لا يوجد برنامج قادم':'التالي: '+next.title)),isThreeLine:true,onTap:(){Navigator.pop(ctx);Navigator.push(context,MaterialPageRoute(builder:(_)=>IptvPlayerPage(channel:c)));});})),
+      Padding(padding:const EdgeInsets.all(14),child:Row(children:[const Expanded(child:Text('دليل البرامج EPG',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900))),Wrap(spacing:4,children:[TextButton.icon(onPressed:(){Navigator.pop(ctx);_importEpg();},icon:const Icon(Icons.file_upload_outlined),label:const Text('ملف')),TextButton.icon(onPressed:(){Navigator.pop(ctx);_importEpgFromUrl();},icon:const Icon(Icons.link_rounded),label:const Text('رابط'))])])),
+      Expanded(child:_programs.isEmpty?const Center(child:Text('استورد ملف XMLTV لعرض البرامج الحالية والقادمة.')):ListView.builder(itemCount:_allChannels.length,itemBuilder:(_,i){final c=_allChannels[i];final current=c.tvgId.isEmpty?null:IptvEpgParser.current(_programs,c.tvgId,now);final next=c.tvgId.isEmpty?null:IptvEpgParser.next(_programs,c.tvgId,now);return ListTile(leading:const Icon(Icons.live_tv),title:Text(c.name),subtitle:Text(current==null?'لا يوجد برنامج حالي':('الآن: '+current.title+' • '+TimeOfDay.fromDateTime(current.start.toLocal()).format(context)+' - '+TimeOfDay.fromDateTime(current.stop.toLocal()).format(context))+'\\n'+(next==null?'لا يوجد برنامج قادم':'التالي: '+next.title)),isThreeLine:true,onTap:(){Navigator.pop(ctx);Navigator.push(context,MaterialPageRoute(builder:(_)=>IptvPlayerPage(channel:c)));});})),
     ])))));
   }
   Future<void> _favorite(IptvChannel c) async {setState(()=>_favorites.contains(c.id)?_favorites.remove(c.id):_favorites.add(c.id));await _save();}
@@ -187,7 +259,8 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       appBar:AppBar(title:const Text('مركز التلفزيون وIPTV'),actions:[
         IconButton(tooltip:'تحديث المصادر',onPressed:_busy?null:_refreshAllSources,icon:const Icon(Icons.refresh_rounded)),
         IconButton(tooltip:'دليل البرامج',onPressed:_showEpgGuide,icon:const Icon(Icons.calendar_month_rounded)),
-        IconButton(tooltip:'استيراد دليل XMLTV',onPressed:_importEpg,icon:const Icon(Icons.event_available_rounded)),
+        IconButton(tooltip:'استيراد ملف XMLTV',onPressed:_importEpg,icon:const Icon(Icons.event_available_rounded)),
+        IconButton(tooltip:'استيراد XMLTV من رابط',onPressed:_busy?null:_importEpgFromUrl,icon:const Icon(Icons.link_rounded)),
         IconButton(tooltip:'إدارة المصادر',onPressed:_manageSources,icon:const Icon(Icons.playlist_add_check)),
         IconButton(tooltip:'استيراد ملف',onPressed:_busy?null:_importFile,icon:const Icon(Icons.file_open)),
       ]),
