@@ -545,3 +545,47 @@ test('members can activate multiple store titles without replacing existing cust
   assert.deepEqual(saved.data().activeStoreTitleIds, ['crown', 'star', 'creator']);
   assert.equal(saved.data().customTitle, 'لقب قديم');
 });
+
+
+test('shared IPTV playlists are readable by signed-in members and founder-managed only', async () => {
+  const playlist = doc(founder(), 'iptvSharedPlaylists/demo-playlist');
+  await assertSucceeds(setDoc(playlist, {
+    name: 'قائمة تجريبية',
+    sourceUrl: 'https://example.test/list.m3u',
+    ownerUid: 'founder-uid',
+    channelCount: 1,
+    updatedBy: 'founder-uid',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'iptvSharedPlaylists/demo-playlist')));
+  await assertSucceeds(setDoc(doc(founder(), 'iptvSharedPlaylists/demo-playlist/channels/000001'), {
+    index: 0,
+    name: 'قناة تجريبية',
+    url: 'https://example.test/live.m3u8',
+    group: 'رياضة',
+    logo: '',
+    tvgId: '',
+    source: 'قائمة تجريبية',
+    sourceUrl: 'https://example.test/list.m3u',
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'iptvSharedPlaylists/demo-playlist/channels/000001')));
+  await assertFails(setDoc(doc(user('alice'), 'iptvSharedPlaylists/hacked'), {
+    name: 'قائمة غير مصرح بها',
+    sourceUrl: '',
+    ownerUid: 'alice',
+    channelCount: 1,
+    updatedBy: 'alice',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'iptvSharedPlaylists/demo-playlist/channels/000002'), {
+    index: 1,
+    name: 'قناة غير مصرح بها',
+    url: 'https://example.test/other.m3u8',
+    group: 'عام',
+    logo: '',
+    tvgId: '',
+    source: 'محاولة',
+    sourceUrl: '',
+  }));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'iptvSharedPlaylists/demo-playlist')));
+});
