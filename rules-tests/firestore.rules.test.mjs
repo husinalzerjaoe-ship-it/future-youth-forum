@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
+  doc, collection, getDoc, getDocs, query, where, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -35,6 +35,45 @@ async function seed(path, data) {
     await setDoc(doc(context.firestore(), path), data);
   });
 }
+
+test('a member can list only their own private conversations with the inbox array-contains query', async () => {
+  await seed('conversations/dm-alice-bob', { members: ['alice', 'bob'], lastMessage: 'hello' });
+  await seed('conversations/dm-alice-carol', { members: ['alice', 'carol'], lastMessage: 'hi' });
+  await seed('conversations/dm-bob-carol', { members: ['bob', 'carol'], lastMessage: 'private' });
+
+  const aliceInbox = await getDocs(query(
+    collection(user('alice'), 'conversations'),
+    where('members', 'array-contains', 'alice'),
+  ));
+  assert.equal(aliceInbox.size, 2);
+  assert.deepEqual(
+    aliceInbox.docs.map((entry) => entry.id).sort(),
+    ['dm-alice-bob', 'dm-alice-carol'],
+  );
+
+  const malloryInbox = await getDocs(query(
+    collection(user('mallory'), 'conversations'),
+    where('members', 'array-contains', 'mallory'),
+  ));
+  assert.equal(malloryInbox.size, 0);
+});
+
+test('conversation members can pin and mute only their own inbox preferences', async () => {
+  await seed('conversations/dm-prefs', { members: ['alice', 'bob'] });
+
+  await assertSucceeds(updateDoc(doc(user('alice'), 'conversations/dm-prefs'), {
+    pinnedBy: ['alice'],
+  }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'conversations/dm-prefs'), {
+    mutedBy: ['bob'],
+  }));
+  await assertFails(updateDoc(doc(user('alice'), 'conversations/dm-prefs'), {
+    pinnedBy: ['alice', 'bob'],
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'conversations/dm-prefs'), {
+    mutedBy: ['alice', 'bob'],
+  }));
+});
 
 test('private conversation messages are readable only by the two members', async () => {
   await seed('conversations/dm-1', { members: ['alice', 'bob'] });
