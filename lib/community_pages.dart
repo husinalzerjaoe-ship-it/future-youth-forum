@@ -38,7 +38,7 @@ import 'v39_daily_challenges.dart';
 import 'v39_creator_links.dart';
 import 'v40_party_deck.dart';
 import 'advanced_features.dart';
-import 'community_expansion.dart';
+import 'community_expansion.dart' hide CommunityEventsPage;
 import 'cinema_hub.dart';
 import 'football_live_center.dart';
 import 'premium_media_hub.dart';
