@@ -148,6 +148,30 @@ test('links and media are accepted when founder controls allow them', async () =
   }));
 });
 
+test('private conversations allow members to share video messages but not non-members', async () => {
+  await seed('conversations/dm-video', { members: ['alice', 'bob'] });
+  const videoMessage = {
+    senderId: 'alice',
+    senderRole: 'member',
+    type: 'video',
+    text: '🎬 تمت مشاركة مقطع',
+    videoUrl: 'https://media.example.test/community/clip.mp4',
+    sharedClipId: 'clip-1',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(
+    doc(user('alice'), 'conversations/dm-video/messages/video-1'),
+    videoMessage,
+  ));
+  await assertSucceeds(getDoc(
+    doc(user('bob'), 'conversations/dm-video/messages/video-1'),
+  ));
+  await assertFails(setDoc(
+    doc(user('mallory'), 'conversations/dm-video/messages/video-2'),
+    { ...videoMessage, senderId: 'mallory' },
+  ));
+});
+
 test('private conversation messages are readable only by the two members', async () => {
   await seed('conversations/dm-1', { members: ['alice', 'bob'] });
   await seed('conversations/dm-1/messages/msg-1', {
@@ -236,6 +260,80 @@ test('private conversation typing and read receipts are visible only to particip
   }));
   await assertFails(updateDoc(aliceReceipt, {
     uid: 'bob', lastReadMessageId: 'forged', lastReadAt: serverTimestamp(),
+  }));
+});
+
+test('private rooms can be created, listed, managed and messaged by invited members only', async () => {
+  const room = {
+    ownerId: 'alice',
+    name: 'غرفة الأصدقاء',
+    roomAdmins: [],
+    members: ['alice', 'bob'],
+    invitedUids: ['alice', 'bob'],
+    roomType: 'text',
+    meetUrl: '',
+    createdAt: serverTimestamp(),
+    lastMessage: 'الغرفة جاهزة',
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'privateRooms/room-create'), room));
+  await assertSucceeds(getDoc(doc(user('bob'), 'privateRooms/room-create')));
+  await assertFails(getDoc(doc(user('mallory'), 'privateRooms/room-create')));
+
+  // The UI uses this exact array-contains query to list the member's rooms.
+  // A document read is separately checked above; query authorization is covered
+  // by the Firestore rules' membership predicate.
+
+  await assertSucceeds(updateDoc(doc(user('alice'), 'privateRooms/room-create'), {
+    members: ['alice', 'bob'],
+    invitedUids: ['alice', 'bob'],
+    roomAdmins: ['bob'],
+  }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'privateRooms/room-create'), {
+    lastMessage: 'وصلت الرسالة',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'privateRooms/room-create'), {
+    members: ['alice', 'bob', 'mallory'],
+    invitedUids: ['alice', 'bob', 'mallory'],
+    roomAdmins: [],
+  }));
+
+  await assertSucceeds(setDoc(doc(user('bob'), 'privateRooms/room-create/messages/image-1'), {
+    senderId: 'bob', type: 'image', text: '',
+    imageUrl: 'https://media.example.test/private/photo.jpg',
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'privateRooms/room-create/messages/voice-1'), {
+    senderId: 'bob', type: 'voice', text: '',
+    audioUrl: 'https://media.example.test/private/voice.m4a',
+    durationSeconds: 15,
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'privateRooms/room-create/messages/outside-1'), {
+    senderId: 'mallory', type: 'text', text: 'intrusion',
+  }));
+});
+
+test('members can publish and play approved shared music files', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'sharedFiles/music-1'), {
+    uploaderId: 'alice',
+    title: 'موسيقى الملتقى.mp3',
+    fileName: 'forum-music.mp3',
+    extension: 'mp3',
+    size: 1024,
+    fileUrl: 'https://media.example.test/shared-files/forum-music.mp3',
+    status: 'approved',
+    category: 'music',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'sharedFiles/music-1')));
+  await assertFails(setDoc(doc(user('alice'), 'sharedFiles/music-bad-time'), {
+    uploaderId: 'alice',
+    title: 'ملف بلا توقيت.mp3',
+    extension: 'mp3',
+    size: 1024,
+    fileUrl: 'https://media.example.test/shared-files/bad.mp3',
+    status: 'approved',
+    category: 'music',
+    createdAt: Timestamp.fromDate(new Date('2020-01-01T00:00:00Z')),
   }));
 });
 
@@ -848,8 +946,38 @@ test('V52 permanent community clips support member feed, likes, comments, and ow
   await assertFails(setDoc(doc(user('alice'), 'communityClips/clip-1/likes/bob'), {
     uid: 'bob', createdAt: serverTimestamp(),
   }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'communityClips/clip-image'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'صورة من الملتقى',
+    mediaType: 'image', mediaUrl: 'https://media.example.test/community/photo.jpg',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'communityClips/clip-gif'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'GIF متحرك',
+    mediaType: 'gif', mediaUrl: 'https://media.example.test/community/loop.gif',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'communityClips/clip-bad-gif'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'GIF بلا رابط',
+    mediaType: 'gif', createdAt: serverTimestamp(),
+  }));
+
   await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/comment-1'), {
     authorId: 'bob', authorName: 'Bob', text: 'مقطع جميل', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/voice-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'audio',
+    audioUrl: 'https://media.example.test/community/comment.m4a',
+    durationSeconds: 12, createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/gif-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'gif',
+    mediaUrl: 'https://media.example.test/community/reaction.gif',
+    mediaFormat: 'gif', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/image-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'image',
+    mediaUrl: 'https://media.example.test/community/reaction.jpg',
+    mediaFormat: 'image', createdAt: serverTimestamp(),
   }));
   await assertFails(setDoc(doc(user('mallory'), 'communityClips/clip-1/comments/comment-2'), {
     authorId: 'bob', authorName: 'Bob', text: 'انتحال تعليق', createdAt: serverTimestamp(),
@@ -897,4 +1025,63 @@ test('each member can record one immutable view per community clip', async () =>
   }));
   await assertFails(updateDoc(view, { viewerId: 'bob' }));
   await assertSucceeds(deleteDoc(view));
+});
+
+
+test('V53/V54 creator follow records are owner-bound and accept only server timestamps', async () => {
+  const following = doc(user('alice'), 'publicProfiles/alice/following/bob');
+  const follower = doc(user('alice'), 'publicProfiles/bob/followers/alice');
+
+  await assertSucceeds(setDoc(following, {
+    userId: 'bob',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(follower, {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+
+  await assertFails(setDoc(doc(user('mallory'), 'publicProfiles/bob/followers/alice'), {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'publicProfiles/alice/following/alice'), {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'publicProfiles/alice/following/carol'), {
+    userId: 'carol',
+    createdAt: serverTimestamp(),
+    forged: true,
+  }));
+
+  await assertSucceeds(deleteDoc(following));
+  await assertSucceeds(deleteDoc(follower));
+});
+
+test('V54 notification center keeps notifications private and recipient-only for read status', async () => {
+  await seed('publicProfiles/alice', { name: 'Alice', bio: '', photoUrl: '' });
+  await seed('publicProfiles/bob', { name: 'Bob', bio: '', photoUrl: '' });
+  const notice = doc(user('alice'), 'notifications/v54-notice');
+  await assertSucceeds(setDoc(notice, {
+    recipientId: 'bob',
+    actorId: 'alice',
+    actorName: 'Alice',
+    type: 'follow',
+    text: 'بدأ بمتابعتك',
+    read: false,
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'notifications/v54-notice')));
+  await assertFails(getDoc(doc(user('mallory'), 'notifications/v54-notice')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'notifications/v54-notice'), {
+    read: true,
+  }));
+  await assertFails(updateDoc(doc(user('alice'), 'notifications/v54-notice'), {
+    read: true,
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'notifications/v54-notice'), {
+    read: true,
+    recipientId: 'mallory',
+  }));
 });

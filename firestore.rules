@@ -136,7 +136,8 @@ service cloud.firestore {
         && (
           (request.resource.data.get('category', '') == 'music'
             && request.resource.data.status == 'approved'
-            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac']
+            && request.resource.data.createdAt == request.time)
           || (request.resource.data.get('category', '') != 'music'
             && request.resource.data.status == 'pending')
         )
@@ -264,16 +265,25 @@ service cloud.firestore {
 
       match /followers/{followerId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == followerId;
+        // A follower record can only be created for the signed-in member,
+        // with the exact fields written by the V53/V54 follow transaction.
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == followerId
+          && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
+          && request.resource.data.userId == followerId
+          && request.resource.data.createdAt == request.time;
         allow delete: if request.auth != null && request.auth.uid == followerId;
         allow update: if false;
       }
 
       match /following/{followedId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == userId
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == userId
           && followedId != userId
-          && request.resource.data.userId == followedId;
+          && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
+          && request.resource.data.userId == followedId
+          && request.resource.data.createdAt == request.time;
         allow delete: if request.auth != null && request.auth.uid == userId;
         allow update: if false;
       }
@@ -764,18 +774,24 @@ service cloud.firestore {
       }
     }
 
-    // Permanent vertical community clips are separate from 24-hour stories.
+    // Permanent vertical community clips support video, still images and animated GIFs.
     match /communityClips/{clipId} {
       allow read: if request.auth != null && accountNotBanned();
       allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.authorName is string
         && request.resource.data.authorName.size() <= 80
-        && request.resource.data.videoUrl is string
-        && request.resource.data.videoUrl.matches('https://.*')
         && request.resource.data.caption is string
         && request.resource.data.caption.size() <= 500
-        && request.resource.data.createdAt is timestamp;
+        && request.resource.data.createdAt is timestamp
+        && (
+          ((!('mediaType' in request.resource.data) || request.resource.data.mediaType == 'video')
+            && request.resource.data.videoUrl is string
+            && request.resource.data.videoUrl.matches('https://.*'))
+          || (request.resource.data.mediaType in ['image', 'gif']
+            && request.resource.data.mediaUrl is string
+            && request.resource.data.mediaUrl.matches('https://.*'))
+        );
       allow update: if false;
       allow delete: if request.auth != null
         && (resource.data.authorId == request.auth.uid || isChatStaff());
@@ -805,9 +821,24 @@ service cloud.firestore {
           && request.resource.data.authorName is string
           && request.resource.data.authorName.size() <= 80
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 300
-          && request.resource.data.createdAt is timestamp;
+          && request.resource.data.createdAt is timestamp
+          && (
+            (request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 300)
+            || (request.resource.data.text == ''
+              && request.resource.data.mediaType == 'audio'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*')
+              && request.resource.data.audioUrl.size() <= 2048
+              && request.resource.data.durationSeconds is int
+              && request.resource.data.durationSeconds >= 1
+              && request.resource.data.durationSeconds <= 180)
+            || (request.resource.data.text == ''
+              && request.resource.data.mediaType in ['image', 'gif']
+              && request.resource.data.mediaUrl is string
+              && request.resource.data.mediaUrl.matches('https://.*')
+              && request.resource.data.mediaUrl.size() <= 2048)
+          );
         allow update: if request.auth != null
           && resource.data.authorId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text'])
@@ -1247,7 +1278,7 @@ service cloud.firestore {
     }
 
     match /privateRooms/{roomId} {
-      allow read: if request.auth != null
+      allow read: if request.auth != null && accountNotBanned()
         && resource.data.members is list
         && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && accountNotBanned()
@@ -1289,7 +1320,8 @@ service cloud.firestore {
         function roomMembers() {
           return get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
         }
-        allow read: if request.auth != null && request.auth.uid in roomMembers();
+        allow read: if request.auth != null && accountNotBanned()
+          && request.auth.uid in roomMembers();
         allow create: if request.auth != null && accountNotBanned()
           && request.auth.uid in roomMembers()
           && request.resource.data.senderId == request.auth.uid
@@ -1320,7 +1352,7 @@ service cloud.firestore {
 
     // Files uploaded by members stay private to the uploader until moderation.
     match /sharedFiles/{fileId} {
-      allow read: if request.auth != null
+      allow read: if request.auth != null && accountNotBanned()
         && (resource.data.status == 'approved'
           || resource.data.uploaderId == request.auth.uid
           || isFounder());
@@ -1329,7 +1361,8 @@ service cloud.firestore {
         && (
           (request.resource.data.get('category', '') == 'music'
             && request.resource.data.status == 'approved'
-            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac']
+            && request.resource.data.createdAt == request.time)
           || (request.resource.data.get('category', '') != 'music'
             && request.resource.data.status == 'pending')
         )

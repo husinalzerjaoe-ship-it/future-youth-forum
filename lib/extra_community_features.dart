@@ -274,9 +274,25 @@ class LocalMusicPage extends StatefulWidget {
 class _LocalMusicPageState extends State<LocalMusicPage> {
  final tracks=<PlatformFile>[];
  int current=-1;
- bool loading=false,uploading=false;
+ bool loading=false,uploading=false,audioReady=false;
+ String? audioInitError;
  final db=FirebaseFirestore.instance;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
+
+ @override
+ void initState() {
+  super.initState();
+  _initializeAudio();
+ }
+
+ Future<void> _initializeAudio() async {
+  try {
+   await initializeLocalAudioService();
+   if(mounted)setState(()=>audioReady=true);
+  } catch(e) {
+   if(mounted)setState(()=>audioInitError=e.toString());
+  }
+ }
  Future<PlatformFile?> _resolveAudioFile(PlatformFile file) async {
   if(file.path!=null)return file;
   final bytes=file.bytes;
@@ -350,7 +366,13 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
   catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الأغنية: '+e.toString())));}
   finally{if(mounted)setState(()=>loading=false);}
  }
- @override Widget build(BuildContext context)=>Scaffold(
+ @override Widget build(BuildContext context) {
+  if(!audioReady) {
+   return Scaffold(body:Center(child:audioInitError==null
+    ? const CircularProgressIndicator()
+    : Padding(padding:const EdgeInsets.all(24),child:Text('تعذر تشغيل مشغل الموسيقى: $audioInitError',textAlign:TextAlign.center))));
+  }
+  return Scaffold(
   floatingActionButton:Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.end,children:[
    FloatingActionButton.extended(heroTag:'upload_shared_music',onPressed:uploading?null:uploadTracks,icon:uploading?const SizedBox(width:18,height:18,child:CircularProgressIndicator(strokeWidth:2)):const Icon(Icons.cloud_upload),label:Text(uploading?'جاري الرفع':'رفع أغنية للمجتمع')),
    const SizedBox(height:10),
@@ -423,6 +445,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
    const Padding(padding:EdgeInsets.all(10),child:Text('التشغيل بالخلفية يستخدم مشغل Android. النشر المباشر مخصص للملفات التي تملك حق مشاركتها.',style:TextStyle(fontSize:12)))
   ])
  );
+ }
 }
 
 

@@ -67,6 +67,7 @@ import 'v44_future_lab.dart';
 import 'v49_discovery.dart';
 import 'v52_community_reels.dart';
 import 'v53_community_hub.dart';
+import 'v54_world_community.dart';
 import 'dns_helper.dart';
 
 const brand = Color(0xFF6554D9);
@@ -764,6 +765,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v54Hub':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V54WorldCommunityPage()));
+                  break;
                 case 'v53Hub':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V53CommunityHubPage()));
                   break;
@@ -944,6 +948,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v54Hub', child: ListTile(leading: Icon(Icons.public_rounded), title: Text('عالم شباب المستقبل V54'), subtitle: Text('مركز المجتمع والإشعارات والإنجازات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v53Hub', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('عالم الملتقى V53'), subtitle: Text('بوابة المجتمع والفعاليات والإنجازات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v49Videos', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('ريلز الملتقى – مقاطع دائمة'), subtitle: Text('فيديوهات عمودية وتعليقات وإعجابات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dnsHelper', child: ListTile(leading: Icon(Icons.dns_rounded), title: Text('DNS الذكي والاتصال'), subtitle: Text('فحص DNS وإعداد Private DNS'), contentPadding: EdgeInsets.zero)),
