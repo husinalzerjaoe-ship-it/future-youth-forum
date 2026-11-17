@@ -157,6 +157,22 @@ test('members may spend coins but cannot mint or increase their own balance', as
   }));
 });
 
+test('regional room messages are available to signed-in members but room bans are enforced', async () => {
+  const iraqMessage = {
+    senderId: 'alice', senderRole: 'member', type: 'text', text: 'تحية لأهل العراق',
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'regionalChats/iraq/messages/hello-1'), iraqMessage));
+  await assertSucceeds(getDoc(doc(user('bob'), 'regionalChats/iraq/messages/hello-1')));
+
+  await seed('regionalChats/syria/bans/mallory', {
+    permanent: true, by: 'moderator', expiresAt: null,
+  });
+  await assertFails(getDoc(doc(user('mallory'), 'regionalChats/syria/messages/hidden-1')));
+  await assertFails(setDoc(doc(user('mallory'), 'regionalChats/syria/messages/blocked-1'), {
+    senderId: 'mallory', senderRole: 'member', type: 'text', text: 'لا أستطيع الإرسال',
+  }));
+});
+
 test('users cannot read another member private cinema favourites', async () => {
   await seed('users/alice/cinemaFavorites/film-1', {
     title: 'Example film', year: '2026', addedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'))
