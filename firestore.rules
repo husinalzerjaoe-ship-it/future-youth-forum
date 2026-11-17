@@ -912,6 +912,41 @@ service cloud.firestore {
             && request.auth.uid in members();
         }
       }
+
+      // Conversation-only typing status; only the two members can observe it.
+      match /typing/{userId} {
+        function isConversationMember() {
+          let parent = get(/databases/$(database)/documents/conversations/$(conversationId));
+          return request.auth != null
+            && parent.data.members is list
+            && request.auth.uid in parent.data.members;
+        }
+        allow read: if isConversationMember();
+        allow create, update: if isConversationMember()
+          && request.auth.uid == userId
+          && request.resource.data.uid == userId
+          && request.resource.data.typing is bool
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isConversationMember() && request.auth.uid == userId;
+      }
+
+      // Each participant writes only their own read cursor.
+      match /readReceipts/{userId} {
+        function isConversationMember() {
+          let parent = get(/databases/$(database)/documents/conversations/$(conversationId));
+          return request.auth != null
+            && parent.data.members is list
+            && request.auth.uid in parent.data.members;
+        }
+        allow read: if isConversationMember();
+        allow create, update: if isConversationMember()
+          && request.auth.uid == userId
+          && request.resource.data.uid == userId
+          && request.resource.data.lastReadMessageId is string
+          && request.resource.data.lastReadMessageId.size() <= 128
+          && request.resource.data.lastReadAt == request.time;
+        allow delete: if isConversationMember() && request.auth.uid == userId;
+      }
     }
 
     // Forum announcements are readable by signed-in members and writable only by the founder.
