@@ -730,3 +730,47 @@ test('V49 vertical video feed reuses secure story permissions for HTTPS videos',
     expiresAt: Timestamp.fromDate(new Date(Date.now() - 60 * 1000)),
   }));
 });
+
+
+test('shared IPTV supports founder file imports with empty source URL and safe replacement', async () => {
+  const founderDb = founder();
+  const playlist = doc(founderDb, 'iptvSharedPlaylists/file-import');
+  await assertSucceeds(setDoc(playlist, {
+    name: 'قائمة من ملف',
+    sourceUrl: '',
+    ownerUid: 'founder-uid',
+    channelCount: 1,
+    updatedBy: 'founder-uid',
+    updatedAt: serverTimestamp(),
+  }));
+  const oldChannel = doc(founderDb, 'iptvSharedPlaylists/file-import/channels/000000');
+  await assertSucceeds(setDoc(oldChannel, {
+    index: 0, name: 'قناة قديمة', url: 'https://example.test/old.m3u8',
+    group: 'عام', logo: '', tvgId: '', source: 'قائمة من ملف', sourceUrl: '',
+  }));
+  await assertSucceeds(deleteDoc(oldChannel));
+  await assertSucceeds(updateDoc(playlist, {
+    channelCount: 2, updatedBy: 'founder-uid', updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(founderDb, 'iptvSharedPlaylists/file-import/channels/000000'), {
+    index: 0, name: 'قناة جديدة', url: 'https://example.test/new.m3u8',
+    group: 'رياضة', logo: '', tvgId: '', source: 'قائمة من ملف', sourceUrl: '',
+  }));
+  await assertSucceeds(getDoc(doc(user('member-one'), 'iptvSharedPlaylists/file-import')));
+  await assertSucceeds(getDoc(doc(user('member-two'), 'iptvSharedPlaylists/file-import/channels/000000')));
+  await assertFails(updateDoc(doc(user('member-one'), 'iptvSharedPlaylists/file-import'), {
+    channelCount: 99, updatedBy: 'member-one', updatedAt: serverTimestamp(),
+  }));
+  await assertFails(deleteDoc(doc(user('member-two'), 'iptvSharedPlaylists/file-import/channels/000000')));
+});
+
+test('shared IPTV publishing remains founder-only even when regular members are signed in', async () => {
+  await assertFails(setDoc(doc(user('alice'), 'iptvSharedPlaylists/member-upload'), {
+    name: 'محاولة عضو', sourceUrl: '', ownerUid: 'alice',
+    channelCount: 1, updatedBy: 'alice', updatedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'iptvSharedPlaylists/member-upload/channels/000000'), {
+    index: 0, name: 'قناة', url: 'https://example.test/live.m3u8',
+    group: 'عام', logo: '', tvgId: '', source: 'محاولة عضو', sourceUrl: '',
+  }));
+});
