@@ -1446,8 +1446,8 @@ class _PublicChatPageState extends State<PublicChatPage> {
     return profile.data()?['name'] as String? ?? user.displayName ?? 'عضو';
   }
 
-  Future<void> _send({String text = '', String? imageUrl, String type = 'text'}) async {
-    if (sending || (text.trim().isEmpty && imageUrl == null)) return;
+  Future<void> _send({String text = '', String? imageUrl, String type = 'text', bool uploadInProgress = false}) async {
+    if ((sending && !uploadInProgress) || (text.trim().isEmpty && imageUrl == null)) return;
     final user = FirebaseAuth.instance.currentUser!;
     setState(() { sending = true; sendError = null; });
     try {
@@ -1482,7 +1482,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
       if (path == null) return;
       setState(() { sending = true; sendError = null; });
       final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'public-chat');
-      await _send(imageUrl: url, type: 'gif');
+      await _send(imageUrl: url, type: 'gif', uploadInProgress: true);
     } catch (e) {
       if (mounted) setState(() => sendError = 'تعذر إرسال GIF: $e');
     } finally { if (mounted) setState(() => sending = false); }
