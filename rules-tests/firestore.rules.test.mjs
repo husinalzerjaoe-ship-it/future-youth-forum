@@ -256,6 +256,41 @@ test('style store purchase atomically spends coins and grants account inventory'
   }));
 });
 
+test('founder can buy cosmetics without a wallet and gift cosmetics to members', async () => {
+  const founderDb = founder();
+  const founderItem = doc(founderDb, 'users/founder-uid/styleInventory/legend');
+  await assertSucceeds(setDoc(founderItem, {
+    itemId: 'legend', name: 'أسطورة الملتقى', category: 'ألقاب',
+    price: 350, purchasedAt: serverTimestamp(), grantedBy: 'founder-uid'
+  }));
+
+  const giftedItem = doc(founderDb, 'users/alice/styleInventory/crown');
+  await assertSucceeds(setDoc(giftedItem, {
+    itemId: 'crown', name: 'تاج القائد', category: 'ألقاب',
+    price: 180, purchasedAt: serverTimestamp(), grantedBy: 'founder-uid'
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'users/alice/styleInventory/crown')));
+
+  await assertFails(setDoc(doc(user('alice'), 'users/alice/styleInventory/legend'), {
+    itemId: 'legend', name: 'أسطورة الملتقى', category: 'ألقاب',
+    price: 350, purchasedAt: serverTimestamp(), grantedBy: 'alice'
+  }));
+});
+
+test('founder can top up a member wallet while members cannot mint coins', async () => {
+  await seed('coinWallets/alice', {
+    coins: 25, updatedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
+    grantedBy: 'founder-uid'
+  });
+  await assertSucceeds(updateDoc(doc(founder(), 'coinWallets/alice'), {
+    coins: 525, updatedAt: serverTimestamp(), grantedBy: 'founder-uid'
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'coinWallets/alice')));
+  await assertFails(updateDoc(doc(user('alice'), 'coinWallets/alice'), {
+    coins: 900, updatedAt: serverTimestamp()
+  }));
+});
+
 test('friends 2D room can be found by its single roomCode field and joined by a second member', async () => {
   await seed('arcadeRooms/room-2d-1', {
     hostId: 'alice', gameId: 'arcade_friend_world',
