@@ -842,7 +842,10 @@ class _HomePageState extends State<HomePage> {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const LocalHelperBotPage()));
                   break;
                 case 'aiAssistant':
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantPage()));
+                  // Use the same configured Activepieces assistant as the
+                  // primary bot entry; the legacy page still points to an
+                  // obsolete n8n webhook and falsely appears disconnected.
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const LocalHelperBotPage()));
                   break;
                 case 'logout':
                   FirebaseAuth.instance.signOut();
