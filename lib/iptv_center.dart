@@ -219,6 +219,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
         utf8.decode(response.bodyBytes, allowMalformed: true),
       );
       if (parsed.isEmpty) throw Exception('لم نعثر على برامج XMLTV صالحة.');
+      if (!mounted) return;
       setState(() {
         _programs
           ..clear()
