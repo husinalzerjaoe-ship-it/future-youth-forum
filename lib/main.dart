@@ -5,6 +5,9 @@ import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1595,6 +1598,66 @@ class _MembershipCard extends StatelessWidget {
       ]),
     );
   }
+}
+
+class ProfileIdentityAvatar extends StatelessWidget {
+  final Map<String,dynamic> profile;
+  final double radius;
+  const ProfileIdentityAvatar({super.key,required this.profile,this.radius=42});
+  @override Widget build(BuildContext context) {
+    final frame=profile['profileFrameColor'] is int ? profile['profileFrameColor'] as int : null;
+    final decoration=(profile['profileDecoration']??'').toString();
+    return Column(mainAxisSize:MainAxisSize.min,children:[
+      Container(padding:const EdgeInsets.all(4),decoration:BoxDecoration(
+        shape:BoxShape.circle,
+        border:Border.all(color:frame==null?Theme.of(context).colorScheme.primary:Color(frame),width:frame==null?2:4),
+        boxShadow:frame==null?const[]:[BoxShadow(color:Color(frame).withValues(alpha:.35),blurRadius:14)],
+      ),child:UserAvatar(url:profile['photoUrl'] as String?,radius:radius)),
+      if(decoration.isNotEmpty) Padding(padding:const EdgeInsets.only(top:4),child:Text(
+        decoration=='spark'?'✨':decoration=='flame'?'🔥':decoration=='diamond'?'💎':decoration=='moon'?'🌙':decoration=='comet'?'☄️':'🌿',
+        style:const TextStyle(fontSize:18))),
+    ]);
+  }
+}
+
+class InlineVideoPost extends StatefulWidget {
+  final String url;
+  const InlineVideoPost({super.key,required this.url});
+  @override State<InlineVideoPost> createState()=>_InlineVideoPostState();
+}
+class _InlineVideoPostState extends State<InlineVideoPost> {
+  late final VideoPlayerController _controller=VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  @override void initState(){super.initState();_controller.initialize().then((_){if(mounted)setState((){});}).catchError((_){if(mounted)setState((){});});}
+  @override void dispose(){_controller.dispose();super.dispose();}
+  @override Widget build(BuildContext context){
+    if(!_controller.value.isInitialized)return const Padding(padding:EdgeInsets.all(16),child:Center(child:CircularProgressIndicator()));
+    return Column(children:[
+      AspectRatio(aspectRatio:_controller.value.aspectRatio,child:ClipRRect(borderRadius:BorderRadius.circular(14),child:VideoPlayer(_controller))),
+      Row(children:[
+        IconButton(onPressed:()=>setState(()=>_controller.value.isPlaying?_controller.pause():_controller.play()),
+          icon:Icon(_controller.value.isPlaying?Icons.pause_circle:Icons.play_circle)),
+        Expanded(child:VideoProgressIndicator(_controller,allowScrubbing:true)),
+      ]),
+    ]);
+  }
+}
+class InlineAudioPost extends StatefulWidget {
+  final String url;
+  const InlineAudioPost({super.key,required this.url});
+  @override State<InlineAudioPost> createState()=>_InlineAudioPostState();
+}
+class _InlineAudioPostState extends State<InlineAudioPost>{
+  late final AudioPlayer _player=AudioPlayer();
+  @override void initState(){super.initState();_player.setUrl(widget.url).catchError((_){ });}
+  @override void dispose(){_player.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Row(children:[
+    StreamBuilder<PlayerState>(stream:_player.playerStateStream,builder:(context,s){
+      final playing=s.data?.playing??false;
+      return IconButton(onPressed:()=>playing?_player.pause():_player.play(),icon:Icon(playing?Icons.pause_circle_filled:Icons.play_circle_fill));
+    }),
+    const Expanded(child:Text('رسالة صوتية / مقطع صوتي',style:TextStyle(fontWeight:FontWeight.bold))),
+    StreamBuilder<Duration>(stream:_player.positionStream,builder:(context,s)=>Text('${s.data?.inSeconds??0} ث')),
+  ])));
 }
 
 class UserAvatar extends StatelessWidget {
