@@ -52,7 +52,7 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
   DocumentReference<Map<String,dynamic>> get _profile=>_db.collection('publicProfiles').doc(_uid);
   List<String> get _categories=>['الكل',..._items.map((e)=>e.category).toSet()];
   Future<void> _equip(_StyleItem item) async {
-    final data=<String,dynamic>{};
+    final data=<String,dynamic>{'customTitleUpdatedAt':FieldValue.serverTimestamp()};
     if(item.category=='ألقاب') {
       data.addAll({'customTitle':item.name,'customTitleColor':item.color,'customTitleEndColor':item.color,
         'customTitleFont':'default','customTitleGradient':false,'customTitleGlow':true,
