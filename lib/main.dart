@@ -2178,7 +2178,7 @@ class PostSocialActions extends StatelessWidget {
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: comments.snapshots(),
           builder: (context, snap) => TextButton.icon(
-            onPressed: () => _openComments(context, comments),
+            onPressed: () => _openComments(context, comments, authorId),
             icon: const Icon(Icons.mode_comment_outlined),
             label: Text('تعليقات ${snap.data?.docs.length ?? 0}')),
         ),
@@ -2198,7 +2198,7 @@ class PostSocialActions extends StatelessWidget {
       ]),
     ]);
   }
-  Future<void> _openComments(BuildContext context, CollectionReference<Map<String,dynamic>> comments) async {
+  Future<void> _openComments(BuildContext context, CollectionReference<Map<String,dynamic>> comments, String postAuthorId) async {
     final controller = TextEditingController();
     await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(sc)=>Directionality(
       textDirection:TextDirection.rtl,
@@ -2209,19 +2209,27 @@ class PostSocialActions extends StatelessWidget {
             if(!s.hasData)return const Center(child:CircularProgressIndicator());
             if(s.data!.docs.isEmpty)return const Center(child:Text('كن أول من يعلّق'));
             return ListView(children:s.data!.docs.map((doc){final d=doc.data();return ListTile(
-              leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ?? 'عضو'),
-              subtitle:Text(d['text'] as String? ?? ''));}).toList());
+              leading:const CircleAvatar(child:Icon(Icons.person)),
+              title:Text(d['authorName'] as String? ?? 'عضو'),
+              subtitle: (d['mediaType'] == 'audio' && d['audioUrl'] is String)
+                ? _VoiceCommentPlayer(url: d['audioUrl'] as String)
+                : Text(d['text'] as String? ?? ''));}).toList());
           })),
           SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
             Expanded(child:TextField(controller:controller,maxLength:500,decoration:const InputDecoration(hintText:'اكتب تعليقك...',counterText:'',border:OutlineInputBorder()))),
+            IconButton(
+              tooltip: 'تسجيل تعليق صوتي',
+              onPressed: () => _recordVoiceComment(context, comments, postAuthorId),
+              icon: const Icon(Icons.mic_rounded, color: brand),
+            ),
             IconButton.filled(onPressed:() async {
               final value=controller.text.trim();if(value.isEmpty)return;
               final user=FirebaseAuth.instance.currentUser!;
               final profile=await db.collection('publicProfiles').doc(user.uid).get();
               await comments.add({'text':value,'authorId':user.uid,'authorName':profile.data()?['name'] ?? user.displayName ?? 'عضو','createdAt':FieldValue.serverTimestamp()});
-              if (authorId.isNotEmpty && authorId != user.uid) {
+              if (postAuthorId.isNotEmpty && postAuthorId != user.uid) {
                 await db.collection('notifications').add({
-                  'recipientId': authorId, 'actorId': user.uid,
+                  'recipientId': postAuthorId, 'actorId': user.uid,
                   'actorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
                   'type': 'comment', 'text': 'علّق على منشورك',
                   'read': false, 'createdAt': FieldValue.serverTimestamp(),
@@ -2234,6 +2242,141 @@ class PostSocialActions extends StatelessWidget {
     ));
     controller.dispose();
   }
+}
+
+
+Future<void> _recordVoiceComment(
+  BuildContext context,
+  CollectionReference<Map<String, dynamic>> comments,
+  String postAuthorId,
+) async {
+  final recorder = AudioRecorder();
+  String? path;
+  try {
+    if (!await recorder.hasPermission()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اسمح للتطبيق باستخدام المايك لتسجيل التعليق الصوتي.')),
+        );
+      }
+      return;
+    }
+    final dir = await Directory.systemTemp.createTemp('future_comment_voice_');
+    path = '\${dir.path}/comment_\${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 96000, sampleRate: 44100),
+      path: path,
+    );
+    final publish = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تسجيل تعليق صوتي'),
+          content: const Text('سجّل تعليقك، ثم اضغط إيقاف وإرسال.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.stop_circle),
+              label: const Text('إيقاف وإرسال'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final stopped = await recorder.stop();
+    if (publish != true) return;
+    final finalPath = stopped ?? path;
+    final file = File(finalPath);
+    if (!await file.exists() || await file.length() == 0) {
+      throw StateError('التسجيل فارغ.');
+    }
+    final user = FirebaseAuth.instance.currentUser!;
+    final profile = await db.collection('publicProfiles').doc(user.uid).get();
+    final name = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
+    final url = await uploadForumMedia(
+      XFile(finalPath, name: 'voice_comment_\${DateTime.now().millisecondsSinceEpoch}.m4a'),
+      folder: 'posts',
+    );
+    await comments.add({
+      'text': '',
+      'audioUrl': url,
+      'mediaType': 'audio',
+      'authorId': user.uid,
+      'authorName': name,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    if (postAuthorId.isNotEmpty && postAuthorId != user.uid) {
+      await db.collection('notifications').add({
+        'recipientId': postAuthorId,
+        'actorId': user.uid,
+        'actorName': name,
+        'type': 'comment',
+        'text': 'أرسل تعليقاً صوتياً على منشورك',
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال التعليق الصوتي')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إرسال التعليق الصوتي: $e')),
+      );
+    }
+  } finally {
+    try { await recorder.dispose(); } catch (_) {}
+    if (path != null) {
+      try { final file = File(path); if (await file.exists()) await file.delete(); } catch (_) {}
+    }
+  }
+}
+
+class _VoiceCommentPlayer extends StatefulWidget {
+  const _VoiceCommentPlayer({required this.url});
+  final String url;
+  @override
+  State<_VoiceCommentPlayer> createState() => _VoiceCommentPlayerState();
+}
+class _VoiceCommentPlayerState extends State<_VoiceCommentPlayer> {
+  late final AudioPlayer _player = AudioPlayer();
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    _player.setUrl(widget.url).catchError((_) {
+      if (mounted) setState(() => _failed = true);
+    });
+  }
+  @override
+  void dispose() { _player.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    IconButton(
+      visualDensity: VisualDensity.compact,
+      tooltip: 'تشغيل التعليق الصوتي',
+      onPressed: _failed ? null : () async {
+        if (_player.playing) { await _player.pause(); } else { await _player.play(); }
+      },
+      icon: Icon(_failed ? Icons.error_outline : (_player.playing ? Icons.pause_circle : Icons.play_circle)),
+    ),
+    const Text('تعليق صوتي'),
+    StreamBuilder<Duration?>(
+      stream: _player.durationStream,
+      builder: (context, snapshot) {
+        final duration = snapshot.data;
+        if (duration == null) return const SizedBox.shrink();
+        final seconds = duration.inSeconds;
+        return Text('  $seconds ث');
+      },
+    ),
+  ]);
 }
 
 
