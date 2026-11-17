@@ -34,6 +34,7 @@ import 'knowledge_corner.dart';
 import 'v31_member_titles.dart';
 import 'friends_fun_world.dart';
 import 'future_arcade.dart';
+import 'v39_daily_challenges.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -61,6 +62,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'مدينة الألعاب 2D',subtitle:'ألعاب أركيد وطاولات وألغاز ومغامرات',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const FutureArcadePage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
+  (title:'تحديات وإنجازات V39',subtitle:'مهمة يومية وسلسلة استمرار ومستويات وشارات محلية',category:'الألعاب',icon:Icons.military_tech_rounded,page:const V39DailyChallengesPage()),
   (title:'مركز المباريات',subtitle:'مواعيد ونتائج ومتابعة أخبار الكرة',category:'الألعاب',icon:Icons.sports_soccer,page:const MatchCenterPage()),
   (title:'المساعد الذكي',subtitle:'مساعد مجاني داخل التطبيق',category:'المعرفة',icon:Icons.smart_toy,page:const LocalHelperBotPage()),
   (title:'ركن المعرفة والترفيه',subtitle:'معلومات يومية ونصائح وألغاز وكتابة إبداعية',category:'المعرفة',icon:Icons.auto_stories_rounded,page:const KnowledgeCornerPage()),
