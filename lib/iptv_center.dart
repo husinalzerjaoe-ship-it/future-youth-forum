@@ -150,7 +150,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     leading:ClipRRect(borderRadius:BorderRadius.circular(9),child:Container(width:46,height:46,color:Theme.of(context).colorScheme.surfaceContainerHighest,padding:const EdgeInsets.all(5),child:c.logo.startsWith('https://')?Image.network(c.logo,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.tv)):const Icon(Icons.tv))),
     title:Text(c.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w800)),
     subtitle:Text(c.group+' • '+c.source,maxLines:1,overflow:TextOverflow.ellipsis),
-    trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+    trailing:Wrap(children:[
       IconButton(tooltip:'شاهد مع الأصدقاء',onPressed:()=>_openWatchParty(c),icon:const Icon(Icons.groups_rounded)),
       IconButton(tooltip:'المفضلة',onPressed:()=>_favorite(c),icon:Icon(_favorites.contains(c.id)?Icons.favorite:Icons.favorite_border,color:_favorites.contains(c.id)?Colors.redAccent:null)),
     ]),
