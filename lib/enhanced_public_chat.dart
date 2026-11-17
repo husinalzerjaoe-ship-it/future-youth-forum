@@ -128,6 +128,19 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
+      final controls = (await _chatDb.collection('chatControls').doc('main').get()).data() ?? {};
+      if (controls['publicChatEnabled'] == false) {
+        if (mounted) setState(() => _error = 'الدردشة العامة متوقفة مؤقتاً من الإدارة.');
+        return;
+      }
+      if (type != 'text' && type != 'sticker' && controls['allowMedia'] == false) {
+        if (mounted) setState(() => _error = 'إرسال الوسائط متوقف حالياً من الإدارة.');
+        return;
+      }
+      if (type == 'text' && controls['allowLinks'] == false && RegExp(r'https?://', caseSensitive: false).hasMatch(body)) {
+        if (mounted) setState(() => _error = 'نشر الروابط متوقف حالياً من الإدارة.');
+        return;
+      }
       final sanction = (await _chatDb.collection('userSanctions').doc(_uid).get()).data() ?? {};
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
