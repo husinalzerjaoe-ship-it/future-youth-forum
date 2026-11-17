@@ -210,20 +210,6 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
   }
 
-  Future<void> _sendGif() async {
-    if (_sending) return;
-    try {
-      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif']);
-      final path = picked?.files.single.path;
-      if (path == null) return;
-      if (mounted) setState(() { _sending = true; _error = null; });
-      final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'public-chat');
-      await _send(body: 'GIF', mediaUrl: url, type: 'gif', uploadInProgress: true);
-    } catch (e) {
-      if (mounted) setState(() => _error = 'تعذر إرسال GIF: $e');
-    } finally { if (mounted) setState(() => _sending = false); }
-  }
-
   Future<void> _sendVideo() async {
     if (_sending) return;
     try {
