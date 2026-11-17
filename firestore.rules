@@ -50,6 +50,24 @@ service cloud.firestore {
         && request.auth.uid == userId;
       allow delete: if false;
 
+      match /savedClips/{clipId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['clipId','authorId','authorName','caption','videoUrl','savedAt'])
+          && request.resource.data.clipId == clipId
+          && request.resource.data.authorId is string
+          && request.resource.data.authorName is string
+          && request.resource.data.authorName.size() <= 80
+          && request.resource.data.caption is string
+          && request.resource.data.caption.size() <= 500
+          && request.resource.data.videoUrl is string
+          && request.resource.data.videoUrl.matches('https://.*')
+          && request.resource.data.savedAt == request.time;
+        allow update: if false;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+
       match /animeWatchlist/{entryId} {
         allow read, create, delete: if request.auth != null && request.auth.uid == userId;
         allow update: if request.auth != null && request.auth.uid == userId
@@ -768,6 +786,16 @@ service cloud.firestore {
           && request.auth.uid == likeId
           && request.resource.data.uid == request.auth.uid;
         allow delete: if request.auth != null && request.auth.uid == likeId;
+      }
+
+      match /views/{viewerId} {
+        allow read: if request.auth != null && accountNotBanned();
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == viewerId
+          && request.resource.data.viewerId == request.auth.uid
+          && request.resource.data.createdAt == request.time;
+        allow update: if false;
+        allow delete: if request.auth != null && request.auth.uid == viewerId;
       }
 
       match /comments/{commentId} {
