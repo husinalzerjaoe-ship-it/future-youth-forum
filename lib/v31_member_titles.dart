@@ -52,6 +52,61 @@ class MemberTitleBadge extends StatelessWidget {
   }
 }
 
+
+/// Displays every store title activated by the member, while preserving
+/// the older founder/custom title field for existing accounts.
+class MemberStoreTitleBadges extends StatelessWidget {
+  const MemberStoreTitleBadges({super.key, required this.profile, this.compact = false});
+  final Map<String, dynamic> profile;
+  final bool compact;
+
+  static const Map<String, Map<String, Object>> _catalog = {
+    'crown': {'name':'تاج القائد','color':0xFFE3AF35,'icon':'👑'},
+    'star': {'name':'نجم المجتمع','color':0xFF4D9DDB,'icon':'⭐'},
+    'creator': {'name':'صانع الإبداع','color':0xFF9A65D6,'icon':'🎨'},
+    'friend': {'name':'صديق الجميع','color':0xFF3EAA8A,'icon':'🤝'},
+    'legend': {'name':'أسطورة الملتقى','color':0xFFFFB52E,'icon':'🏆'},
+    'explorer': {'name':'مستكشف المستقبل','color':0xFF20A6A6,'icon':'🧭'},
+    'thinker': {'name':'العقل اللامع','color':0xFF6688E8,'icon':'💡'},
+    'artist': {'name':'فنان الملتقى','color':0xFFE16A9B,'icon':'🎨'},
+    'gamer': {'name':'ملك الألعاب','color':0xFF9B70E8,'icon':'🎮'},
+    'reader': {'name':'صديق الكتب','color':0xFFB78655,'icon':'📚'},
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final ids = (profile['activeStoreTitleIds'] as List? ?? const [])
+        .whereType<String>().toSet().toList();
+    final badges = <Widget>[];
+    final legacy = (profile['customTitle'] ?? '').toString().trim();
+    if (legacy.isNotEmpty) {
+      badges.add(MemberTitleBadge.fromProfile(title: legacy, profile: profile, compact: compact));
+    }
+    for (final id in ids) {
+      final item = _catalog[id];
+      if (item == null) continue;
+      badges.add(MemberTitleBadge(
+        title: item['name']! as String,
+        colorValue: item['color']! as int,
+        endColorValue: item['color']! as int,
+        icon: item['icon']! as String,
+        glow: true,
+        compact: compact,
+      ));
+    }
+    if (badges.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: compact ? 3 : 7),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 5,
+        runSpacing: 5,
+        children: badges,
+      ),
+    );
+  }
+}
+
 class FounderMemberTitlesPage extends StatefulWidget {
   const FounderMemberTitlesPage({super.key});
   @override State<FounderMemberTitlesPage> createState() => _FounderMemberTitlesPageState();
