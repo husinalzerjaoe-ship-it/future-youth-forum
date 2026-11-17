@@ -136,7 +136,8 @@ service cloud.firestore {
         && (
           (request.resource.data.get('category', '') == 'music'
             && request.resource.data.status == 'approved'
-            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac']
+            && request.resource.data.createdAt == request.time)
           || (request.resource.data.get('category', '') != 'music'
             && request.resource.data.status == 'pending')
         )
@@ -1277,7 +1278,7 @@ service cloud.firestore {
     }
 
     match /privateRooms/{roomId} {
-      allow read: if request.auth != null
+      allow read: if request.auth != null && accountNotBanned()
         && resource.data.members is list
         && request.auth.uid in resource.data.members;
       allow create: if request.auth != null && accountNotBanned()
@@ -1319,7 +1320,8 @@ service cloud.firestore {
         function roomMembers() {
           return get(/databases/$(database)/documents/privateRooms/$(roomId)).data.members;
         }
-        allow read: if request.auth != null && request.auth.uid in roomMembers();
+        allow read: if request.auth != null && accountNotBanned()
+          && request.auth.uid in roomMembers();
         allow create: if request.auth != null && accountNotBanned()
           && request.auth.uid in roomMembers()
           && request.resource.data.senderId == request.auth.uid
@@ -1350,7 +1352,7 @@ service cloud.firestore {
 
     // Files uploaded by members stay private to the uploader until moderation.
     match /sharedFiles/{fileId} {
-      allow read: if request.auth != null
+      allow read: if request.auth != null && accountNotBanned()
         && (resource.data.status == 'approved'
           || resource.data.uploaderId == request.auth.uid
           || isFounder());
