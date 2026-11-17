@@ -24,6 +24,8 @@ const _arcadeGames = <_ArcadeGame>[
   _ArcadeGame('sudoku','سودوكو','املأ الشبكة بالأرقام دون تكرار',Icons.numbers_rounded,'ذكاء'),
   _ArcadeGame('wordsearch','البحث عن الكلمات','اكتشف الكلمات المخفية داخل الشبكة',Icons.search_rounded,'ذكاء'),
   _ArcadeGame('bomb','ساحة القنابل','تحرك بذكاء وضع القنابل لتفتح الطريق',Icons.whatshot_rounded,'2D'),
+  _ArcadeGame('memory','ذاكرة الرموز','طابق الرموز المتشابهة بأقل عدد من المحاولات',Icons.extension_rounded,'ذكاء'),
+  _ArcadeGame('rps','حجر ورقة مقص','تحدّ الحاسوب بجولات سريعة وممتعة',Icons.sports_martial_arts_rounded,'خفيفة'),
 ];
 
 class _ArcadeGame {
@@ -52,9 +54,9 @@ class _FutureArcadePageState extends State<FutureArcadePage> {
           child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             const Row(children:[Icon(Icons.sports_esports_rounded,color:Colors.white,size:30),Spacer(),Text('PLAY • LEVEL UP • WIN',style:TextStyle(color:Colors.white70,fontWeight:FontWeight.w900))]),
             const SizedBox(height:14),const Text('عالمك، لعبك، تحدّيك! 🎮',style:TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:23)),
-            const SizedBox(height:6),const Text('14 لعبة جديدة بتجارب متنوعة — العب ونافس وحقق أرقاماً جديدة.',style:TextStyle(color:Colors.white70,height:1.5)),
+            const SizedBox(height:6),const Text('16 لعبة بتجارب متنوعة — العب ونافس وحقق أرقاماً جديدة.',style:TextStyle(color:Colors.white70,height:1.5)),
             const SizedBox(height:16),Row(children:[
-              Expanded(child:_stat('14','لعبة')),const SizedBox(width:8),Expanded(child:_stat('6','أنواع')),const SizedBox(width:8),Expanded(child:_stat('2D','أركيد')),
+              Expanded(child:_stat('16','لعبة')),const SizedBox(width:8),Expanded(child:_stat('6','أنواع')),const SizedBox(width:8),Expanded(child:_stat('2D','أركيد')),
             ]),
             const SizedBox(height:14),Wrap(spacing:8,runSpacing:8,children:[
               OutlinedButton.icon(onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const ArcadeAchievementsPage())),icon:const Icon(Icons.military_tech_rounded),label:const Text('إنجازاتي'),style:OutlinedButton.styleFrom(foregroundColor:Colors.white,side:const BorderSide(color:Colors.white54))),
@@ -94,6 +96,11 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   int _score=0,_step=0,_turn=0,_lane=1,_position=0,_wave=1,_fish=0;
   int? _selected;
   bool _revealed=false,_ended=false,_rewardClaimed=false;
+  final List<String> _memoryCards=['🚀','🌟','🎮','🐱','🍀','🎵','🚀','🌟','🎮','🐱','🍀','🎵'];
+  final Set<int> _memoryOpen={};
+  final Set<int> _memoryMatched={};
+  int _memoryMoves=0,_rpsWins=0,_rpsLosses=0;
+  String _rpsResult='اختر حركتك وابدأ التحدي.';
   String _message='ابدأ التحدي!';
   final List<int> _snake=[27,28,29];
   final List<int> _bombs=[];
@@ -101,7 +108,7 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
   final List<String> _millionAnswers=['بغداد','المريخ','المحيط الهادئ','البرتغالية','7','القاهرة','الذهب','الأكسجين','آسيا','جبران خليل جبران','زحل','ليوناردو دافنشي','النيل','اليابان','القلب','3','التمثيل الضوئي','الحوت الأزرق','باريس','4'];
   final List<String> _millionQuestions=['ما عاصمة العراق؟','ما الكوكب الأحمر؟','ما أكبر محيط؟','ما لغة البرازيل الرسمية؟','كم عدد أيام الأسبوع؟','ما عاصمة مصر؟','ما المعدن الذي رمزه Au؟','ما الغاز الذي يحتاجه الإنسان للتنفس؟','ما أكبر قارة؟','من مؤلف كتاب النبي؟','أي كوكب مشهور بحلقاته؟','من رسم الموناليزا؟','ما أطول نهر في أفريقيا؟','في أي دولة تقع طوكيو؟','ما العضو الذي يضخ الدم؟','كم ضلعاً للمثلث؟','ما العملية التي تصنع بها النباتات غذاءها؟','ما أكبر حيوان على الأرض؟','ما عاصمة فرنسا؟','كم ضلعاً للمربع؟'];
   final List<int> _questionOrder=[];
-  @override void initState(){super.initState();_shuffleQuestions();}
+  @override void initState(){super.initState();_shuffleQuestions();_memoryCards.shuffle(_random);}
   void _shuffleQuestions(){_questionOrder..clear()..addAll(List<int>.generate(_millionQuestions.length,(i)=>i))..shuffle(_random);}
   final List<List<int>> _sudoku=[
     [1,0,0,4],[0,4,1,0],[0,1,4,0],[4,0,0,1]
@@ -185,8 +192,42 @@ class _ArcadePlayPageState extends State<ArcadePlayPage> {
       case 'sudoku': return _sudokuBoard();
       case 'wordsearch': return _wordSearch();
       case 'bomb': return _bombBoard();
+      case 'memory': return _memoryGame();
+      case 'rps': return _rockPaperScissors();
       default:return const SizedBox.shrink();
     }
+  }
+  Widget _memoryGame()=>_panel('🧠 ذاكرة الرموز',[
+    Text('المحاولات: '+_memoryMoves.toString()+' • الأزواج: '+(_memoryMatched.length~/2).toString()+' / 6',style:_big),
+    const SizedBox(height:8),
+    GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:_memoryCards.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:3,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(context,index){
+      final shown=_memoryOpen.contains(index)||_memoryMatched.contains(index);
+      return InkWell(onTap:()=>_tapMemoryCard(index),borderRadius:BorderRadius.circular(14),child:Container(decoration:BoxDecoration(color:_memoryMatched.contains(index)?Colors.green.withValues(alpha:.22):Theme.of(context).colorScheme.surfaceContainerHighest,borderRadius:BorderRadius.circular(14),border:Border.all(color:Theme.of(context).colorScheme.outlineVariant)),child:Center(child:Text(shown?_memoryCards[index]:'؟',style:const TextStyle(fontSize:30,fontWeight:FontWeight.w900)))));
+    }),
+    if(_memoryMatched.length==_memoryCards.length) const Text('أحسنت! طابقت كل الرموز 🎉',style:TextStyle(fontWeight:FontWeight.w900,color:Colors.green)),
+    _button('إعادة خلط البطاقات',_resetMemory),
+  ]);
+  Future<void> _tapMemoryCard(int index) async {
+    if(_memoryOpen.length>=2||_memoryOpen.contains(index)||_memoryMatched.contains(index))return;
+    setState(()=>_memoryOpen.add(index));
+    if(_memoryOpen.length==2){
+      _memoryMoves++;
+      final pair=_memoryOpen.toList();
+      if(_memoryCards[pair[0]]==_memoryCards[pair[1]]){setState(()=>_memoryMatched.addAll(pair));_score+=3;_message='زوج صحيح! استمر.';_memoryOpen.clear();}
+      else{await Future.delayed(const Duration(milliseconds:650));if(!mounted)return;setState(()=>_memoryOpen.clear());}
+    }
+  }
+  void _resetMemory(){setState((){_memoryCards.shuffle(_random);_memoryOpen.clear();_memoryMatched.clear();_memoryMoves=0;_message='بدأت جولة ذاكرة جديدة.';});}
+  Widget _rockPaperScissors()=>_panel('✊ حجر • 📄 ورقة • ✂️ مقص',[
+    Text('فوزك: '+_rpsWins.toString()+' • خسارتك: '+_rpsLosses.toString(),style:_big),
+    const SizedBox(height:8),Text(_rpsResult,textAlign:TextAlign.center,style:const TextStyle(fontSize:16,fontWeight:FontWeight.w800)),
+    const SizedBox(height:12),Wrap(alignment:WrapAlignment.center,spacing:8,children:[_button('✊ حجر',()=>_playRps('حجر')),_button('📄 ورقة',()=>_playRps('ورقة')),_button('✂️ مقص',()=>_playRps('مقص'))]),
+  ]);
+  void _playRps(String mine){
+    const choices=['حجر','ورقة','مقص'];final cpu=choices[_random.nextInt(3)];
+    final win=(mine=='حجر'&&cpu=='مقص')||(mine=='ورقة'&&cpu=='حجر')||(mine=='مقص'&&cpu=='ورقة');
+    final draw=mine==cpu;
+    setState((){if(win){_rpsWins++;_score+=2;}else if(!draw){_rpsLosses++;}_rpsResult=draw?'تعادل! اختر مرة ثانية.':win?'أنت فزت! الحاسوب اختار '+cpu:'الحاسوب فاز؛ اختار '+cpu+'. جرّب مجدداً.';_message=_rpsResult;});
   }
   Widget _panel(String title,List<Widget> children)=>Container(padding:const EdgeInsets.all(15),decoration:BoxDecoration(borderRadius:BorderRadius.circular(20),color:Theme.of(context).colorScheme.surfaceContainer),child:Column(crossAxisAlignment:CrossAxisAlignment.stretch,children:[Text(title,style:_big),const SizedBox(height:12),...children]));
   TextStyle get _big=>const TextStyle(fontSize:17,fontWeight:FontWeight.w900);
