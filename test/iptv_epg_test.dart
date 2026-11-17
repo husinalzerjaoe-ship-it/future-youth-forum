@@ -20,4 +20,13 @@ void main(){
     expect(IptvEpgParser.current(items,'news',now)?.title,'Now');
     expect(IptvEpgParser.next(items,'news',now)?.title,'Next');
   });
+
+  test('sorts programmes chronologically even when XML entries are unordered', () {
+    const xml = '<tv>'
+        '<programme channel="guide" start="20261117170000 +0000" stop="20261117180000 +0000"><title>Later</title></programme>'
+        '<programme channel="guide" start="20261117150000 +0000" stop="20261117160000 +0000"><title>Earlier</title></programme>'
+        '</tv>';
+    final items = IptvEpgParser.parse(xml);
+    expect(items.map((item) => item.title).toList(), ['Earlier', 'Later']);
+  });
 }
