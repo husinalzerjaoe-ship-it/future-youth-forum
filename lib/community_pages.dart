@@ -35,6 +35,7 @@ import 'v31_member_titles.dart';
 import 'friends_fun_world.dart';
 import 'future_arcade.dart';
 import 'v39_daily_challenges.dart';
+import 'v39_creator_links.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -51,6 +52,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
  String _category='الكل';
 
  late final List<({String title,String subtitle,String category,IconData icon,Widget page})> _items=[
+  (title:'حسابات المطوّر',subtitle:'روابط التواصل الرسمية وإعدادات الدردشة بإدارة المؤسس',category:'المجتمع',icon:Icons.verified_user_rounded,page:const V39CreatorLinksPage()),
   (title:'الستوريات',subtitle:'صور وفيديوهات لمدة 24 ساعة',category:'التواصل',icon:Icons.camera_alt,page:const StoriesPage()),
   (title:'دردشات الدول',subtitle:'غرف العراق حسب المحافظات والاهتمامات وغرف عربية',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
   (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
