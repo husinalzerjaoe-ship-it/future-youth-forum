@@ -15,6 +15,7 @@ on:
       - feature/v52-community-reels-stories
       - feature/v53-community-universe
       - feature/v54-world-community
+      - feature/v55-music-notifications-repair
     paths:
       - 'firestore.rules'
       - 'storage.rules'
