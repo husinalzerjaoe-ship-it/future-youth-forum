@@ -1872,6 +1872,38 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Shared IPTV libraries: signed-in members can read; only the founder can publish or edit.
+    match /iptvSharedPlaylists/{playlistId} {
+      allow read: if request.auth != null;
+      allow create: if isFounder()
+        && request.resource.data.keys().hasOnly(['name','sourceUrl','ownerUid','channelCount','updatedBy','updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.sourceUrl is string && request.resource.data.sourceUrl.size() <= 2048
+        && request.resource.data.ownerUid == request.auth.uid && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.channelCount is int && request.resource.data.channelCount > 0 && request.resource.data.channelCount <= 10000
+        && request.resource.data.updatedAt == request.time;
+      allow update: if isFounder()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sourceUrl','channelCount','updatedBy','updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.sourceUrl is string && request.resource.data.sourceUrl.size() <= 2048
+        && request.resource.data.channelCount is int && request.resource.data.channelCount > 0 && request.resource.data.channelCount <= 10000
+        && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+      allow delete: if isFounder();
+      match /channels/{channelId} {
+        allow read: if request.auth != null;
+        allow create, update: if isFounder()
+          && request.resource.data.keys().hasOnly(['index','name','url','group','logo','tvgId','source','sourceUrl'])
+          && request.resource.data.index is int && request.resource.data.index >= 0 && request.resource.data.index < 10000
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
+          && request.resource.data.url is string && request.resource.data.url.size() <= 4096 && request.resource.data.url.matches('https?://.*')
+          && request.resource.data.group is string && request.resource.data.group.size() <= 100
+          && request.resource.data.logo is string && request.resource.data.logo.size() <= 2048
+          && request.resource.data.tvgId is string && request.resource.data.tvgId.size() <= 160
+          && request.resource.data.source is string && request.resource.data.source.size() <= 100
+          && request.resource.data.sourceUrl is string && request.resource.data.sourceUrl.size() <= 2048;
+        allow delete: if isFounder();
+      }
+    }
     // V26 gaming guide, local game library notes and wallpaper favourites use
     // SharedPreferences. They do not create Firestore records, so no permissive
     // client-writable cloud collection is added until a synced schema is designed.
