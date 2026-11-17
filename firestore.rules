@@ -421,11 +421,14 @@ service cloud.firestore {
           && roomChatNotMuted() && accountNotBanned() && chatNotMuted()
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 500
-          && request.resource.data.type in ['text', 'image', 'voice']
+          && request.resource.data.type in ['text', 'image', 'voice', 'video', 'gif', 'sticker']
           && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map)
           && ((request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
             || (request.resource.data.type == 'image' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
-            || (request.resource.data.type == 'voice' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*') && request.resource.data.durationSeconds is int && request.resource.data.durationSeconds >= 1 && request.resource.data.durationSeconds <= 180));
+            || (request.resource.data.type == 'voice' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*') && request.resource.data.durationSeconds is int && request.resource.data.durationSeconds >= 1 && request.resource.data.durationSeconds <= 180)
+            || (request.resource.data.type == 'video' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
+            || (request.resource.data.type == 'gif' && request.resource.data.mediaUrl is string && request.resource.data.mediaUrl.matches('https://.*'))
+            || (request.resource.data.type == 'sticker' && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 16));
         allow update: if false;
         allow delete: if canAccessRoom()
           && request.auth != null
@@ -701,11 +704,27 @@ service cloud.firestore {
 
       match /replies/{replyId} {
         allow read: if request.auth != null;
+        // Story replies support text and voice notes; media URLs must be HTTPS.
         allow create: if request.auth != null && accountNotBanned()
           && request.resource.data.authorId == request.auth.uid
-          && request.resource.data.text is string
-          && request.resource.data.text.size() > 0
-          && request.resource.data.text.size() <= 300;
+          && request.resource.data.authorId is string
+          && request.resource.data.authorId.size() > 0
+          && (
+            (request.resource.data.text is string
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 300)
+            || (
+              request.resource.data.text == ''
+              && request.resource.data.mediaType == 'audio'
+              && request.resource.data.audioUrl is string
+              && request.resource.data.audioUrl.matches('https://.*')
+              && request.resource.data.audioUrl.size() <= 2048
+              && (!('durationSeconds' in request.resource.data)
+                || (request.resource.data.durationSeconds is int
+                  && request.resource.data.durationSeconds >= 1
+                  && request.resource.data.durationSeconds <= 180))
+            )
+          );
         allow update: if request.auth != null
           && resource.data.authorId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text']);
