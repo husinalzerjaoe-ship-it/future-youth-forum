@@ -13,6 +13,7 @@ on:
       - feature/v48-community-evolution
       - feature/v52-community-reels-stories
       - feature/v53-community-universe
+      - feature/v54-world-community
     paths:
       - 'firestore.rules'
       - 'rules-tests/**'
