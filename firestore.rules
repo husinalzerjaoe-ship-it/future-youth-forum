@@ -177,7 +177,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'customTitle', 'customTitleColor', 'customTitleEndColor', 'customTitleFont',
           'customTitleGradient', 'customTitleGlow', 'customTitleIcon',
-          'customTitleExpiresAt', 'customTitleUpdatedAt',
+          'customTitleExpiresAt', 'customTitleUpdatedAt', 'activeStoreTitleIds',
           'profileFrameId', 'profileFrameColor', 'profileDecoration', 'profileDecorationColor'
         ])
         && request.resource.data.get('customTitle', '') is string
@@ -196,6 +196,8 @@ service cloud.firestore {
         && (request.resource.data.get('customTitleExpiresAt', null) == null
           || request.resource.data.get('customTitleExpiresAt', null) is timestamp)
         && request.resource.data.customTitleUpdatedAt == request.time
+        && request.resource.data.get('activeStoreTitleIds', []) is list
+        && request.resource.data.get('activeStoreTitleIds', []).size() <= 12
         && request.resource.data.get('profileFrameId', '') is string
         && request.resource.data.get('profileFrameId', '').size() <= 40
         && request.resource.data.get('profileFrameColor', 0) is int
