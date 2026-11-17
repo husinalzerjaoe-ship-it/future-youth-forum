@@ -62,6 +62,7 @@ import 'future_style_store.dart';
 import 'region_chat_hub.dart';
 import 'future_utility_studio.dart';
 import 'future_planner.dart';
+import 'v44_future_lab.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -758,6 +759,30 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v44':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => V44FutureLabPage(onOpen: (route) {
+                    switch (route) {
+                      case 'games':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const GameCenterPage()));
+                        break;
+                      case 'events':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityEventsPage()));
+                        break;
+                      case 'studio':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureStudioPage()));
+                        break;
+                      case 'knowledge':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const KnowledgeCornerPage()));
+                        break;
+                      case 'media':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage()));
+                        break;
+                      case 'community':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage()));
+                        break;
+                    }
+                  })));
+                  break;
                 case 'v17':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V17SmartHubPage()));
                   break;
@@ -902,6 +927,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v44', child: ListTile(leading: Icon(Icons.science_rounded), title: Text('مختبر المستقبل V44 – التحديات والأفكار والتركيز'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v17', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز الملتقى الذكي V18'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v15', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز الملتقى الشامل V15'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v14', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('مركز الملتقى V14'), contentPadding: EdgeInsets.zero)),
