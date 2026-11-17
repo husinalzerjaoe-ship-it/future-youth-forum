@@ -52,6 +52,8 @@ class IptvCenterPage extends StatefulWidget {
   @override State<IptvCenterPage> createState()=>_IptvCenterPageState();
 }
 class _IptvCenterPageState extends State<IptvCenterPage> {
+  // Allow larger M3U/M3U8 playlists while keeping memory use bounded.
+  static const int _maxPlaylistBytes = 64 * 1024 * 1024;
   static const _key='future_youth_iptv_channels_v1';
   static const _epgKey='future_youth_iptv_epg_v1';
   final _url=TextEditingController(),_name=TextEditingController(),_search=TextEditingController(),_epgUrl=TextEditingController();
@@ -149,7 +151,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     try{
       final response=await http.get(uri,headers:const {'Accept':'application/x-mpegURL, text/plain, */*'}).timeout(const Duration(seconds:25));
       if(response.statusCode!=200)throw Exception('استجابة المصدر '+response.statusCode.toString());
-      if(response.bodyBytes.length>8*1024*1024)throw Exception('القائمة أكبر من 8 ميغابايت.');
+      if(response.bodyBytes.length>_maxPlaylistBytes)throw Exception('القائمة أكبر من الحد الأقصى (64 ميغابايت).');
       final source=_name.text.trim().isEmpty?uri.host:_name.text.trim();
       final items=IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
       if(items.isEmpty)throw Exception('لم نعثر على قنوات صالحة.');
@@ -163,7 +165,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       if(picked==null||picked.files.isEmpty)return;
       final file=picked.files.first,bytes=picked.files.first.bytes;
       if(bytes==null){_toast('تعذر قراءة الملف.');return;}
-      if(bytes.length>8*1024*1024){_toast('الملف أكبر من 8 ميغابايت.');return;}
+      if(bytes.length>_maxPlaylistBytes){_toast('الملف أكبر من الحد الأقصى (64 ميغابايت).');return;}
       final items=IptvPlaylistParser.parse(utf8.decode(bytes,allowMalformed:true),source:file.name);
       if(items.isEmpty){_toast('الملف لا يحتوي قنوات M3U صالحة.');return;}
       _replace(file.name,items);await _save();final shared=await _publishSharedPlaylist(file.name,items);_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ فشل النشر المشترك: '+(_lastPublishError.isEmpty?'تحقق من حساب المؤسس وقواعد Firestore.':_lastPublishError));
@@ -233,7 +235,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       if (response.statusCode != 200) {
         throw Exception('استجابة المصدر ' + response.statusCode.toString());
       }
-      if (response.bodyBytes.length > 8 * 1024 * 1024) {
+      if (response.bodyBytes.length > _maxPlaylistBytes) {
         throw Exception('ملف الدليل أكبر من 8 ميغابايت.');
       }
       final parsed = IptvEpgParser.parse(
@@ -342,7 +344,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 25));
       if (response.statusCode != 200) throw Exception('HTTP '+response.statusCode.toString());
-      if (response.bodyBytes.length > 8*1024*1024) throw Exception('القائمة أكبر من 8 ميغابايت.');
+      if (response.bodyBytes.length > _maxPlaylistBytes) throw Exception('القائمة أكبر من الحد الأقصى (64 ميغابايت).');
       final items = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
       if (items.isEmpty) throw Exception('القائمة لا تحتوي قنوات صالحة.');
       _replace(source,items); await _save(); _toast('تم تحديث '+items.length.toString()+' قناة.');
