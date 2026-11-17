@@ -46,9 +46,9 @@ import 'v31_member_titles.dart';
 import 'v32_future_growth.dart';
 import 'v33_future_universe.dart';
 import 'v22_cinema_discovery.dart';
-import 'ai_assistant.dart';
 import 'local_bot.dart';
 import 'godot_game_launcher.dart';
+import 'iraqi_recipes.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -749,6 +749,9 @@ class _HomePageState extends State<HomePage> {
                 case 'media':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage()));
                   break;
+                case 'recipes':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const IraqiRecipesPage()));
+                  break;
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
@@ -859,6 +862,7 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'v12', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V12 المستقبلية الجديدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v11', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('بوابة V11 الفخمة – كل المميزات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'media', child: ListTile(leading: Icon(Icons.library_music_rounded), title: Text('مكتبة ومشغّل المستقبل'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'recipes', child: ListTile(leading: Icon(Icons.restaurant_menu_rounded), title: Text('مطبخ المستقبل – وصفات عراقية وعربية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dashboard', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('بوابة المستقبل – لوحة يومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'knowledge', child: ListTile(leading: Icon(Icons.lightbulb_outline_rounded), title: Text('ركن المعرفة والاكتشاف اليومي'), contentPadding: EdgeInsets.zero)),
