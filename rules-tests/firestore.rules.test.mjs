@@ -327,3 +327,20 @@ test('friends 2D room can be found by its single roomCode field and joined by a 
   await assertSucceeds(updateDoc(doc(user('alice'), 'arcadeRooms/room-2d-1'), { status: 'playing', updatedAt: serverTimestamp() }));
   await assertFails(getDoc(doc(user('mallory'), 'arcadeRooms/room-2d-1')));
 });
+
+
+test('post voice comments require an owned HTTPS audio URL', async () => {
+  const valid = {
+    authorId: 'alice',
+    authorName: 'Alice',
+    text: '',
+    mediaType: 'audio',
+    audioUrl: 'https://media.example.test/posts/voice-note.m4a',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-voice/comments/voice-1'), valid));
+  await assertFails(setDoc(doc(user('alice'), 'posts/post-voice/comments/voice-2'), {
+    ...valid, audioUrl: 'http://media.example.test/voice-note.m4a',
+  }));
+  await assertFails(setDoc(doc(user('bob'), 'posts/post-voice/comments/voice-3'), valid));
+});
