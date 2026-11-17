@@ -325,7 +325,7 @@ class _V44FutureLabPageState extends State<V44FutureLabPage> {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(children: [
-            Text(_timerLabel, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900, fontFeatures: [FontFeature.tabularFigures()])),
+            Text(_timerLabel, style: const TextStyle(fontSize: 42, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [15, 25, 45].map((minutes) => ChoiceChip(
               label: Text('$minutes دقيقة'),
