@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'watch_party.dart';
 
 class IptvChannel {
   const IptvChannel({required this.name, required this.url, this.group='عام', this.logo='', this.tvgId='', this.source='', this.sourceUrl=''});
@@ -130,17 +131,29 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       ]),
     ));
   }
+  Future<void> _openWatchParty([IptvChannel? channel]) async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(
+      initialUrl: channel?.url,
+      initialName: channel == null ? 'غرفة IPTV جماعية' : 'مشاهدة ${channel.name}',
+      forceDirect: channel != null,
+    )));
+  }
+
   Widget _hero()=>Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(borderRadius:BorderRadius.circular(21),gradient:const LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF4B3D9B),Color(0xFF1B2945),Color(0xFF123A46)])),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     const Icon(Icons.live_tv,color:Color(0xFFE4DEFF),size:32),const SizedBox(height:8),
     const Text('شاهد قنواتك بمكان واحد',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900)),
     const SizedBox(height:5),const Text('استيراد M3U وM3U8، تصنيفات، بحث ومفضلة.',style:TextStyle(color:Colors.white70)),
     const SizedBox(height:10),Text(_channels.length.toString()+' قناة • '+_channels.map((e)=>e.source).toSet().length.toString()+' مصدر • '+_favorites.length.toString()+' مفضلة',style:const TextStyle(color:Colors.white)),
+    const SizedBox(height:12),FilledButton.icon(onPressed:()=>_openWatchParty(),icon:const Icon(Icons.groups_rounded),label:const Text('غرف مشاهدة IPTV مع الأصدقاء')), 
   ]));
   Widget _channelTile(IptvChannel c)=>Card(margin:const EdgeInsets.only(bottom:7),child:ListTile(
     leading:ClipRRect(borderRadius:BorderRadius.circular(9),child:Container(width:46,height:46,color:Theme.of(context).colorScheme.surfaceContainerHighest,padding:const EdgeInsets.all(5),child:c.logo.startsWith('https://')?Image.network(c.logo,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.tv)):const Icon(Icons.tv))),
     title:Text(c.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w800)),
     subtitle:Text(c.group+' • '+c.source,maxLines:1,overflow:TextOverflow.ellipsis),
-    trailing:IconButton(onPressed:()=>_favorite(c),icon:Icon(_favorites.contains(c.id)?Icons.favorite:Icons.favorite_border,color:_favorites.contains(c.id)?Colors.redAccent:null)),
+    trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+      IconButton(tooltip:'شاهد مع الأصدقاء',onPressed:()=>_openWatchParty(c),icon:const Icon(Icons.groups_rounded)),
+      IconButton(tooltip:'المفضلة',onPressed:()=>_favorite(c),icon:Icon(_favorites.contains(c.id)?Icons.favorite:Icons.favorite_border,color:_favorites.contains(c.id)?Colors.redAccent:null)),
+    ]),
     onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>IptvPlayerPage(channel:c))),
   ));
   Future<void> _refreshSource(String source) async {
@@ -196,7 +209,7 @@ class _IptvPlayerPageState extends State<IptvPlayerPage> {
   String _time(Duration d)=>d.inMinutes.toString().padLeft(2,'0')+':'+(d.inSeconds%60).toString().padLeft(2,'0');
   @override Widget build(BuildContext context){
     final p=_player;
-    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(backgroundColor:Colors.black,appBar:AppBar(backgroundColor:Colors.black,title:Text(widget.channel.name,maxLines:1,overflow:TextOverflow.ellipsis)),body:Column(children:[
+    return Directionality(textDirection:TextDirection.rtl,child:Scaffold(backgroundColor:Colors.black,appBar:AppBar(backgroundColor:Colors.black,title:Text(widget.channel.name,maxLines:1,overflow:TextOverflow.ellipsis),actions:[IconButton(tooltip:'شاهد مع الأصدقاء',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>WatchPartyLobbyPage(initialUrl:widget.channel.url,initialName:'مشاهدة ${widget.channel.name}',forceDirect:true))),icon:const Icon(Icons.groups_rounded))]),body:Column(children:[
       Expanded(child:Center(child:_loading?const CircularProgressIndicator(color:Colors.white):_error!=null||p==null||!p.value.isInitialized
         ?Padding(padding:const EdgeInsets.all(24),child:Column(mainAxisSize:MainAxisSize.min,children:[const Icon(Icons.live_tv,color:Colors.white70,size:48),const SizedBox(height:10),Text(_error??'تعذر تشغيل القناة.',textAlign:TextAlign.center,style:const TextStyle(color:Colors.white)),const SizedBox(height:12),FilledButton.icon(onPressed:_initialize,icon:const Icon(Icons.refresh),label:const Text('إعادة المحاولة'))]))
         :AspectRatio(aspectRatio:p.value.aspectRatio>0?p.value.aspectRatio:16/9,child:Stack(fit:StackFit.expand,children:[
