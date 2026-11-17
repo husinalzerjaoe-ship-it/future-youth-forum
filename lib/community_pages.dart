@@ -375,7 +375,7 @@ class _StoriesPageState extends State<StoriesPage>{
    final url=await uploadForumMedia(file,folder:'stories');
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
    await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':expiryMode=='24h'?Timestamp.fromDate(DateTime.now().add(const Duration(hours:24))):null});
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text(expiryMode=='24h'?'تم نشر الستوري وستنتهي بعد 24 ساعة':'تم نشر الستوري وستبقى حتى تحذفها بنفسك')));
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(expiryMode=='24h'?'تم نشر الستوري وستنتهي بعد 24 ساعة':'تم نشر الستوري وستبقى حتى تحذفها بنفسك')));
   }on StorageException catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل تخزين الستوري: ${e.message}')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الستوري: $e')));}
   finally{if(mounted)setState(()=>busy=false);}
  }
