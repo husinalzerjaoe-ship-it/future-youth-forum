@@ -116,10 +116,8 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
   Future<void> _equip(_StyleItem item) async {
     final data=<String,dynamic>{'customTitleUpdatedAt':FieldValue.serverTimestamp()};
     if(item.category=='ألقاب') {
-      data.addAll({'customTitle':item.name,'customTitleColor':item.color,'customTitleEndColor':item.color,
-        'customTitleFont':'default','customTitleGradient':false,'customTitleGlow':true,
-        'customTitleIcon':item.id=='crown'?'👑':item.id=='legend'?'🏆':'⭐',
-        'customTitleExpiresAt':null,'customTitleUpdatedAt':FieldValue.serverTimestamp()});
+      // Keep every owned store title active; never replace the previous title.
+      data['activeStoreTitleIds']=FieldValue.arrayUnion([item.id]);
     } else if(item.category=='إطارات') {
       data.addAll({'profileFrameId':item.id,'profileFrameColor':item.color});
     } else {
