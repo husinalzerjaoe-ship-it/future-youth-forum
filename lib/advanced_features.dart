@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -331,7 +332,75 @@ class _DirectChatPageState extends State<DirectChatPage> {
   final AudioRecorder voiceRecorder = AudioRecorder();
   String? backgroundUrl;
   String searchQuery = '';
-  @override void initState() { super.initState(); _loadBackground(); }
+  Timer? _typingTimer;
+  bool _typingState = false;
+  String? _lastMarkedMessageId;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _messageReadSubscription;
+
+  @override void initState() {
+    super.initState();
+    _loadBackground();
+    _watchIncomingMessages();
+  }
+
+  DocumentReference<Map<String, dynamic>> get _typingRef => _db
+      .collection('conversations').doc(widget.conversationId)
+      .collection('typing').doc(_uid);
+
+  Future<void> _setTyping(bool value) async {
+    if (_typingState == value) return;
+    _typingState = value;
+    try {
+      if (value) {
+        await _typingRef.set({
+          'uid': _uid,
+          'typing': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await _typingRef.delete();
+      }
+    } catch (_) {}
+  }
+
+  void _handleTyping(String value) {
+    _typingTimer?.cancel();
+    if (value.trim().isEmpty) {
+      unawaited(_setTyping(false));
+      return;
+    }
+    unawaited(_setTyping(true));
+    _typingTimer = Timer(const Duration(seconds: 2), () {
+      unawaited(_setTyping(false));
+    });
+  }
+
+  void _watchIncomingMessages() {
+    _messageReadSubscription = _db
+        .collection('conversations').doc(widget.conversationId)
+        .collection('messages')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.docs.isEmpty) return;
+      final latest = snapshot.docs.first;
+      if (latest.data()['senderId'] == _uid || latest.id == _lastMarkedMessageId) return;
+      _lastMarkedMessageId = latest.id;
+      unawaited(_markRead(latest.id));
+    });
+  }
+
+  Future<void> _markRead(String messageId) async {
+    try {
+      await _db.collection('conversations').doc(widget.conversationId)
+          .collection('readReceipts').doc(_uid).set({
+        'uid': _uid,
+        'lastReadMessageId': messageId,
+        'lastReadAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
   Future<void> _loadBackground() async {
     try {
       final snap = await _db.collection('conversations').doc(widget.conversationId).get();
@@ -379,7 +448,14 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تغيير الخلفية. تحقق من صلاحيات تخزين Supabase.')));
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
-  @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
+  @override void dispose() {
+    _typingTimer?.cancel();
+    unawaited(_setTyping(false));
+    _messageReadSubscription?.cancel();
+    controller.dispose();
+    voiceRecorder.dispose();
+    super.dispose();
+  }
   Future<void> send({String? imageUrl, String? audioUrl, String? videoUrl, String? gifUrl, String? sticker, int? durationSeconds}) async {
     final value = (sticker ?? controller.text).trim();
     if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null && gifUrl == null) || busy) return;
@@ -422,6 +498,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
       batch.set(convo, {'lastMessage': sticker != null ? '✨ ملصق' : gifUrl != null ? 'GIF متحرك' : audioUrl != null ? '🎙️ رسالة صوتية' : videoUrl != null ? '🎬 فيديو' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
+      _typingTimer?.cancel();
+      unawaited(_setTyping(false));
       if (mounted) setState(() => replyTo = null);
       try {
         final latestConversation = (await convo.get()).data() ?? {};
@@ -677,7 +755,24 @@ class _DirectChatPageState extends State<DirectChatPage> {
             },
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(widget.otherName)),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.otherName),
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: _db.collection('conversations').doc(widget.conversationId)
+                    .collection('typing').doc(widget.otherUid).snapshots(),
+                builder: (context, typing) {
+                  final data = typing.data?.data() ?? {};
+                  final active = data['typing'] == true;
+                  return Text(
+                    active ? 'يكتب الآن...' : 'محادثة خاصة',
+                    style: TextStyle(fontSize: 10, color: active ? _brand : Colors.white60),
+                  );
+                },
+              ),
+            ],
+          )),
         ]),
         actions: [
           IconButton(
@@ -743,6 +838,13 @@ class _DirectChatPageState extends State<DirectChatPage> {
               final haystack = '${d['text'] ?? ''} ${d['senderName'] ?? ''}'.toLowerCase();
               return haystack.contains(searchQuery);
             }).toList();
+            String? latestOwnMessageId;
+            for (final message in visible) {
+              if (message.data()['senderId'] == _uid) {
+                latestOwnMessageId = message.id;
+                break;
+              }
+            }
             if (visible.isEmpty) return Center(child: Text(searchQuery.isEmpty ? 'ابدأ محادثتك الآن ✨' : 'ماكو رسائل تطابق البحث'));
             return ListView(padding: const EdgeInsets.all(12), children: visible.reversed.map((doc) {
               final d = doc.data(); final mine = d['senderId'] == _uid;
@@ -780,6 +882,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
                         );
                       },
                     ),
+                  if (d['edited'] == true)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 5),
+                      child: Text('تم التعديل', style: TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic)),
+                    ),
                   if (d['isPinned'] == true)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 6),
@@ -807,6 +914,27 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     if (counts.isEmpty) return const SizedBox.shrink();
                     return Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 8, children: counts.entries.map((e) => Text('${e.key} ${e.value}', style: const TextStyle(fontSize: 12))).toList()));
                   }),
+                  if (mine && doc.id == latestOwnMessageId)
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: _db.collection('conversations').doc(widget.conversationId)
+                          .collection('readReceipts').doc(widget.otherUid).snapshots(),
+                      builder: (context, receipt) {
+                        final readAt = receipt.data?.data()?['lastReadAt'];
+                        final sentAt = d['createdAt'];
+                        final wasRead = readAt is Timestamp && sentAt is Timestamp
+                            && !readAt.toDate().isBefore(sentAt.toDate());
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(wasRead ? Icons.done_all_rounded : Icons.done_rounded,
+                                size: 13, color: wasRead ? Colors.blue : Colors.black45),
+                            const SizedBox(width: 4),
+                            Text(wasRead ? 'مقروءة' : 'تم الإرسال',
+                                style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                          ]),
+                        );
+                      },
+                    ),
                 ]),
               )));
             }).toList());
@@ -820,7 +948,7 @@ class _DirectChatPageState extends State<DirectChatPage> {
           IconButton(onPressed: busy ? null : showStickerPacks, tooltip: 'حزم الملصقات', icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.orange)),
           IconButton(onPressed: busy ? null : sendVideo, tooltip: 'إرسال فيديو', icon: const Icon(Icons.video_library_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
-          Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),
+          Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onChanged: _handleTyping, onSubmitted: (_) => send())),
           const SizedBox(width: 8),
           IconButton.filled(onPressed: busy ? null : send, icon: const Icon(Icons.send)),
         ])]))),
