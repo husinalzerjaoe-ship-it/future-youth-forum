@@ -1,4 +1,10 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -198,6 +204,9 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   bool _loading = true;
   bool _muted = false;
   bool _busy = false;
+  final AudioRecorder _commentRecorder = AudioRecorder();
+  bool _recordingComment = false;
+  DateTime? _commentVoiceStarted;
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   CollectionReference<Map<String, dynamic>> get _likes => FirebaseFirestore
@@ -313,8 +322,21 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                                 child: Icon(Icons.person_outline)),
                             title: Text(
                                 (data['authorName'] ?? 'عضو').toString()),
-                            subtitle:
-                                Text((data['text'] ?? '').toString()),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if ((data['text'] ?? '').toString().isNotEmpty)
+                                  Text((data['text'] ?? '').toString()),
+                                if (data['mediaType'] == 'audio' && data['audioUrl'] is String)
+                                  _ReelCommentAudio(url: data['audioUrl'] as String),
+                                if ((data['mediaType'] == 'image' || data['mediaType'] == 'gif') && data['mediaUrl'] is String)
+                                  Padding(padding: const EdgeInsets.only(top: 6),
+                                    child: ClipRRect(borderRadius: BorderRadius.circular(10),
+                                      child: Image.network(data['mediaUrl'] as String, width: 190, height: 150,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) => const Text('تعذر عرض المرفق')))),
+                              ],
+                            ),
                           );
                         }).toList(),
                       );
@@ -323,6 +345,13 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                 ),
                 Row(
                   children: [
+                    IconButton(tooltip: 'إرفاق صورة', onPressed: () => _sendCommentMedia(kind: 'image'),
+                      icon: const Icon(Icons.image_outlined)),
+                    IconButton(tooltip: 'إرفاق GIF متحرك', onPressed: () => _sendCommentMedia(kind: 'gif'),
+                      icon: const Icon(Icons.gif_box_outlined)),
+                    IconButton(tooltip: _recordingComment ? 'إيقاف وإرسال الفويس' : 'تسجيل فويس',
+                      color: _recordingComment ? Colors.red : null, onPressed: _toggleCommentVoice,
+                      icon: Icon(_recordingComment ? Icons.stop_circle : Icons.mic_none)),
                     Expanded(
                       child: TextField(
                         controller: input,
@@ -361,6 +390,120 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
       ),
     );
     input.dispose();
+  }
+
+  Future<void> _shareClipPrivately() async {
+    final profiles = await FirebaseFirestore.instance.collection('publicProfiles').limit(100).get();
+    if (!mounted) return;
+    final candidates = profiles.docs.where((p) => p.id != _uid).toList();
+    final recipient = await showModalBottomSheet<QueryDocumentSnapshot<Map<String, dynamic>>>(
+      context: context, isScrollControlled: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * .65,
+          child: Column(children: [
+            const Padding(padding: EdgeInsets.all(16), child: Text('مشاركة المقطع برسالة خاصة',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            Expanded(child: ListView.builder(
+              itemCount: candidates.length,
+              itemBuilder: (context, index) {
+                final profile = candidates[index];
+                final data = profile.data();
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundImage: (data['photoUrl'] is String && (data['photoUrl'] as String).startsWith('https://'))
+                      ? NetworkImage(data['photoUrl'] as String) : null,
+                    child: const Icon(Icons.person_outline)),
+                  title: Text((data['name'] ?? 'عضو').toString()),
+                  onTap: () => Navigator.pop(sheetContext, profile));
+              })),
+          ]),
+        )),
+      ),
+    );
+    if (recipient == null) return;
+    final otherUid = recipient.id;
+    final otherName = (recipient.data()['name'] ?? 'عضو').toString();
+    final members = <String>[_uid, otherUid]..sort();
+    final conversationId = members.join('_');
+    final db = FirebaseFirestore.instance;
+    final me = await db.collection('publicProfiles').doc(_uid).get();
+    final myName = (me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو').toString();
+    final conversation = db.collection('conversations').doc(conversationId);
+    await conversation.set({
+      'members': members, 'memberA': members[0], 'memberB': members[1],
+      'memberNames': {_uid: myName, otherUid: otherName},
+      'lastMessage': '🎬 تمت مشاركة مقطع من مقاطع الملتقى',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    await conversation.collection('messages').add({
+      'text': '🎬 شاهد هذا المقطع من ملتقى شباب المستقبل',
+      'type': 'video', 'videoUrl': widget.clip.data()['videoUrl'],
+      'senderId': _uid, 'senderRole': 'member', 'senderName': myName,
+      'createdAt': FieldValue.serverTimestamp(),
+      'sharedClipId': widget.clip.id,
+    });
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('تمت مشاركة المقطع مع $otherName')));
+  }
+
+  Future<void> _sendCommentMedia({required String kind}) async {
+    try {
+      XFile? file;
+      if (kind == 'gif') {
+        final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['gif']);
+        final path = picked?.files.single.path;
+        if (path != null) file = XFile(path, name: picked!.files.single.name);
+      } else {
+        file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      }
+      if (file == null) return;
+      final url = await uploadForumMedia(file, folder: 'stories');
+      final profile = await FirebaseFirestore.instance.collection('publicProfiles').doc(_uid).get();
+      await _comments.add({
+        'authorId': _uid, 'authorName': profile.data()?['name'] ?? 'عضو',
+        'text': '', 'mediaType': kind == 'gif' ? 'gif' : 'image',
+        'mediaUrl': url, 'mediaFormat': kind == 'gif' ? 'gif' : 'image',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إرفاق الصورة: $error')));
+    }
+  }
+
+  Future<void> _toggleCommentVoice() async {
+    try {
+      if (!_recordingComment) {
+        if (!await _commentRecorder.hasPermission()) throw StateError('يلزم السماح باستخدام الميكروفون.');
+        final dir = await getTemporaryDirectory();
+        final path = '${dir.path}/reel_comment_${DateTime.now().millisecondsSinceEpoch}.m4a';
+        await _commentRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 64000, sampleRate: 44100),
+          path: path);
+        if (mounted) setState(() { _recordingComment = true; _commentVoiceStarted = DateTime.now(); });
+        return;
+      }
+      final path = await _commentRecorder.stop();
+      final started = _commentVoiceStarted;
+      if (mounted) setState(() { _recordingComment = false; _commentVoiceStarted = null; });
+      if (path == null || started == null) return;
+      final seconds = DateTime.now().difference(started).inSeconds.clamp(1, 180);
+      final url = await uploadForumMedia(
+        XFile(path, name: 'reel_comment_${DateTime.now().millisecondsSinceEpoch}.m4a'),
+        folder: 'voice-messages');
+      final profile = await FirebaseFirestore.instance.collection('publicProfiles').doc(_uid).get();
+      await _comments.add({
+        'authorId': _uid, 'authorName': profile.data()?['name'] ?? 'عضو',
+        'text': '', 'mediaType': 'audio', 'audioUrl': url,
+        'durationSeconds': seconds, 'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      if (mounted) setState(() => _recordingComment = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تسجيل التعليق الصوتي: $error')));
+    }
   }
 
   Future<void> _reportClip() async {
@@ -430,6 +573,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   @override
   void dispose() {
     _video?.dispose();
+    _commentRecorder.dispose();
     super.dispose();
   }
 
@@ -531,6 +675,12 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                         color: Colors.white,
                         onPressed: _showComments,
                         icon: const Icon(Icons.mode_comment_outlined),
+                      ),
+                      IconButton(
+                        color: Colors.white,
+                        tooltip: 'مشاركة برسالة خاصة',
+                        onPressed: _shareClipPrivately,
+                        icon: const Icon(Icons.send_outlined),
                       ),
                       IconButton(
                         color: Colors.white,
