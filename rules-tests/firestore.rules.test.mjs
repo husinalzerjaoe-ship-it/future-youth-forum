@@ -180,3 +180,45 @@ test('users cannot read another member private cinema favourites', async () => {
   await assertSucceeds(getDoc(doc(user('alice'), 'users/alice/cinemaFavorites/film-1')));
   await assertFails(getDoc(doc(user('bob'), 'users/alice/cinemaFavorites/film-1')));
 });
+
+
+test('private friends quiz room supports code join, member chat, and blocks outsiders after start', async () => {
+  const room = doc(user('alice'), 'gameRooms/123456');
+  await assertSucceeds(setDoc(room, {
+    game: 'football_quiz',
+    hostId: 'alice',
+    roomCode: '123456',
+    members: ['alice'],
+    memberNames: { alice: 'Alice' },
+    status: 'waiting',
+    round: 0,
+    answers: {},
+    scores: { alice: 0 },
+    mode: '1v1',
+  }));
+
+  // A signed-in friend who has the room code can open the waiting room and join.
+  await assertSucceeds(getDoc(doc(user('bob'), 'gameRooms/123456')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'gameRooms/123456'), {
+    members: ['alice', 'bob'],
+    memberNames: { alice: 'Alice', bob: 'Bob' },
+    scores: { alice: 0, bob: 0 },
+    updatedAt: serverTimestamp(),
+  }));
+
+  await assertSucceeds(setDoc(doc(user('bob'), 'gameRooms/123456/chat/bob-1'), {
+    uid: 'bob', name: 'Bob', text: 'جاهز نبدأ؟', createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'gameRooms/123456/chat/outside-1'), {
+    uid: 'mallory', name: 'Mallory', text: 'رسالة من خارج الغرفة',
+  }));
+
+  await assertSucceeds(updateDoc(doc(user('alice'), 'gameRooms/123456'), {
+    status: 'playing',
+    round: 0,
+    answers: {},
+    scores: { alice: 0, bob: 0 },
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(getDoc(doc(user('mallory'), 'gameRooms/123456')));
+});
