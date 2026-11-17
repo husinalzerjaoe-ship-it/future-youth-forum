@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp, deleteField
+  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, deleteField
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -223,7 +223,7 @@ test('private conversation typing and read receipts are visible only to particip
   await assertFails(setDoc(doc(user('mallory'), 'conversations/dm-presence/typing/mallory'), {
     uid: 'mallory', typing: true, updatedAt: serverTimestamp(),
   }));
-  await assertSucceeds(aliceTyping.delete());
+  await assertSucceeds(deleteDoc(aliceTyping));
 
   const aliceReceipt = doc(user('alice'), 'conversations/dm-presence/readReceipts/alice');
   await assertSucceeds(setDoc(aliceReceipt, {
