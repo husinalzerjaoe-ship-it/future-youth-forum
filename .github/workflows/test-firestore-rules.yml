@@ -10,6 +10,7 @@ on:
       - feature/v38-ultimate-all-in-one
       - feature/v40-full-community-release
       - feature/v47-shared-iptv-library
+      - feature/v48-community-evolution
     paths:
       - 'firestore.rules'
       - 'rules-tests/**'
