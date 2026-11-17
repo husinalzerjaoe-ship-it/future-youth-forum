@@ -368,11 +368,16 @@ class _DirectChatPageState extends State<DirectChatPage> {
   Future<void> sendGif() async {
     if (busy) return;
     try {
-      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif']);
-      final path = picked?.files.single.path;
-      if (path == null || !mounted) return;
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif'], allowMultiple: false, withData: false);
+      final file = picked?.files.single;
+      final path = file?.path;
+      if (file == null || path == null || !mounted) return;
+      if (file.size > 15 * 1024 * 1024) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم GIF يجب ألا يتجاوز 15 ميغابايت')));
+        return;
+      }
       setState(() => busy = true);
-      final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'private-chat');
+      final url = await uploadForumMedia(XFile(path, name: file.name), folder: 'private-chat');
       if (mounted) setState(() => busy = false);
       await send(gifUrl: url);
     } catch (e) {
@@ -382,11 +387,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
 
   Future<void> showStickerPacks() async {
     const packs = <String, List<String>>{
-      'ضحك وميمز': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏'],
-      'حب ومشاعر': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','💖','💘','💕'],
-      'ردود وتفاعل': ['👍','👎','👏','🙌','🤝','🙏','👌','✌️','🤟','🫡','💯','🔥'],
-      'لطافة': ['🥹','😍','🥰','😘','🫶','🐱','🐼','🐻','🌸','🌹','✨','⭐'],
-      'رياضة وألعاب': ['⚽','🏆','🎮','🎯','🎲','🏀','🎉','🚀','👑','💎','🎵','🎧'],
+      'ضحك وميمز': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏','😅','😄','😁','😃','😆','😝','🫠','😬','😳','😱','🤯','😴','🥱','🤔','🙄','😤','🤫','🫣'],
+      'حب ومشاعر': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','💘','💝','💟','❣️','🌹','🌷','🌸','💐','🫶','🥰','😍','😘','💋','💌','💍'],
+      'ردود وتفاعل': ['👍','👎','👏','🙌','🤝','🙏','👌','✌️','🤟','🫡','💯','🔥','⭐','🌟','✨','🎉','🎊','🏆','🥇','✅','❌','👀','💪','🫰','👋','🖐️','🤌','🫂','💡','📌'],
+      'لطافة وحيوانات': ['🥹','😍','🥰','😘','🫶','🐱','🐼','🐻','🌸','🌹','✨','⭐','🐶','🐨','🦊','🐸','🐵','🐰','🐹','🐣','🦄','🐧','🦋','🐢','🐬','🦁','🐯','🐮','🐷','🐙'],
+      'رياضة وألعاب': ['⚽','🏆','🎮','🎯','🎲','🏀','🎉','🚀','👑','💎','🎵','🎧','🏐','🕹️','♟️','🏓','🎤','🎬','🎨','🌙','☀️','⚡','🛸','🏁','🎸','🥁','🎹','🧩','🪄','📚'],
     };
     final chosen = await showModalBottomSheet<String>(
       context: context, isScrollControlled: true, showDragHandle: true,
