@@ -1695,7 +1695,7 @@ class EditProfilePage extends StatefulWidget {
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 class _EditProfilePageState extends State<EditProfilePage> {
-  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController();
+  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController(), title = TextEditingController();
   bool loading = true, saving = false, uploadingPhoto = false;
   @override
   void initState() {
@@ -1705,11 +1705,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       name.text = d['name'] as String? ?? '';
       bio.text = d['bio'] as String? ?? '';
       photo.text = d['photoUrl'] as String? ?? '';
+      title.text = d['customTitle'] as String? ?? '';
       if (mounted) setState(() => loading = false);
     });
   }
   @override
-  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); title.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
     appBar: AppBar(title: const Text('تعديل الملف الشخصي')),
@@ -1717,6 +1718,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم الظاهر', border: OutlineInputBorder())),
       const SizedBox(height: 12),
       TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
+      const SizedBox(height: 12),
+      TextField(controller: title, maxLength: 32, decoration: const InputDecoration(labelText: 'لقبك الشخصي', hintText: 'مثلاً: عاشق الأنمي ⭐', border: OutlineInputBorder())),
+      const SizedBox(height: 6),
+      const Text('تگدر تختار لقب لنفسك، أو تشتري ألقاب جاهزة من المتجر. اللقب يظهر بملفك والدردشة.',style:TextStyle(fontSize:12,color:Colors.grey)),
       const SizedBox(height: 12),
       TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
       const SizedBox(height: 10),
@@ -1743,7 +1748,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => saving = true);
         try {
           final u = FirebaseAuth.instance.currentUser!;
-          await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          final profileRef = db.collection('publicProfiles').doc(u.uid);
+          await profileRef.set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          await profileRef.update({
+            'customTitle': title.text.trim(),
+            'customTitleColor': 0xFF6554D9,
+            'customTitleEndColor': 0xFF168E9B,
+            'customTitleFont': 'default',
+            'customTitleGradient': true,
+            'customTitleGlow': false,
+            'customTitleIcon': '',
+            'customTitleExpiresAt': null,
+            'customTitleUpdatedAt': FieldValue.serverTimestamp(),
+          });
           await u.updateDisplayName(name.text.trim());
           if (context.mounted) Navigator.pop(context);
         } catch (_) {
