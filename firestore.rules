@@ -446,12 +446,15 @@ service cloud.firestore {
       allow create: if request.auth != null && accountNotBanned() && chatNotMuted()
         && request.resource.data.senderId == request.auth.uid
         && request.resource.data.senderRole == (isFounder() ? 'founder' : 'member')
-        && request.resource.data.type in ['text', 'image', 'sticker', 'voice', 'video']
+        && request.resource.data.type in ['text', 'image', 'sticker', 'voice', 'video', 'gif']
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 1000
         && (
           (request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
           || (request.resource.data.type == 'sticker' && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 16)
+          || (request.resource.data.type == 'gif'
+            && ((request.resource.data.get('gifUrl', '') is string && request.resource.data.get('gifUrl', '').matches('https://.*'))
+              || (request.resource.data.get('imageUrl', '') is string && request.resource.data.get('imageUrl', '').matches('https://.*'))))
           || (request.resource.data.type == 'image'
             && request.resource.data.imageUrl is string
             && request.resource.data.imageUrl.matches('https://.*'))
@@ -807,6 +810,12 @@ service cloud.firestore {
           && request.resource.data.text.size() <= 1000
           && (
             (request.resource.data.type == 'text' && request.resource.data.text.size() > 0)
+            || (request.resource.data.type == 'sticker'
+              && request.resource.data.text.size() > 0
+              && request.resource.data.text.size() <= 16)
+            || (request.resource.data.type == 'gif'
+              && request.resource.data.gifUrl is string
+              && request.resource.data.gifUrl.matches('https://.*'))
             || (request.resource.data.type == 'image'
               && request.resource.data.imageUrl is string
               && request.resource.data.imageUrl.matches('https://.*'))
