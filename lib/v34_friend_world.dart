@@ -332,6 +332,8 @@ class _FriendWorldLobbyPageState extends State<FriendWorldLobbyPage> {
       if (result.docs.isEmpty) throw StateError('ما لقينا غرفة بهذا الرمز. تأكد من الأرقام الستة.');
       if (result.docs.length > 1) throw StateError('الرمز غير فريد، اطلب من صديقك إنشاء غرفة جديدة.');
       final ref = result.docs.first.reference;
+      final profile = await _db.collection('publicProfiles').doc(_uid).get();
+      final memberName = (profile.data()?['name'] ?? _name).toString();
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
         final data = snap.data() ?? {};
@@ -340,7 +342,11 @@ class _FriendWorldLobbyPageState extends State<FriendWorldLobbyPage> {
         if (data['roomCode']?.toString() != code) throw StateError('رمز الغرفة غير مطابق.');
         if (members.contains(_uid)) return;
         if (data['status'] != 'waiting' || members.length >= 4) throw StateError('الغرفة بدأت أو اكتمل عدد اللاعبين.');
-        tx.update(ref, {'members': [...members, _uid], 'updatedAt': FieldValue.serverTimestamp()});
+        tx.update(ref, {
+          'members': [...members, _uid],
+          'memberNames.$_uid': memberName,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       });
       if (mounted) setState(() => _roomId = ref.id);
       _code.clear();
