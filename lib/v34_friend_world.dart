@@ -328,14 +328,16 @@ class _FriendWorldLobbyPageState extends State<FriendWorldLobbyPage> {
     }
     setState(() => _busy = true);
     try {
-      final result = await _db.collection('arcadeRooms').where('roomCode', isEqualTo: code).where('status', isEqualTo: 'waiting').limit(1).get();
-      if (result.docs.isEmpty) throw StateError('الغرفة غير موجودة.');
+      final result = await _db.collection('arcadeRooms').where('roomCode', isEqualTo: code).limit(2).get();
+      if (result.docs.isEmpty) throw StateError('ما لقينا غرفة بهذا الرمز. تأكد من الأرقام الستة.');
+      if (result.docs.length > 1) throw StateError('الرمز غير فريد، اطلب من صديقك إنشاء غرفة جديدة.');
       final ref = result.docs.first.reference;
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
         final data = snap.data() ?? {};
         final members = List<String>.from(data['members'] ?? const []);
         if (data['gameId'] != 'arcade_friend_world') throw StateError('هذا الرمز ليس لعالم الأصدقاء.');
+        if (data['roomCode']?.toString() != code) throw StateError('رمز الغرفة غير مطابق.');
         if (members.contains(_uid)) return;
         if (data['status'] != 'waiting' || members.length >= 4) throw StateError('الغرفة بدأت أو اكتمل عدد اللاعبين.');
         tx.update(ref, {'members': [...members, _uid], 'updatedAt': FieldValue.serverTimestamp()});
