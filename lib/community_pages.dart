@@ -37,6 +37,20 @@ import 'future_arcade.dart';
 import 'v39_daily_challenges.dart';
 import 'v39_creator_links.dart';
 import 'v40_party_deck.dart';
+import 'advanced_features.dart';
+import 'cinema_hub.dart';
+import 'football_live_center.dart';
+import 'premium_media_hub.dart';
+import 'social_party_games.dart';
+import 'multiplayer_arcade.dart';
+import 'friends_battle_arena.dart';
+import 'future_dashboard.dart';
+import 'future_planner.dart';
+import 'future_studio.dart';
+import 'future_culture_hub.dart';
+import 'future_life_hub.dart';
+import 'future_style_store.dart';
+import 'future_utility_studio.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -63,6 +77,22 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
   (title:'عالم الوناسة',subtitle:'تحديات جماعية وألغاز وتمثيل وألعاب خفيفة بدون إنترنت',category:'الألعاب',icon:Icons.celebration_rounded,page:const FriendsFunWorldPage()),
   (title:'مكتبة 100 تحدي V40',subtitle:'مئة بطاقة متنوعة مع نقاط وجولات ومسابقة أونلاين منفصلة',category:'الألعاب',icon:Icons.style_rounded,page:const V40PartyDeckPage()),
+  (title:'ساحة معركة الأصدقاء',subtitle:'تحديات وأسئلة وساحة كنز بين الأصدقاء',category:'الألعاب',icon:Icons.emoji_events_rounded,page:const FriendsBattleArenaPage()),
+  (title:'ألعاب السهرة الجماعية',subtitle:'الجاسوس والذئب وارسم وخمّن وسباق النرد',category:'الألعاب',icon:Icons.theater_comedy_rounded,page:const SocialPartyGamesPage()),
+  (title:'الأركيد متعدد اللاعبين',subtitle:'غرف ألعاب أونلاين ومنافسات XO',category:'الألعاب',icon:Icons.sports_esports_rounded,page:const MultiplayerArcadePage()),
+  (title:'سينما الملتقى',subtitle:'اكتشف الأفلام والمسلسلات وقوائم المشاهدة',category:'الترفيه',icon:Icons.movie_filter_rounded,page:const CinemaHubPage()),
+  (title:'مركز الكرة المباشر',subtitle:'متابعة مباريات وبطولات وروابط مصادر البث',category:'الترفيه',icon:Icons.sports_soccer_rounded,page:const FootballLiveCenterPage()),
+  (title:'مكتبة الوسائط والمشغل',subtitle:'ملفاتك الصوتية والمرئية ومكتبة تشغيل محلية',category:'الترفيه',icon:Icons.perm_media_rounded,page:const PremiumMediaHubPage()),
+  (title:'لوحة المستقبل',subtitle:'عادات يومية ومؤشرات تقدم واقتباس اليوم',category:'المعرفة',icon:Icons.dashboard_customize_rounded,page:const FutureDashboardPage()),
+  (title:'مخطط المستقبل',subtitle:'مهام وعادات وملاحظات ويوميات محفوظة محلياً',category:'المعرفة',icon:Icons.event_note_rounded,page:const FuturePlannerPage()),
+  (title:'الاستوديو الإبداعي',subtitle:'صمّم بطاقات واقتباسات وشارك أفكارك',category:'الثقافة',icon:Icons.brush_rounded,page:const FutureStudioPage()),
+  (title:'المكتبة الثقافية الموسعة',subtitle:'شعر واقتباسات ومحتوى ثقافي عربي',category:'الثقافة',icon:Icons.library_books_rounded,page:const FutureCultureHubPage()),
+  (title:'دليل الحياة اليومية',subtitle:'قوائم شخصية وأهداف وتنظيم اهتماماتك',category:'المعرفة',icon:Icons.checklist_rounded,page:const FutureLifeHubPage()),
+  (title:'استوديو الأدوات الذكية',subtitle:'حاسبات وتحويل وحدات وأدوات يومية',category:'المعرفة',icon:Icons.calculate_rounded,page:const FutureUtilityStudioPage()),
+  (title:'متجر الألقاب والإطارات',subtitle:'استعرض الزخارف والألقاب المتاحة لحسابك',category:'المجتمع',icon:Icons.workspace_premium_rounded,page:const FutureStyleStorePage()),
+  (title:'الإشعارات',subtitle:'تنبيهات الرسائل والتعليقات والتفاعلات',category:'التواصل',icon:Icons.notifications_active_rounded,page:const NotificationsPage()),
+  (title:'منشوراتي المحفوظة',subtitle:'ارجع للمنشورات التي حفظتها',category:'المجتمع',icon:Icons.bookmark_rounded,page:const SavedPostsPage()),
+  (title:'الأمان وقائمة الحظر',subtitle:'راجع الأعضاء الذين حظرتهم وإعدادات الأمان',category:'المجتمع',icon:Icons.shield_rounded,page:const MemberSafetyPage()),
   (title:'مدينة الألعاب 2D',subtitle:'ألعاب أركيد وطاولات وألغاز ومغامرات',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const FutureArcadePage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
