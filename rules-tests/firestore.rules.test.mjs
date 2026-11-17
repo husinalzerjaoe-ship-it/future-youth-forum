@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, query, where, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
+  doc, collection, getDoc, getDocs, query, where, Filter, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -36,25 +36,24 @@ async function seed(path, data) {
   });
 }
 
-test('a member can list only their own private conversations with the inbox array-contains query', async () => {
-  await seed('conversations/dm-alice-bob', { members: ['alice', 'bob'], lastMessage: 'hello' });
-  await seed('conversations/dm-alice-carol', { members: ['alice', 'carol'], lastMessage: 'hi' });
-  await seed('conversations/dm-bob-carol', { members: ['bob', 'carol'], lastMessage: 'private' });
+test('the inbox OR query lists only conversations indexed to the signed-in member', async () => {
+  await seed('conversations/dm-alice-bob', { members: ['alice', 'bob'], memberA: 'alice', memberB: 'bob', lastMessage: 'hello' });
+  await seed('conversations/dm-alice-carol', { members: ['alice', 'carol'], memberA: 'alice', memberB: 'carol', lastMessage: 'hi' });
+  await seed('conversations/dm-bob-carol', { members: ['bob', 'carol'], memberA: 'bob', memberB: 'carol', lastMessage: 'private' });
 
-  const aliceInbox = await getDocs(query(
-    collection(user('alice'), 'conversations'),
-    where('members', 'array-contains', 'alice'),
-  ));
+  const inboxQuery = (uid) => query(
+    collection(user(uid), 'conversations'),
+    Filter.or(where('memberA', '==', uid), where('memberB', '==', uid)),
+  );
+  const aliceInbox = await getDocs(inboxQuery('alice'));
   assert.equal(aliceInbox.size, 2);
   assert.deepEqual(
     aliceInbox.docs.map((entry) => entry.id).sort(),
     ['dm-alice-bob', 'dm-alice-carol'],
   );
-
-  const malloryInbox = await getDocs(query(
-    collection(user('mallory'), 'conversations'),
-    where('members', 'array-contains', 'mallory'),
-  ));
+  const bobInbox = await getDocs(inboxQuery('bob'));
+  assert.equal(bobInbox.size, 2);
+  const malloryInbox = await getDocs(inboxQuery('mallory'));
   assert.equal(malloryInbox.size, 0);
 });
 
