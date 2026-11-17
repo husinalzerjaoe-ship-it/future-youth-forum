@@ -327,10 +327,68 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     } catch(e) { _toast('فشل تحديث المصدر: '+e.toString()); }
     finally { if(mounted) setState(() => _busy = false); }
   }
+  Future<void> _refreshSharedSources() async {
+    final email = FirebaseAuth.instance.currentUser?.email?.toLowerCase();
+    if (email != 'husinalzerjaoe@gmail.com') return;
+    setState(() => _busy = true);
+    var updated = 0;
+    var skipped = 0;
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('iptvSharedPlaylists')
+          .get()
+          .timeout(const Duration(seconds: 20));
+      for (final doc in snapshot.docs) {
+        if (!mounted) return;
+        final data = doc.data();
+        final sourceUrl = data['sourceUrl']?.toString() ?? '';
+        final sourceName = data['name']?.toString() ?? 'قائمة IPTV';
+        final uri = Uri.tryParse(sourceUrl);
+        if (uri == null || !{'http', 'https'}.contains(uri.scheme) || uri.host.isEmpty) {
+          skipped++;
+          continue;
+        }
+        try {
+          final response = await http.get(uri).timeout(const Duration(seconds: 25));
+          if (response.statusCode != 200 || response.bodyBytes.length > 8 * 1024 * 1024) {
+            skipped++;
+            continue;
+          }
+          final items = IptvPlaylistParser.parse(
+            utf8.decode(response.bodyBytes, allowMalformed: true),
+            source: sourceName,
+            sourceUrl: uri.toString(),
+            baseUri: uri,
+          );
+          if (items.isEmpty || !await _publishSharedPlaylist(sourceName, items, sourceUrl: uri.toString())) {
+            skipped++;
+            continue;
+          }
+          updated++;
+        } catch (_) {
+          skipped++;
+        }
+      }
+      _toast('تحديث المكتبة المشتركة: تم تحديث $updated قائمة، وتعذر تحديث $skipped.');
+    } catch (e) {
+      _toast('تعذر تحديث المكتبة المشتركة: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _refreshAllSources() async {
     final sources = _channels.where((e)=>e.sourceUrl.isNotEmpty).map((e)=>e.source).toSet().toList();
-    if(sources.isEmpty){_toast('لا توجد قوائم روابط لتحديثها.');return;}
-    for(final source in sources){if(!mounted)return;await _refreshSource(source);}
+    final isFounder = FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com';
+    if (sources.isEmpty && !isFounder) {
+      _toast('لا توجد قوائم روابط محلية لتحديثها.');
+      return;
+    }
+    for (final source in sources) {
+      if (!mounted) return;
+      await _refreshSource(source);
+    }
+    if (isFounder) await _refreshSharedSources();
   }
   Future<void> _manageSources() async {
     final sources=_channels.map((e)=>e.source).toSet().toList()..sort();
