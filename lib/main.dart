@@ -1474,18 +1474,42 @@ class _PublicChatPageState extends State<PublicChatPage> {
     } on StorageException catch (e) { if (mounted) setState(() => sendError = 'فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}'); } catch (e) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة: $e'); }
   }
 
+  Future<void> sendGif() async {
+    if (sending) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif']);
+      final path = picked?.files.single.path;
+      if (path == null) return;
+      setState(() { sending = true; sendError = null; });
+      final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'public-chat');
+      await _send(imageUrl: url, type: 'gif');
+    } catch (e) {
+      if (mounted) setState(() => sendError = 'تعذر إرسال GIF: $e');
+    } finally { if (mounted) setState(() => sending = false); }
+  }
+
   void showStickers() {
-    showModalBottomSheet<void>(context: context, showDragHandle: true, backgroundColor: Colors.white,
-      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Row(children: [Icon(Icons.emoji_emotions_outlined, color: brand), SizedBox(width: 8), Text('ملصقات سريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17))]),
-          const SizedBox(height: 12),
-          GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 4, childAspectRatio: 1.35,
-            children: stickers.map((sticker) => InkWell(borderRadius: BorderRadius.circular(16),
-              onTap: () { Navigator.pop(sheet); _send(text: sticker, type: 'sticker'); },
-              child: Center(child: Text(sticker, style: const TextStyle(fontSize: 34))))).toList()),
-        ]),
+    const packs = <String, List<String>>{
+      'ضحك': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏'],
+      'حب': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','💖','💘','💕'],
+      'تفاعل': ['👍','👎','👏','🙌','🤝','🙏','👌','✌️','🤟','🫡','💯','🔥'],
+      'لطافة': ['🥹','😍','🥰','😘','🫶','🐱','🐼','🐻','🌸','🌹','✨','⭐'],
+      'ألعاب': ['⚽','🏆','🎮','🎯','🎲','🏀','🎉','🚀','👑','💎','🎵','🎧'],
+    };
+    showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true, backgroundColor: Colors.white,
+      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(
+        child: SizedBox(height: MediaQuery.of(sheet).size.height * .58,
+          child: DefaultTabController(length: packs.length, child: Column(children: [
+            const Padding(padding: EdgeInsets.all(12), child: Text('حزم الملصقات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            TabBar(isScrollable: true, tabs: packs.keys.map((name) => Tab(text: name)).toList()),
+            Expanded(child: TabBarView(children: packs.values.map((items) => GridView.count(
+              crossAxisCount: 4, children: items.map((sticker) => InkWell(
+                onTap: () { Navigator.pop(sheet); _send(text: sticker, type: 'sticker'); },
+                child: Center(child: Text(sticker, style: const TextStyle(fontSize: 36))),
+              )).toList(),
+            )).toList())),
+          ])),
+        ),
       )));
   }
 
@@ -1542,7 +1566,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
                     const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold))],
                 ])));
             }),
-        if (type == 'image' && imageUrl != null)
+        if ((type == 'image' || type == 'gif') && imageUrl != null)
           ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.network(imageUrl, width: 230, fit: BoxFit.cover,
             loadingBuilder: (c, child, progress) => progress == null ? child : const SizedBox(width: 230, height: 150, child: Center(child: CircularProgressIndicator())),
             errorBuilder: (c, e, st) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر عرض الصورة')))),
@@ -1581,7 +1605,8 @@ class _PublicChatPageState extends State<PublicChatPage> {
     Container(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .06), blurRadius: 12, offset: const Offset(0, -3))]),
       child: SafeArea(top: false, child: Row(children: [
-        IconButton(onPressed: sending ? null : sendImage, tooltip: 'إرسال صورة أو GIF', icon: const Icon(Icons.image_rounded, color: brand, size: 25)),
+        IconButton(onPressed: sending ? null : sendImage, tooltip: 'إرسال صورة', icon: const Icon(Icons.image_rounded, color: brand, size: 25)),
+        IconButton(onPressed: sending ? null : sendGif, tooltip: 'إرسال GIF متحرك', icon: const Icon(Icons.gif_box_rounded, color: Colors.deepPurple, size: 27)),
         IconButton(onPressed: sending ? null : showStickers, tooltip: 'ملصقات', icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFE6A52C), size: 25)),
         Expanded(child: TextField(controller: messageController, minLines: 1, maxLines: 4, maxLength: 1000,
           textInputAction: TextInputAction.send, onSubmitted: (_) => sendMessage(),
