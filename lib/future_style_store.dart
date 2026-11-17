@@ -97,10 +97,27 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
         tx.update(_wallet,{'coins':coins-item.price,'updatedAt':FieldValue.serverTimestamp()});
         tx.set(inventoryRef,{'itemId':item.id,'name':item.name,'category':item.category,'price':item.price,'purchasedAt':FieldValue.serverTimestamp()});
       });
-      await _equip(item);
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(owned?'العنصر موجود عندك وتم تفعيله':'تم الشراء والتفعيل بنجاح')));
+      // Buying and equipping are separate outcomes. Preserve a completed
+      // purchase even if updating the public profile fails afterwards.
+      try {
+        await _equip(item);
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(owned?'العنصر موجود عندك وتم تفعيله':'تم الشراء والتفعيل بنجاح')));
+      } catch (equipError) {
+        if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:Text(owned
+            ? 'العنصر محفوظ بمخزونك، لكن تعذر تفعيله حالياً: $equipError'
+            : 'تم الشراء وحُفظ العنصر بمخزونك، لكن تعذر إظهاره بالملف حالياً: $equipError'),
+          duration:const Duration(seconds:6),
+        ));
+      }
     }catch(e){
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('ما تم الشراء: ${e.toString().replaceFirst('Bad state: ','')}')));
+      final detail=e is FirebaseException
+        ? '${e.code}: ${e.message ?? e.toString()}'
+        : e.toString().replaceFirst('Bad state: ','');
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content:Text('تعذر إكمال الشراء: $detail'),
+        duration:const Duration(seconds:6),
+      ));
     }finally{if(mounted)setState(()=>_busy=false);}
   }
   @override Widget build(BuildContext context){
