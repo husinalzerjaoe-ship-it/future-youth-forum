@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'advanced_features.dart';
@@ -143,7 +144,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final expiry = membership['expiresAt'];
       final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
       final sentMessage = await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':'imageUrl'):mediaUrl,if(mediaFormat!=null)'mediaFormat':mediaFormat,if(durationSeconds!=null)'durationSeconds':durationSeconds,
+        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':type=='gif'?'gifUrl':'imageUrl'):mediaUrl,if(mediaFormat!=null)'mediaFormat':mediaFormat,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
@@ -207,6 +208,20 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _sendGif() async {
+    if (_sending) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif']);
+      final path = picked?.files.single.path;
+      if (path == null) return;
+      if (mounted) setState(() { _sending = true; _error = null; });
+      final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'public-chat');
+      await _send(body: 'GIF', mediaUrl: url, type: 'gif', uploadInProgress: true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر إرسال GIF: $e');
+    } finally { if (mounted) setState(() => _sending = false); }
   }
 
   Future<void> _sendVideo() async {
@@ -600,7 +615,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
-        if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
+        if((type=='image'&&d['imageUrl'] is String)||(type=='gif'&&d['gifUrl'] is String))ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network((type=='gif'?d['gifUrl']:d['imageUrl']) as String,width:230,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='video'&&d['videoUrl'] is String)_ChatVideoMessage(url:d['videoUrl'] as String),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
