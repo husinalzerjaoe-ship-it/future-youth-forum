@@ -512,6 +512,17 @@ test('post voice comments require an owned HTTPS audio URL', async () => {
     ...valid, audioUrl: 'http://media.example.test/voice-note.m4a',
   }));
   await assertFails(setDoc(doc(user('bob'), 'posts/post-voice/comments/voice-3'), valid));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-media/comments/image-1'), {
+    authorId: 'alice', authorName: 'Alice', text: '', mediaType: 'image',
+    mediaUrl: 'https://media.example.test/reels/comment.jpg', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-media/comments/gif-1'), {
+    authorId: 'alice', authorName: 'Alice', text: '', mediaType: 'gif',
+    mediaUrl: 'https://media.example.test/reels/comment.gif', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-voice/comments/voice-4'), {
+    ...valid, durationSeconds: 24,
+  }));
 });
 
 
