@@ -69,6 +69,7 @@ import 'v52_community_reels.dart';
 import 'v53_community_hub.dart';
 import 'v54_world_community.dart';
 import 'dns_helper.dart';
+import 'v55_foreground_notifications.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -265,6 +266,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
   Color _accent = brand;
   bool _reduceMotion = false;
   bool _compactCards = false;
+  final V55ForegroundNotificationService _v55Notifications = V55ForegroundNotificationService();
   @override
   void initState() {
     super.initState();
@@ -272,6 +274,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
     v17ReduceMotionNotifier.addListener(_visualPreferencesChanged);
     v17CompactCardsNotifier.addListener(_visualPreferencesChanged);
     _loadVisualPreferences();
+    _v55Notifications.start();
   }
 
   void _visualPreferencesChanged() {
@@ -288,6 +291,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
     v17AccentNotifier.removeListener(_visualPreferencesChanged);
     v17ReduceMotionNotifier.removeListener(_visualPreferencesChanged);
     v17CompactCardsNotifier.removeListener(_visualPreferencesChanged);
+    _v55Notifications.dispose();
     super.dispose();
   }
 
