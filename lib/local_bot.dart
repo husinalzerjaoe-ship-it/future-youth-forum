@@ -197,6 +197,10 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
     if (value.isEmpty || thinking) return;
 
     final history = messages
+        .reversed
+        .take(12)
+        .toList()
+        .reversed
         .map((item) => {
               'role': item['from'] == 'user' ? 'user' : 'assistant',
               'content': item['text'] ?? '',
@@ -277,7 +281,7 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Text(
-                'تُرسل رسالتك إلى خدمة المساعد للرد عليها، ويُحفظ سجل المحادثة على هذا الجهاز. لا ترسل كلمات مرور أو معلومات خاصة.',
+                'تُرسل رسالتك وآخر 12 رسالة من سياق المحادثة وبعض بيانات الحساب إلى خدمة المساعد، ويُحفظ السجل محلياً على هذا الجهاز. لا ترسل كلمات مرور أو معلومات خاصة.',
                 style: TextStyle(fontSize: 11, height: 1.4),
               ),
             ),
