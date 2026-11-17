@@ -12,6 +12,7 @@ on:
     paths:
       - 'firestore.rules'
       - 'storage.rules'
+      - 'rules-tests/**'
       - 'firebase.json'
       - '.github/workflows/deploy-firebase-rules.yml'
 
