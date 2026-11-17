@@ -8,6 +8,7 @@ on:
       - feature/v22-cinema-2025-2026-discovery
       - feature/v35-comprehensive-community-upgrade
       - feature/v38-ultimate-all-in-one
+      - feature/v40-full-community-release
     paths:
       - 'firestore.rules'
       - 'storage.rules'
