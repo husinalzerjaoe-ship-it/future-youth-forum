@@ -39,7 +39,7 @@ class _V39DailyChallengesPageState extends State<V39DailyChallengesPage> {
     (title: 'تحدي القراءة', detail: 'اقرأ عشر صفحات أو مقالاً مفيداً.', icon: Icons.menu_book_rounded),
     (title: 'روح الفريق', detail: 'شارك في تصويت أو فعالية داخل الملتقى.', icon: Icons.groups_2_outlined),
     (title: 'مبدع اليوم', detail: 'اكتب فكرة أو خاطرة قصيرة من تأليفك.', icon: Icons.brush_outlined),
-    (title: 'صديق وفي', detail: 'تواصل مع صديق برسالة لطيفة.', icon: Icons.waving_hand_outlined),
+    (title: 'صديق وفي', detail: 'تواصل مع صديق برسالة لطيفة.', icon: Icons.waving_hand),
     (title: 'عقل متفتح', detail: 'حل لغزاً أو سؤالاً ثقافياً.', icon: Icons.psychology_alt_outlined),
     (title: 'استراحة ذكية', detail: 'خذ استراحة قصيرة بعيداً عن الشاشة.', icon: Icons.spa_outlined),
     (title: 'مشارك نشيط', detail: 'شارك في نشاط مجتمعي مفيد.', icon: Icons.forum_outlined),
@@ -47,7 +47,7 @@ class _V39DailyChallengesPageState extends State<V39DailyChallengesPage> {
     (title: 'عين على الإبداع', detail: 'اكتشف قسماً جديداً في الملتقى.', icon: Icons.explore_outlined),
     (title: 'امتنان اليوم', detail: 'اكتب شيئاً واحداً أنت ممتن له.', icon: Icons.volunteer_activism_outlined),
     (title: 'تحدي التنظيم', detail: 'رتّب مهمة صغيرة وأنجزها.', icon: Icons.checklist_rounded),
-    (title: 'معلومة رياضية', detail: 'تابع نتيجة أو معلومة في مركز المباريات.', icon: Icons.sports_soccer_outlined),
+    (title: 'معلومة رياضية', detail: 'تابع نتيجة أو معلومة في مركز المباريات.', icon: Icons.sports_soccer),
   ];
 
   bool _loading = true;
