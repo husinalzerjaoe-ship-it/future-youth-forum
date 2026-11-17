@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "609448232328",
+    "project_id": "futureyouth-69f8a",
+    "storage_bucket": "futureyouth-69f8a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:609448232328:android:e88c61f0d02550e025a63d",
+        "android_client_info": {
+          "package_name": "com.futureyouth.forum"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDYE7t2lD0HLrGS2191tN3LsuVoQvAw-eI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

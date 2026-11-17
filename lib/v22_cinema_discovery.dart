@@ -1,0 +1,637 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'youtube_video_player.dart';
+
+class V22CinemaDiscoveryPage extends StatefulWidget {
+  const V22CinemaDiscoveryPage({super.key});
+  @override
+  State<V22CinemaDiscoveryPage> createState() => _V22CinemaDiscoveryPageState();
+}
+
+class _V22CinemaDiscoveryPageState extends State<V22CinemaDiscoveryPage> {
+  final TextEditingController _search = TextEditingController();
+  String _year = '2026';
+  String _kind = 'movie';
+  String _genre = 'الكل';
+  String _apiKey = '';
+  bool _loading = false;
+  bool _hasMore = true;
+  String? _error;
+  int _page = 1;
+  final List<_V22Title> _items = [];
+  final Set<int> _favorites = {};
+  final Set<int> _watched = {};
+
+  static const Map<String, int> _genres = {
+    'الكل': 0, 'أكشن': 28, 'مغامرة': 12, 'كوميديا': 35, 'دراما': 18,
+    'خيال علمي': 878, 'رعب': 27, 'غموض': 9648, 'رسوم متحركة': 16,
+    'وثائقي': 99, 'عائلي': 10751,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _apiKey = prefs.getString('v22_tmdb_api_key') ?? '';
+      _favorites.addAll((prefs.getStringList('v22_favorites') ?? const [])
+          .map((e) => int.tryParse(e) ?? -1).where((e) => e >= 0));
+      _watched.addAll((prefs.getStringList('v22_watched') ?? const [])
+          .map((e) => int.tryParse(e) ?? -1).where((e) => e >= 0));
+    });
+    if (_apiKey.isEmpty) {
+      setState(() => _error = 'أضف مفتاح TMDB API من زر الإعدادات لتفعيل فهرس 2025 و2026.');
+    } else {
+      await _load(reset: true);
+    }
+  }
+
+  Future<void> _saveSet(String key, Set<int> values) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(key, values.map((e) => e.toString()).toList());
+  }
+
+  Future<void> _configureKey() async {
+    final controller = TextEditingController(text: _apiKey);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('إعداد فهرس الأفلام'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('أدخل مفتاح TMDB API. يُحفظ على هذا الجهاز فقط ويُرسل إلى TMDB.'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'TMDB API Key',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+    if (value == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('v22_tmdb_api_key', value);
+    if (!mounted) return;
+    setState(() {
+      _apiKey = value;
+      _error = null;
+      if (value.isEmpty) _items.clear();
+    });
+    if (_apiKey.isNotEmpty) await _load(reset: true);
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (_apiKey.isEmpty) {
+      if (mounted) setState(() => _error = 'أضف مفتاح TMDB API من زر الإعدادات.');
+      return;
+    }
+    if (_loading || (!_hasMore && !reset)) return;
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final query = _search.text.trim();
+      final isMovie = _kind == 'movie';
+      final endpoint = query.isNotEmpty
+          ? (isMovie ? 'search/movie' : 'search/tv')
+          : (isMovie ? 'discover/movie' : 'discover/tv');
+      final params = <String, String>{
+        'api_key': _apiKey,
+        'language': 'ar-IQ',
+        'page': _page.toString(),
+        'include_adult': 'false',
+        'sort_by': 'popularity.desc',
+      };
+      if (query.isNotEmpty) {
+        params['query'] = query;
+        params[isMovie ? 'primary_release_year' : 'first_air_date_year'] = _year;
+      } else if (isMovie) {
+        params['primary_release_date.gte'] = '$_year-01-01';
+        params['primary_release_date.lte'] = '$_year-12-31';
+      } else {
+        params['first_air_date.gte'] = '$_year-01-01';
+        params['first_air_date.lte'] = '$_year-12-31';
+      }
+      final genreId = _genres[_genre] ?? 0;
+      if (genreId != 0) params['with_genres'] = genreId.toString();
+
+      final uri = Uri.https('api.themoviedb.org', '/3/$endpoint', params);
+      final response = await http.get(
+        uri,
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        throw Exception(response.statusCode == 401
+            ? 'مفتاح TMDB غير صحيح.'
+            : 'تعذر جلب الفهرس (${response.statusCode}).');
+      }
+      final root = jsonDecode(response.body) as Map<String, dynamic>;
+      final raw = root['results'] as List<dynamic>? ?? const [];
+      final fresh = raw
+          .whereType<Map<String, dynamic>>()
+          .map((json) => _V22Title.fromJson(json, isMovie))
+          .where((item) => item.id > 0)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        if (reset) {
+          _items
+            ..clear()
+            ..addAll(fresh);
+        } else {
+          _items.addAll(fresh);
+        }
+        _hasMore = _page < ((root['total_pages'] as num?)?.toInt() ?? 1) &&
+            fresh.isNotEmpty;
+        _page++;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = error.toString().replaceFirst('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _toggle(Set<int> values, int id, String key) async {
+    setState(() {
+      if (!values.add(id)) values.remove(id);
+    });
+    await _saveSet(key, values);
+  }
+
+  Future<void> _details(_V22Title item) async {
+    final String typePath = item.isMovie ? 'movie' : 'tv';
+    List<Map<String, dynamic>> providers = [];
+    String? providerLink;
+    String? trailerUrl;
+
+    try {
+      final providerPath = '/3/$typePath/${item.id}/watch/providers';
+      final response = await http.get(
+        Uri.https('api.themoviedb.org', providerPath, {'api_key': _apiKey}),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 12));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final results = data['results'] as Map<String, dynamic>?;
+        final iraq = results?['IQ'] as Map<String, dynamic>?;
+        providerLink = iraq?['link']?.toString();
+        providers = (iraq?['flatrate'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+    } catch (_) {}
+
+    try {
+      final videoPath = '/3/$typePath/${item.id}/videos';
+      final videoResponse = await http.get(
+        Uri.https('api.themoviedb.org', videoPath, {
+          'api_key': _apiKey,
+          'language': 'ar-IQ',
+        }),
+        headers: const {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 12));
+      if (videoResponse.statusCode == 200) {
+        final videoRoot = jsonDecode(videoResponse.body) as Map<String, dynamic>;
+        final videos = (videoRoot['results'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .where((video) =>
+                video['site'] == 'YouTube' &&
+                video['type'] == 'Trailer' &&
+                (video['key'] ?? '').toString().isNotEmpty)
+            .toList();
+        videos.sort((a, b) =>
+            ((b['official'] == true) ? 1 : 0)
+                .compareTo((a['official'] == true) ? 1 : 0));
+        if (videos.isNotEmpty) {
+          final key = videos.first['key'].toString();
+          if (RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(key)) {
+            trailerUrl = 'https://www.youtube.com/watch?v=$key';
+          }
+        }
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    final safeProviderLink = providerLink;
+    final safeTrailerUrl = trailerUrl;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(item.title,
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 6),
+                Text('${item.year} • ${item.isMovie ? 'فيلم' : 'مسلسل'} • ⭐ ${item.rating.toStringAsFixed(1)}'),
+                const SizedBox(height: 12),
+                Text(
+                  item.overview.isEmpty
+                      ? 'لا يتوفر ملخص عربي لهذا العنوان حالياً.'
+                      : item.overview,
+                  style: const TextStyle(height: 1.6),
+                ),
+                const SizedBox(height: 12),
+                const Text('الإعلان الرسمي', style: TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                if (safeTrailerUrl != null)
+                  YouTubeVideoPlayer(url: safeTrailerUrl)
+                else
+                  const Text('ما متوفر إعلان رسمي قابل للتضمين لهذا العنوان حالياً.'),
+                const SizedBox(height: 12),
+                const Text('المشاهدة والترجمة', style: TextStyle(fontWeight: FontWeight.w900)),
+                const Text('تختلف الترجمة العربية حسب البلد والمنصة. بيانات TMDB لا تضمن توفر ترجمة لكل عنوان.'),
+                if (providers.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: providers
+                        .map((provider) => Chip(
+                              label: Text((provider['provider_name'] ?? '').toString()),
+                            ))
+                        .toList(),
+                  )
+                else
+                  const Text('لا تتوفر حالياً بيانات مزودي مشاهدة لهذا العنوان في العراق.'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final url = Uri.parse(
+                            'https://www.themoviedb.org/$typePath/${item.id}');
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      },
+                      icon: const Icon(Icons.info_outline),
+                      label: const Text('تفاصيل TMDB'),
+                    ),
+                    if (safeProviderLink != null &&
+                        safeProviderLink.startsWith('https://'))
+                      FilledButton.icon(
+                        onPressed: () async {
+                          await launchUrl(Uri.parse(safeProviderLink),
+                              mode: LaunchMode.externalApplication);
+                        },
+                        icon: const Icon(Icons.ondemand_video),
+                        label: const Text('خيارات المشاهدة'),
+                      ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('إغلاق'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('مكتبة 2025 • 2026'),
+          actions: [
+            IconButton(
+              tooltip: 'إعداد مفتاح الفهرس',
+              onPressed: _configureKey,
+              icon: const Icon(Icons.key_rounded),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+              child: TextField(
+                controller: _search,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) => _load(reset: true),
+                decoration: InputDecoration(
+                  hintText: 'ابحث عن فيلم أو مسلسل…',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      _search.clear();
+                      _load(reset: true);
+                    },
+                    icon: const Icon(Icons.close),
+                  ),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('2026'),
+                    selected: _year == '2026',
+                    onSelected: (_) {
+                      setState(() => _year = '2026');
+                      _load(reset: true);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('2025'),
+                    selected: _year == '2025',
+                    onSelected: (_) {
+                      setState(() => _year = '2025');
+                      _load(reset: true);
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  ChoiceChip(
+                    label: const Text('أفلام'),
+                    selected: _kind == 'movie',
+                    onSelected: (_) {
+                      setState(() => _kind = 'movie');
+                      _load(reset: true);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('مسلسلات'),
+                    selected: _kind == 'tv',
+                    onSelected: (_) {
+                      setState(() => _kind = 'tv');
+                      _load(reset: true);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: _genres.keys
+                    .map((genre) => Padding(
+                          padding: const EdgeInsetsDirectional.only(end: 7),
+                          child: ChoiceChip(
+                            label: Text(genre),
+                            selected: _genre == genre,
+                            onSelected: (_) {
+                              setState(() => _genre = genre);
+                              _load(reset: true);
+                            },
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    if (_apiKey.isEmpty)
+                      TextButton.icon(
+                        onPressed: _configureKey,
+                        icon: const Icon(Icons.key),
+                        label: const Text('إعداد مفتاح TMDB'),
+                      ),
+                    if (_apiKey.isNotEmpty)
+                      TextButton(
+                        onPressed: () => _load(reset: true),
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: _items.isEmpty && _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _items.isEmpty
+                      ? const Center(
+                          child: Text('لا توجد نتائج بعد. أضف مفتاح الفهرس أو غيّر البحث.'))
+                      : NotificationListener<ScrollNotification>(
+                          onNotification: (notification) {
+                            if (notification.metrics.pixels >=
+                                    notification.metrics.maxScrollExtent - 240 &&
+                                !_loading &&
+                                _hasMore) {
+                              _load();
+                            }
+                            return false;
+                          },
+                          child: GridView.builder(
+                            padding: const EdgeInsets.all(12),
+                            itemCount: _items.length + (_loading ? 1 : 0),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              childAspectRatio: .59,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                            ),
+                            itemBuilder: (context, index) {
+                              if (index >= _items.length) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              }
+                              final item = _items[index];
+                              final poster = item.poster.isEmpty
+                                  ? null
+                                  : 'https://image.tmdb.org/t/p/w500${item.poster}';
+                              return Card(
+                                clipBehavior: Clip.antiAlias,
+                                child: InkWell(
+                                  onTap: () => _details(item),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Expanded(
+                                        child: poster == null
+                                            ? const ColoredBox(
+                                                color: Color(0xFF28243A),
+                                                child: Icon(Icons.movie,
+                                                    size: 54,
+                                                    color: Colors.white54),
+                                              )
+                                            : Image.network(
+                                                poster,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const ColoredBox(
+                                                  color: Color(0xFF28243A),
+                                                  child: Icon(
+                                                      Icons.broken_image,
+                                                      color: Colors.white54),
+                                                ),
+                                              ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            8, 8, 8, 2),
+                                        child: Text(
+                                          item.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w900),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8),
+                                        child: Text(
+                                          '${item.year} • ⭐ ${item.rating.toStringAsFixed(1)}',
+                                          style: const TextStyle(
+                                              fontSize: 11, color: Colors.grey),
+                                        ),
+                                      ),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            tooltip: 'مفضلة',
+                                            onPressed: () => _toggle(
+                                                _favorites,
+                                                item.id,
+                                                'v22_favorites'),
+                                            icon: Icon(
+                                              _favorites.contains(item.id)
+                                                  ? Icons.favorite
+                                                  : Icons.favorite_border,
+                                              color: Colors.pinkAccent,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            tooltip: 'تمت المشاهدة',
+                                            onPressed: () => _toggle(
+                                                _watched,
+                                                item.id,
+                                                'v22_watched'),
+                                            icon: Icon(
+                                              _watched.contains(item.id)
+                                                  ? Icons.check_circle
+                                                  : Icons.check_circle_outline,
+                                              color: Colors.green,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(12, 4, 12, 10),
+              child: Text(
+                'بيانات وصور TMDB مع الإسناد المطلوب. توفر المنصات والترجمة قد يختلف حسب البلد. لا نستضيف الأفلام أو نوفر روابط بث غير مرخصة.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: Colors.grey),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _V22Title {
+  const _V22Title({
+    required this.id,
+    required this.title,
+    required this.year,
+    required this.overview,
+    required this.poster,
+    required this.rating,
+    required this.isMovie,
+  });
+
+  final int id;
+  final String title;
+  final String year;
+  final String overview;
+  final String poster;
+  final double rating;
+  final bool isMovie;
+
+  factory _V22Title.fromJson(Map<String, dynamic> json, bool isMovie) {
+    final date = (json[isMovie ? 'release_date' : 'first_air_date'] ?? '')
+        .toString();
+    return _V22Title(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      title: (json[isMovie ? 'title' : 'name'] ?? 'بدون عنوان').toString(),
+      year: date.length >= 4 ? date.substring(0, 4) : '—',
+      overview: (json['overview'] ?? '').toString(),
+      poster: (json['poster_path'] ?? '').toString(),
+      rating: (json['vote_average'] as num?)?.toDouble() ?? 0,
+      isMovie: isMovie,
+    );
+  }
+}

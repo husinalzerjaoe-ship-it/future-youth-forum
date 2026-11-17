@@ -1,0 +1,132 @@
+name: Flutter quality check and Android APK
+on:
+  workflow_dispatch:
+  # Feature branches are accumulated without repeated APK builds.
+  # Run the complete validation/build manually when the user requests the final package.
+  push:
+    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: flutter-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check Firebase Functions syntax
+        run: node --check functions/index.js
+      - name: Check LiveKit token worker syntax
+        run: node --check workers/livekit-token/src/index.js
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Run Flutter tests
+        run: flutter test --no-pub
+      - name: Analyze Flutter code
+        run: flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings
+      - name: Generate Android platform files
+        run: flutter create --platforms=android --org com.futureyouth --project-name forum .
+      - name: Set Android compile SDK to 36
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          candidates = [Path('android/app/build.gradle.kts'), Path('android/app/build.gradle')]
+          for path in candidates:
+              if not path.exists():
+                  continue
+              content = path.read_text()
+              if path.suffix == '.kts':
+                  content = content.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+              else:
+                  content = content.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 36')
+              path.write_text(content)
+              print(f'Updated {path} to compile SDK 36')
+              break
+          else:
+              raise SystemExit('Android app Gradle file not found')
+          PY
+      - name: Force Android library plugins to compile with SDK 36
+        run: |
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/force-android-compile-sdk.gradle" <<'GRADLE'
+          allprojects {
+              afterEvaluate { project ->
+                  def androidExtension = project.extensions.findByName("android")
+                  if (androidExtension != null) {
+                      androidExtension.compileSdkVersion(36)
+                      println("Forced compileSdk 36 for ${project.path}")
+                  }
+              }
+          }
+          GRADLE
+      - name: Configure Android background audio
+        run: python scripts/configure_android_audio.py
+      - name: Configure embedded Godot Android runtime
+        run: python scripts/configure_godot_android.py
+      - name: Set Android app display name
+        run: sed -i 's/android:label="forum"/android:label="ملتقى شباب المستقبل"/' android/app/src/main/AndroidManifest.xml
+      - name: Configure Future Youth Forum launcher icon
+        run: python scripts/configure_android_branding.py
+      - name: Verify Android Flutter embedding v2 manifest
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          path = "android/app/src/main/AndroidManifest.xml"
+          root = ET.parse(path).getroot()
+          android = "{http://schemas.android.com/apk/res/android}"
+          app = root.find("application")
+          if app is None:
+              raise SystemExit("Android application element is missing")
+          app_name = app.get(android + "name")
+          if app_name == "io.flutter.app.FlutterApplication":
+              raise SystemExit("Legacy FlutterApplication v1 declaration remains")
+          marker = next((item for item in app.findall("meta-data")
+                         if item.get(android + "name") == "flutterEmbedding"), None)
+          if marker is None or marker.get(android + "value") != "2":
+              raise SystemExit("Flutter embedding v2 marker is missing or unreadable")
+          print("Verified Flutter Android embedding v2 in the generated manifest.")
+          PY
+      - name: Verify Activepieces webhook secret
+        env:
+          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
+        run: test -n "$ACTIVEPIECES_WEBHOOK_URL"
+      - name: Build release APK
+        env:
+          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          url = os.environ.get("ACTIVEPIECES_WEBHOOK_URL", "").strip()
+          if not url:
+              raise SystemExit("ACTIVEPIECES_WEBHOOK_URL is empty")
+          Path("/tmp/assistant-dart-defines.json").write_text(
+              json.dumps({"ACTIVEPIECES_WEBHOOK_URL": url})
+          )
+          PY
+          flutter build apk --release --dart-define-from-file=/tmp/assistant-dart-defines.json
+      - name: Verify Godot project and native runtime inside APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/fyf-apk-contents.txt
+          grep -F "assets/project.godot" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scenes/main.tscn" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scripts/main.gd" /tmp/fyf-apk-contents.txt
+          grep -E "lib/[^ ]+/libgodot_android.so" /tmp/fyf-apk-contents.txt
+          echo "Godot project files and Android runtime library are present in the APK."
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: future-youth-forum-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
