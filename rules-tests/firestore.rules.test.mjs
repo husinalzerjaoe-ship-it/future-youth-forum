@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, getDoc, setDoc, updateDoc, serverTimestamp, Timestamp
+  doc, getDoc, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -135,8 +135,19 @@ test('founder can assign and remove custom member titles with an audit record', 
     action: 'set_custom_title', createdAt: serverTimestamp()
   }));
 
-  await assertFails(updateDoc(doc(user('alice'), 'publicProfiles/alice'), {
-    customTitle: 'لقب مزيف',
+  await assertSucceeds(updateDoc(doc(user('alice'), 'publicProfiles/alice'), {
+    customTitle: 'لقبي بنفسي',
+    customTitleColor: 0xFF6554D9,
+    customTitleEndColor: 0xFF168E9B,
+    customTitleFont: 'default',
+    customTitleGradient: true,
+    customTitleGlow: false,
+    customTitleIcon: '⭐',
+    customTitleExpiresAt: null,
+    customTitleUpdatedAt: serverTimestamp()
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'publicProfiles/alice'), {
+    customTitle: 'محاولة تعديل ملف غيري',
     customTitleUpdatedAt: serverTimestamp()
   }));
 });
@@ -221,4 +232,41 @@ test('private friends quiz room supports code join, member chat, and blocks outs
     updatedAt: serverTimestamp(),
   }));
   await assertFails(getDoc(doc(user('mallory'), 'gameRooms/123456')));
+});
+
+
+test('style store purchase atomically spends coins and grants account inventory', async () => {
+  await seed('coinWallets/alice', {
+    coins: 300, updatedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
+    grantedBy: 'founder-uid'
+  });
+  const alice = user('alice');
+  await runTransaction(alice, async (tx) => {
+    tx.update(doc(alice, 'coinWallets/alice'), { coins: 120, updatedAt: serverTimestamp() });
+    tx.set(doc(alice, 'users/alice/styleInventory/crown'), {
+      itemId: 'crown', name: 'تاج القائد', category: 'ألقاب',
+      price: 180, purchasedAt: serverTimestamp()
+    });
+  });
+  await assertSucceeds(getDoc(doc(alice, 'users/alice/styleInventory/crown')));
+  await assertFails(getDoc(doc(user('bob'), 'users/alice/styleInventory/crown')));
+  await assertFails(setDoc(doc(user('alice'), 'users/alice/styleInventory/legend'), {
+    itemId: 'legend', name: 'أسطورة الملتقى', category: 'ألقاب',
+    price: 1, purchasedAt: serverTimestamp()
+  }));
+});
+
+test('friends 2D room can be found by its single roomCode field and joined by a second member', async () => {
+  await seed('arcadeRooms/room-2d-1', {
+    hostId: 'alice', gameId: 'arcade_friend_world',
+    members: ['alice'], memberNames: { alice: 'Alice' },
+    roomCode: '654321', status: 'waiting', visibility: 'private',
+    state: { mode: 'cooperative_2d', players: {}, stars: [], score: 0, moves: 0, wave: 1, finished: false }
+  });
+  await assertSucceeds(getDoc(doc(user('bob'), 'arcadeRooms/room-2d-1')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'arcadeRooms/room-2d-1'), {
+    members: ['alice', 'bob'], updatedAt: serverTimestamp()
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'arcadeRooms/room-2d-1/chat/hello-1')).catch(()=>null));
+  await assertFails(getDoc(doc(user('mallory'), 'arcadeRooms/room-2d-1')));
 });
