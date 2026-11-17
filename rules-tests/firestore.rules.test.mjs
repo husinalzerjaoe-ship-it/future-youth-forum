@@ -75,6 +75,80 @@ test('conversation members can pin and mute only their own inbox preferences', a
   }));
 });
 
+test('founder chat controls are readable by members and writable only by the founder', async () => {
+  await assertSucceeds(setDoc(doc(founder(), 'chatControls/main'), {
+    allowLinks: false,
+    allowMedia: false,
+    directMessagesEnabled: false,
+    publicChatEnabled: true,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'founder-uid',
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'chatControls/main')));
+  await assertFails(updateDoc(doc(user('alice'), 'chatControls/main'), {
+    publicChatEnabled: false,
+    updatedAt: serverTimestamp(),
+    updatedBy: 'alice',
+  }));
+
+  await assertSucceeds(setDoc(doc(founder(), 'developerLinks/main'), {
+    telegram: 'https://t.me/example',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    website: '',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'developerLinks/main')));
+  await assertFails(setDoc(doc(user('bob'), 'developerLinks/forged'), {
+    telegram: 'https://t.me/forged',
+    instagram: '',
+    tiktok: '',
+    youtube: '',
+    website: '',
+    updatedAt: serverTimestamp(),
+  }));
+});
+
+test('founder controls can pause direct messages, public chat, media, and links', async () => {
+  await seed('chatControls/main', {
+    allowLinks: false,
+    allowMedia: false,
+    directMessagesEnabled: false,
+    publicChatEnabled: false,
+  });
+
+  await assertFails(setDoc(doc(user('alice'), 'conversations/dm-disabled'), {
+    members: ['alice', 'bob'],
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'messages/public-disabled'), {
+    senderId: 'alice', senderRole: 'member', type: 'text', text: 'hello',
+  }));
+
+  await seed('conversations/dm-media', { members: ['alice', 'bob'] });
+  await assertFails(setDoc(doc(user('alice'), 'conversations/dm-media/messages/media-1'), {
+    senderId: 'alice', senderRole: 'member', type: 'image', text: '',
+    imageUrl: 'https://media.example.test/photo.jpg',
+  }));
+});
+
+test('links and media are accepted when founder controls allow them', async () => {
+  await seed('chatControls/main', {
+    allowLinks: true,
+    allowMedia: true,
+    directMessagesEnabled: true,
+    publicChatEnabled: true,
+  });
+  await assertSucceeds(setDoc(doc(user('alice'), 'messages/link-allowed'), {
+    senderId: 'alice', senderRole: 'member', type: 'text',
+    text: 'شاهد https://example.com',
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'messages/image-allowed'), {
+    senderId: 'alice', senderRole: 'member', type: 'image', text: '',
+    imageUrl: 'https://media.example.test/photo.jpg',
+  }));
+});
+
 test('private conversation messages are readable only by the two members', async () => {
   await seed('conversations/dm-1', { members: ['alice', 'bob'] });
   await seed('conversations/dm-1/messages/msg-1', {
