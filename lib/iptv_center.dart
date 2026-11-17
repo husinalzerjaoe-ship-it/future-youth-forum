@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'watch_party.dart';
+import 'iptv_epg.dart';
 
 class IptvChannel {
   const IptvChannel({required this.name, required this.url, this.group='عام', this.logo='', this.tvgId='', this.source='', this.sourceUrl=''});
@@ -48,8 +49,10 @@ class IptvCenterPage extends StatefulWidget {
 }
 class _IptvCenterPageState extends State<IptvCenterPage> {
   static const _key='future_youth_iptv_channels_v1';
+  static const _epgKey='future_youth_iptv_epg_v1';
   final _url=TextEditingController(),_name=TextEditingController(),_search=TextEditingController();
   final List<IptvChannel> _channels=[]; final Set<String> _favorites={};
+  final List<IptvProgram> _programs=[];
   bool _loading=true,_busy=false; String _category='الكل',_query='';
   @override void initState(){super.initState();_load();}
   @override void dispose(){_url.dispose();_name.dispose();_search.dispose();super.dispose();}
@@ -57,10 +60,12 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     try { final p=await SharedPreferences.getInstance(),raw=p.getString(_key);
       if(raw!=null){final data=jsonDecode(raw);if(data is List)_channels.addAll(data.whereType<Map>().map((e)=>IptvChannel.fromJson(Map<String,dynamic>.from(e))));}
       _favorites.addAll(p.getStringList(_key+'_favorites')??const []);
+      final epgRaw=p.getString(_epgKey);
+      if(epgRaw!=null){final epgData=jsonDecode(epgRaw);if(epgData is List)_programs.addAll(epgData.whereType<Map>().map((e)=>IptvProgram.fromJson(Map<String,dynamic>.from(e))));}
     } catch(_){}
     if(mounted)setState(()=>_loading=false);
   }
-  Future<void> _save() async {final p=await SharedPreferences.getInstance();await p.setString(_key,jsonEncode(_channels.map((e)=>e.toJson()).toList()));await p.setStringList(_key+'_favorites',_favorites.toList());}
+  Future<void> _save() async {final p=await SharedPreferences.getInstance();await p.setString(_key,jsonEncode(_channels.map((e)=>e.toJson()).toList()));await p.setStringList(_key+'_favorites',_favorites.toList());await p.setString(_epgKey,jsonEncode(_programs.map((e)=>e.toJson()).toList()));}
   void _toast(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
   void _replace(String source,List<IptvChannel> items){_channels.removeWhere((e)=>e.source==source);_channels.addAll(items);_channels.sort((a,b)=>a.name.toLowerCase().compareTo(b.name.toLowerCase()));}
   Future<void> _addUrl() async {
@@ -90,6 +95,27 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       _replace(file.name,items);await _save();_toast('تم استيراد '+items.length.toString()+' قناة من الملف.');
     }catch(e){_toast('تعذر استيراد الملف: '+e.toString());}
   }
+  Future<void> _importEpg() async {
+    try {
+      final picked=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:['xml','xmltv','txt'],withData:true);
+      if(picked==null||picked.files.isEmpty)return;
+      final bytes=picked.files.first.bytes;
+      if(bytes==null){_toast('تعذر قراءة ملف دليل البرامج.');return;}
+      if(bytes.length>8*1024*1024){_toast('ملف الدليل أكبر من 8 ميغابايت.');return;}
+      final parsed=IptvEpgParser.parse(utf8.decode(bytes,allowMalformed:true));
+      if(parsed.isEmpty){_toast('لم نعثر على برامج XMLTV صالحة.');return;}
+      setState((){_programs..clear()..addAll(parsed);});
+      await _save();
+      _toast('تم استيراد دليل البرامج: '+parsed.length.toString()+' برنامج.');
+    } catch(e){_toast('تعذر استيراد دليل البرامج: '+e.toString());}
+  }
+  Future<void> _showEpgGuide() async {
+    final now=DateTime.now();
+    await showModalBottomSheet<void>(context:context,isScrollControlled:true,showDragHandle:true,builder:(ctx)=>Directionality(textDirection:TextDirection.rtl,child:SafeArea(child:SizedBox(height:MediaQuery.of(ctx).size.height*.78,child:Column(children:[
+      Padding(padding:const EdgeInsets.all(14),child:Row(children:[const Expanded(child:Text('دليل البرامج EPG',style:TextStyle(fontSize:20,fontWeight:FontWeight.w900))),TextButton.icon(onPressed:(){Navigator.pop(ctx);_importEpg();},icon:const Icon(Icons.file_upload_outlined),label:const Text('استيراد XMLTV'))])),
+      Expanded(child:_programs.isEmpty?const Center(child:Text('استورد ملف XMLTV لعرض البرامج الحالية والقادمة.')):ListView.builder(itemCount:_channels.length,itemBuilder:(_,i){final c=_channels[i];final current=c.tvgId.isEmpty?null:IptvEpgParser.current(_programs,c.tvgId,now);final next=c.tvgId.isEmpty?null:IptvEpgParser.next(_programs,c.tvgId,now);return ListTile(leading:const Icon(Icons.live_tv),title:Text(c.name),subtitle:Text(current==null?'لا يوجد برنامج حالي':('الآن: '+current.title+' • '+TimeOfDay.fromDateTime(current.start.toLocal()).format(context)+' - '+TimeOfDay.fromDateTime(current.stop.toLocal()).format(context))+'\\n'+(next==null?'لا يوجد برنامج قادم':'التالي: '+next.title)),isThreeLine:true,onTap:(){Navigator.pop(ctx);Navigator.push(context,MaterialPageRoute(builder:(_)=>IptvPlayerPage(channel:c)));});})),
+    ])))));
+  }
   Future<void> _favorite(IptvChannel c) async {setState(()=>_favorites.contains(c.id)?_favorites.remove(c.id):_favorites.add(c.id));await _save();}
   Future<void> _removeSource(String source) async {
     final ids=_channels.where((e)=>e.source==source).map((e)=>e.id).toSet();
@@ -106,6 +132,8 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
       appBar:AppBar(title:const Text('مركز التلفزيون وIPTV'),actions:[
         IconButton(tooltip:'تحديث المصادر',onPressed:_busy?null:_refreshAllSources,icon:const Icon(Icons.refresh_rounded)),
+        IconButton(tooltip:'دليل البرامج',onPressed:_showEpgGuide,icon:const Icon(Icons.calendar_month_rounded)),
+        IconButton(tooltip:'استيراد دليل XMLTV',onPressed:_importEpg,icon:const Icon(Icons.event_available_rounded)),
         IconButton(tooltip:'إدارة المصادر',onPressed:_manageSources,icon:const Icon(Icons.playlist_add_check)),
         IconButton(tooltip:'استيراد ملف',onPressed:_busy?null:_importFile,icon:const Icon(Icons.file_open)),
       ]),
@@ -144,7 +172,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     const Text('شاهد قنواتك بمكان واحد',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900)),
     const SizedBox(height:5),const Text('استيراد M3U وM3U8، تصنيفات، بحث ومفضلة.',style:TextStyle(color:Colors.white70)),
     const SizedBox(height:10),Text(_channels.length.toString()+' قناة • '+_channels.map((e)=>e.source).toSet().length.toString()+' مصدر • '+_favorites.length.toString()+' مفضلة',style:const TextStyle(color:Colors.white)),
-    const SizedBox(height:12),FilledButton.icon(onPressed:()=>_openWatchParty(),icon:const Icon(Icons.groups_rounded),label:const Text('غرف مشاهدة IPTV مع الأصدقاء')), 
+    const SizedBox(height:12),Wrap(spacing:8,runSpacing:8,children:[FilledButton.icon(onPressed:()=>_openWatchParty(),icon:const Icon(Icons.groups_rounded),label:const Text('غرف مشاهدة IPTV مع الأصدقاء')),OutlinedButton.icon(onPressed:_showEpgGuide,icon:const Icon(Icons.calendar_month),label:Text('دليل البرامج ('+_programs.length.toString()+')'))]), 
   ]));
   Widget _channelTile(IptvChannel c)=>Card(margin:const EdgeInsets.only(bottom:7),child:ListTile(
     leading:ClipRRect(borderRadius:BorderRadius.circular(9),child:Container(width:46,height:46,color:Theme.of(context).colorScheme.surfaceContainerHighest,padding:const EdgeInsets.all(5),child:c.logo.startsWith('https://')?Image.network(c.logo,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Icon(Icons.tv)):const Icon(Icons.tv))),
