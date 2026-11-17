@@ -7,6 +7,7 @@ on:
       - feature/v10-jitsi-backup-calls
       - feature/v22-cinema-2025-2026-discovery
       - feature/v35-comprehensive-community-upgrade
+      - feature/v38-ultimate-all-in-one
     paths:
       - 'firestore.rules'
       - 'storage.rules'

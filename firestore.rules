@@ -1692,13 +1692,17 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['coins', 'updatedAt', 'grantedBy'])
         && request.resource.data.coins is int
         && request.resource.data.coins >= 0
-        && request.resource.data.updatedAt == request.time;
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.grantedBy == request.auth.uid;
+      // Preserve legacy wallet metadata while allowing the founder to update
+      // only the balance/audit fields used by the store's gift transaction.
       allow update: if (
           isFounder()
-          && request.resource.data.keys().hasOnly(['coins', 'updatedAt', 'grantedBy'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coins', 'updatedAt', 'grantedBy'])
           && request.resource.data.coins is int
           && request.resource.data.coins >= 0
           && request.resource.data.updatedAt == request.time
+          && request.resource.data.grantedBy == request.auth.uid
         ) || (
           request.auth != null
           && request.auth.uid == userId

@@ -344,3 +344,20 @@ test('post voice comments require an owned HTTPS audio URL', async () => {
   }));
   await assertFails(setDoc(doc(user('bob'), 'posts/post-voice/comments/voice-3'), valid));
 });
+
+
+test('founder can gift coins to a legacy wallet without deleting unrelated metadata', async () => {
+  await seed('coinWallets/alice', {
+    coins: 40,
+    updatedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
+    grantedBy: 'founder-uid',
+    legacyNote: 'keep-this-field',
+    lifetimeEarned: 900,
+  });
+  await assertSucceeds(updateDoc(doc(founder(), 'coinWallets/alice'), {
+    coins: 540,
+    updatedAt: serverTimestamp(),
+    grantedBy: 'founder-uid',
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'coinWallets/alice')));
+});
