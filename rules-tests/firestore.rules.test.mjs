@@ -361,3 +361,18 @@ test('founder can gift coins to a legacy wallet without deleting unrelated metad
   }));
   await assertSucceeds(getDoc(doc(user('alice'), 'coinWallets/alice')));
 });
+
+
+test('members can activate multiple store titles without replacing existing custom titles', async () => {
+  await seed('publicProfiles/alice', {
+    name: 'Alice', bio: '', photoUrl: '', customTitle: 'لقب قديم',
+    createdAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z'))
+  });
+  await assertSucceeds(updateDoc(doc(user('alice'), 'publicProfiles/alice'), {
+    activeStoreTitleIds: ['crown', 'star', 'creator'],
+    customTitleUpdatedAt: serverTimestamp()
+  }));
+  const saved = await getDoc(doc(user('alice'), 'publicProfiles/alice'));
+  assert.deepEqual(saved.data().activeStoreTitleIds, ['crown', 'star', 'creator']);
+  assert.equal(saved.data().customTitle, 'لقب قديم');
+});
