@@ -298,7 +298,7 @@ service cloud.firestore {
               request.resource.data.text == ''
               && request.resource.data.mediaType == 'audio'
               && request.resource.data.audioUrl is string
-              && request.resource.data.audioUrl.size() > 0
+              && request.resource.data.audioUrl.matches('https://.*')
               && request.resource.data.audioUrl.size() <= 2048
             )
           );
