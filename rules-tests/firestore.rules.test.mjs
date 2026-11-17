@@ -265,7 +265,7 @@ test('friends 2D room can be found by its single roomCode field and joined by a 
   });
   await assertSucceeds(getDoc(doc(user('bob'), 'arcadeRooms/room-2d-1')));
   await assertSucceeds(updateDoc(doc(user('bob'), 'arcadeRooms/room-2d-1'), {
-    members: ['alice', 'bob'], updatedAt: serverTimestamp()
+    members: ['alice', 'bob'], 'memberNames.bob': 'Bob', updatedAt: serverTimestamp()
   }));
   await assertSucceeds(setDoc(doc(user('bob'), 'arcadeRooms/room-2d-1/chat/hello-1'), { uid: 'bob', name: 'Bob', text: 'هلا', createdAt: serverTimestamp() }));
   // Waiting rooms are readable to signed-in users for code lookup; once the host starts, outsiders are blocked.
