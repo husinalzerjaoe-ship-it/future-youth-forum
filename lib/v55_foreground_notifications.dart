@@ -69,7 +69,7 @@ class V55ForegroundNotificationService {
           if (firstMessageSnapshot) { firstMessageSnapshot = false; return; }
           for (final change in messages.docChanges) {
             if (change.type == DocumentChangeType.added &&
-                change.doc.data()['senderId'] != uid) {
+                change.doc.data()?['senderId'] != uid) {
               _playAlert();
               break;
             }
