@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'achievement_hub.dart';
 import 'community_events.dart';
 import 'community_polls.dart';
@@ -18,6 +21,7 @@ class V53CommunityHubPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({String title, String subtitle, IconData icon, Widget page})>[
+      (title: 'المقاطع المحفوظة', subtitle: 'ارجع للمقاطع التي حفظتها', icon: Icons.bookmarks_rounded, page: const V53SavedClipsPage()),
       (title: 'ريلز الملتقى', subtitle: 'مقاطع دائمة وتعليقات صوتية وصور ومشاركة خاصة', icon: Icons.video_library_rounded, page: const CommunityReelsPage()),
       (title: 'الفعاليات والمسابقات', subtitle: 'تابع الفعاليات والمواعيد والأنشطة', icon: Icons.event_available_rounded, page: const CommunityEventsPage()),
       (title: 'التصويتات', subtitle: 'شارك رأيك باستطلاعات المجتمع', icon: Icons.poll_rounded, page: const CommunityPollsPage()),
@@ -76,6 +80,60 @@ class V53CommunityHubPage extends StatelessWidget {
               child: Text('هذه البوابة تجمع الأنظمة الموجودة فعلاً في التطبيق؛ لا تنشئ نسخاً مكررة منها ولا تستبدل صفحاتها الأصلية.'),
             )),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+
+class V53SavedClipsPage extends StatelessWidget {
+  const V53SavedClipsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      return const Scaffold(body: Center(child: Text('سجّل الدخول لعرض محفوظاتك.')));
+    }
+    final stream = FirebaseFirestore.instance.collection('users').doc(uid)
+        .collection('savedClips').orderBy('savedAt', descending: true).snapshots();
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('مقاطعك المحفوظة')),
+        body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: stream,
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Center(child: Text('تعذر تحميل المحفوظات حالياً.'));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final docs = snapshot.data!.docs;
+            if (docs.isEmpty) return const Center(child: Text('ما عندك مقاطع محفوظة بعد. اضغط علامة الحفظ على أي ريل.'));
+            return ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final data = docs[index].data();
+                return Card(child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.play_arrow_rounded)),
+                  title: Text((data['caption'] ?? 'مقطع من الملتقى').toString(), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('بواسطة ${(data['authorName'] ?? 'عضو').toString()}'),
+                  trailing: IconButton(
+                    tooltip: 'نسخ رابط المقطع',
+                    icon: const Icon(Icons.copy_rounded),
+                    onPressed: () async {
+                      final url = (data['videoUrl'] ?? '').toString();
+                      if (url.startsWith('https://')) {
+                        await Clipboard.setData(ClipboardData(text: url));
+                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نسخ رابط المقطع')));
+                      }
+                    },
+                  ),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CommunityReelsPage())),
+                ));
+              },
+            );
+          },
         ),
       ),
     );
