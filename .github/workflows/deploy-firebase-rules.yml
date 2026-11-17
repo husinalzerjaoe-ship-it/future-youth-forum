@@ -12,6 +12,7 @@ on:
       - feature/v47-shared-iptv-library
       - feature/v48-community-evolution
       - feature/v49-complete-community-upgrade
+      - feature/v52-community-reels-stories
     paths:
       - 'firestore.rules'
       - 'storage.rules'

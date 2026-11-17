@@ -359,13 +359,23 @@ class _StoriesPageState extends State<StoriesPage>{
   ])));
   if(type==null)return;
   final file=type=='image'?await pick.pickImage(source:ImageSource.gallery,imageQuality:85):await pick.pickVideo(source:ImageSource.gallery,maxDuration:const Duration(seconds:60));
-  if(file==null)return;setState(()=>busy=true);
+  if(file==null)return;
+  final expiryMode=await showDialog<String>(context:context,builder:(c)=>AlertDialog(
+   title:const Text('مدة بقاء الستوري'),
+   content:const Text('اختار شلون تريد تتحكم بمدة ظهورها.'),
+   actions:[
+    TextButton(onPressed:()=>Navigator.pop(c,'manual'),child:const Text('تبقى لحد ما أحذفها')),
+    FilledButton(onPressed:()=>Navigator.pop(c,'24h'),child:const Text('تنحذف بعد 24 ساعة')),
+   ],
+  ));
+  if(expiryMode==null)return;
+  setState(()=>busy=true);
   try{
    final u=FirebaseAuth.instance.currentUser!;
    final url=await uploadForumMedia(file,folder:'stories');
    final profile=await db2.collection('publicProfiles').doc(u.uid).get();
-   await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':Timestamp.fromDate(DateTime.now().add(const Duration(hours:24)))});
-   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الستوري لمدة 24 ساعة')));
+   await db2.collection('stories').add({'mediaUrl':url,'mediaType':type,'authorId':u.uid,'authorName':profile.data()?['name']??u.displayName??'عضو','createdAt':FieldValue.serverTimestamp(),'expiresAt':expiryMode=='24h'?Timestamp.fromDate(DateTime.now().add(const Duration(hours:24))):null});
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(expiryMode=='24h'?'تم نشر الستوري وستنتهي بعد 24 ساعة':'تم نشر الستوري وستبقى حتى تحذفها بنفسك')));
   }on StorageException catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('فشل تخزين الستوري: ${e.message}')));}catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الستوري: $e')));}
   finally{if(mounted)setState(()=>busy=false);}
  }
@@ -382,7 +392,7 @@ class _StoriesPageState extends State<StoriesPage>{
      if(video)Container(height:220,color:Colors.black,child:IconButton(color:Colors.white,iconSize:60,icon:const Icon(Icons.play_circle),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>StoryVideoPage(url:url)))))
      else Image.network(url,width:double.infinity,height:250,fit:BoxFit.cover),
      if(video) Align(alignment:Alignment.centerLeft,child:TextButton.icon(onPressed:()=>downloadStory(url),icon:const Icon(Icons.download),label:const Text('تنزيل الفيديو للجهاز'))),
-     const Padding(padding:EdgeInsets.all(8),child:Text('تختفي بعد 24 ساعة',style:TextStyle(color:Colors.black54,fontSize:12))),
+     Padding(padding:const EdgeInsets.all(8),child:Text(d['expiresAt'] is Timestamp?'تنتهي بعد 24 ساعة من النشر':'تبقى حتى يحذفها صاحبها',style:const TextStyle(color:Colors.black54,fontSize:12))),
      StoryInteractionPanel(storyId:doc.id,authorId:(d['authorId']??'').toString())
     ]));
    }).toList());

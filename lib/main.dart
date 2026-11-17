@@ -65,6 +65,7 @@ import 'future_utility_studio.dart';
 import 'future_planner.dart';
 import 'v44_future_lab.dart';
 import 'v49_discovery.dart';
+import 'v52_community_reels.dart';
 import 'dns_helper.dart';
 
 const brand = Color(0xFF6554D9);
@@ -763,7 +764,7 @@ class _HomePageState extends State<HomePage> {
             onSelected: (value) {
               switch (value) {
                 case 'v49Videos':
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V49ShortVideoFeedPage()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityReelsPage()));
                   break;
                 case 'dnsHelper':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const DnsHelperPage()));
@@ -939,7 +940,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'v49Videos', child: ListTile(leading: Icon(Icons.video_library_rounded), title: Text('مقاطع الملتقى – فيديوهات المجتمع'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'v49Videos', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('ريلز الملتقى – مقاطع دائمة'), subtitle: Text('فيديوهات عمودية وتعليقات وإعجابات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dnsHelper', child: ListTile(leading: Icon(Icons.dns_rounded), title: Text('DNS الذكي والاتصال'), subtitle: Text('فحص DNS وإعداد Private DNS'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v44', child: ListTile(leading: Icon(Icons.science_rounded), title: Text('مختبر المستقبل V44 – التحديات والأفكار والتركيز'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v17', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز الملتقى الذكي V18'), contentPadding: EdgeInsets.zero)),

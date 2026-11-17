@@ -312,6 +312,17 @@ service cloud.firestore {
               && request.resource.data.audioUrl is string
               && request.resource.data.audioUrl.matches('https://.*')
               && request.resource.data.audioUrl.size() <= 2048
+              && (!('durationSeconds' in request.resource.data)
+                || (request.resource.data.durationSeconds is int
+                  && request.resource.data.durationSeconds >= 1
+                  && request.resource.data.durationSeconds <= 180))
+            )
+            || (
+              request.resource.data.text == ''
+              && request.resource.data.mediaType in ['image', 'gif']
+              && request.resource.data.mediaUrl is string
+              && request.resource.data.mediaUrl.matches('https://.*')
+              && request.resource.data.mediaUrl.size() <= 2048
             )
           );
         allow update: if request.auth != null
@@ -687,9 +698,11 @@ service cloud.firestore {
         && request.resource.data.mediaUrl is string
         && request.resource.data.mediaUrl.matches('https://.*')
         && request.resource.data.mediaType in ['image', 'video']
-        && request.resource.data.expiresAt is timestamp
-        && request.resource.data.expiresAt > request.time
-        && request.resource.data.expiresAt <= request.time + duration.value(24, 'h');
+        // Stories may expire after 24 hours or remain until their owner deletes them.
+        && (request.resource.data.expiresAt == null
+          || (request.resource.data.expiresAt is timestamp
+            && request.resource.data.expiresAt > request.time
+            && request.resource.data.expiresAt <= request.time + duration.value(24, 'h')));
       allow update: if false;
       allow delete: if request.auth != null
         && resource.data.authorId == request.auth.uid;
@@ -728,6 +741,51 @@ service cloud.firestore {
         allow update: if request.auth != null
           && resource.data.authorId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text']);
+        allow delete: if request.auth != null
+          && (resource.data.authorId == request.auth.uid || isChatStaff());
+      }
+    }
+
+    // Permanent vertical community clips are separate from 24-hour stories.
+    match /communityClips/{clipId} {
+      allow read: if request.auth != null && accountNotBanned();
+      allow create: if request.auth != null && accountNotBanned()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() <= 80
+        && request.resource.data.videoUrl is string
+        && request.resource.data.videoUrl.matches('https://.*')
+        && request.resource.data.caption is string
+        && request.resource.data.caption.size() <= 500
+        && request.resource.data.createdAt is timestamp;
+      allow update: if false;
+      allow delete: if request.auth != null
+        && (resource.data.authorId == request.auth.uid || isChatStaff());
+
+      match /likes/{likeId} {
+        allow read: if request.auth != null && accountNotBanned();
+        allow create, update: if request.auth != null && accountNotBanned()
+          && request.auth.uid == likeId
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if request.auth != null && request.auth.uid == likeId;
+      }
+
+      match /comments/{commentId} {
+        allow read: if request.auth != null && accountNotBanned();
+        allow create: if request.auth != null && accountNotBanned()
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.authorName is string
+          && request.resource.data.authorName.size() <= 80
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 300
+          && request.resource.data.createdAt is timestamp;
+        allow update: if request.auth != null
+          && resource.data.authorId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text'])
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 300;
         allow delete: if request.auth != null
           && (resource.data.authorId == request.auth.uid || isChatStaff());
       }

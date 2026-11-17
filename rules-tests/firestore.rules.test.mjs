@@ -512,6 +512,17 @@ test('post voice comments require an owned HTTPS audio URL', async () => {
     ...valid, audioUrl: 'http://media.example.test/voice-note.m4a',
   }));
   await assertFails(setDoc(doc(user('bob'), 'posts/post-voice/comments/voice-3'), valid));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-media/comments/image-1'), {
+    authorId: 'alice', authorName: 'Alice', text: '', mediaType: 'image',
+    mediaUrl: 'https://media.example.test/reels/comment.jpg', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-media/comments/gif-1'), {
+    authorId: 'alice', authorName: 'Alice', text: '', mediaType: 'gif',
+    mediaUrl: 'https://media.example.test/reels/comment.gif', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'posts/post-voice/comments/voice-4'), {
+    ...valid, durationSeconds: 24,
+  }));
 });
 
 
@@ -787,4 +798,62 @@ test('banned accounts cannot read the shared IPTV library', async () => {
   });
   await assertSucceeds(getDoc(doc(user('active-member'), 'iptvSharedPlaylists/readable')));
   await assertFails(getDoc(doc(user('banned-reader'), 'iptvSharedPlaylists/readable')));
+});
+
+
+test('V52 stories can remain until manually deleted by their owner', async () => {
+  const manualStory = doc(user('alice'), 'stories/manual-story');
+  await assertSucceeds(setDoc(manualStory, {
+    authorId: 'alice',
+    authorName: 'Alice',
+    mediaUrl: 'https://media.example.test/story-manual.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: null,
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'stories/manual-story')));
+  await assertFails(deleteDoc(doc(user('bob'), 'stories/manual-story')));
+  await assertSucceeds(deleteDoc(manualStory));
+});
+
+test('V52 permanent community clips support member feed, likes, comments, and owner moderation', async () => {
+  const clip = doc(user('alice'), 'communityClips/clip-1');
+  await assertSucceeds(setDoc(clip, {
+    authorId: 'alice',
+    authorName: 'Alice',
+    authorPhoto: '',
+    caption: 'مقطع من نشاط الملتقى',
+    videoUrl: 'https://media.example.test/community/clip.mp4',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'communityClips/clip-1')));
+  await assertFails(setDoc(doc(user('bob'), 'communityClips/forged'), {
+    authorId: 'alice',
+    authorName: 'Alice',
+    caption: 'انتحال ملكية',
+    videoUrl: 'https://media.example.test/community/forged.mp4',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'communityClips/http-video'), {
+    authorId: 'alice',
+    authorName: 'Alice',
+    caption: '',
+    videoUrl: 'http://media.example.test/community/clip.mp4',
+    createdAt: serverTimestamp(),
+  }));
+
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/likes/bob'), {
+    uid: 'bob', createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'communityClips/clip-1/likes/bob'), {
+    uid: 'bob', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/comment-1'), {
+    authorId: 'bob', authorName: 'Bob', text: 'مقطع جميل', createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'communityClips/clip-1/comments/comment-2'), {
+    authorId: 'bob', authorName: 'Bob', text: 'انتحال تعليق', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(deleteDoc(doc(user('alice'), 'communityClips/clip-1')));
+  await assertFails(deleteDoc(doc(user('bob'), 'communityClips/clip-1')));
 });
