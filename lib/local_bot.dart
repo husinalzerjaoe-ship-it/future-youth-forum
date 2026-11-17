@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _botColor = Color(0xFF6554D9);
 const _assistantWebhookUrl = String.fromEnvironment('ACTIVEPIECES_WEBHOOK_URL');
@@ -26,6 +27,83 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
     },
   ];
   bool thinking = false;
+  bool _historyReady = false;
+
+  String get _historyKey =>
+      'future_helper_bot_history_${FirebaseAuth.instance.currentUser?.uid ?? 'guest'}';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_historyKey);
+    if (!mounted) return;
+    if (raw != null) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          final restored = decoded
+              .whereType<Map>()
+              .map((item) => Map<String, String>.from(item.map(
+                    (key, value) => MapEntry(key.toString(), value.toString()),
+                  )))
+              .where((item) => item['from'] == 'user' || item['from'] == 'bot')
+              .where((item) => (item['text'] ?? '').isNotEmpty)
+              .take(80)
+              .toList();
+          if (restored.isNotEmpty) {
+            messages
+              ..clear()
+              ..addAll(restored);
+          }
+        }
+      } catch (_) {
+        await prefs.remove(_historyKey);
+      }
+    }
+    if (mounted) setState(() => _historyReady = true);
+    _scrollToBottom();
+  }
+
+  Future<void> _saveHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final recent = messages.length > 80
+        ? messages.sublist(messages.length - 80)
+        : messages;
+    await prefs.setString(_historyKey, jsonEncode(recent));
+  }
+
+  Future<void> _clearHistory() async {
+    if (thinking) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('مسح المحادثة؟'),
+          content: const Text('راح تنمسح المحادثة المحفوظة على هذا الجهاز فقط.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('مسح')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    messages
+      ..clear()
+      ..add({
+        'from': 'bot',
+        'text': 'بدأنا محادثة جديدة! شنو تحب تسأل اليوم؟',
+      });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_historyKey);
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -130,6 +208,7 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
       input.clear();
       thinking = true;
     });
+    await _saveHistory();
     _scrollToBottom();
 
     String reply;
@@ -151,6 +230,7 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
       messages.add({'from': 'bot', 'text': reply});
       thinking = false;
     });
+    await _saveHistory();
     _scrollToBottom();
   }
 
@@ -171,6 +251,13 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
         textDirection: TextDirection.rtl,
         child: Scaffold(
           appBar: AppBar(
+            actions: [
+              IconButton(
+                tooltip: 'مسح المحادثة المحفوظة',
+                onPressed: thinking ? null : _clearHistory,
+                icon: const Icon(Icons.delete_sweep_outlined),
+              ),
+            ],
             title: const Row(children: [
               CircleAvatar(
                 backgroundColor: Color(0xFFEAE6FF),
@@ -181,6 +268,19 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
             ]),
           ),
           body: Column(children: [
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 2),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6554D9).withOpacity(.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'تُرسل رسالتك إلى خدمة المساعد للرد عليها، ويُحفظ سجل المحادثة على هذا الجهاز. لا ترسل كلمات مرور أو معلومات خاصة.',
+                style: TextStyle(fontSize: 11, height: 1.4),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
               child: Wrap(
@@ -201,7 +301,9 @@ class _LocalHelperBotPageState extends State<LocalHelperBotPage> {
               ),
             ),
             Expanded(
-              child: ListView.builder(
+              child: !_historyReady
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
                 controller: scroll,
                 padding: const EdgeInsets.all(12),
                 itemCount: messages.length,
