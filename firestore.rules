@@ -61,6 +61,34 @@ service cloud.firestore {
           && request.resource.data.addedAt is timestamp;
         allow delete: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Purchased profile cosmetics are account-bound. A purchase must reduce
+      // the owner's coin wallet in the same atomic transaction.
+      match /styleInventory/{itemId} {
+        function stylePrice(id) {
+          return {
+            'crown': 180, 'star': 120, 'creator': 140, 'friend': 100,
+            'legend': 350, 'explorer': 130, 'thinker': 150, 'artist': 130,
+            'gamer': 160, 'reader': 110, 'goldframe': 220, 'blueframe': 150,
+            'purpleframe': 150, 'roseframe': 150, 'mintframe': 150, 'fireframe': 190,
+            'spark': 100, 'flame': 120, 'leaf': 90, 'comet': 130, 'diamond': 240,
+            'moon': 100, 'oceanbubble': 120, 'violetbubble': 120, 'goldbubble': 180,
+            'royalbadge': 200, 'creativebadge': 140, 'friendlybadge': 100
+          }[id];
+        }
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create: if request.auth != null && request.auth.uid == userId
+          && accountNotBanned()
+          && request.resource.data.itemId == itemId
+          && request.resource.data.price == stylePrice(itemId)
+          && request.resource.data.name is string
+          && request.resource.data.category in ['ألقاب','إطارات','زخارف','فقاعات','شارات']
+          && request.resource.data.purchasedAt == request.time
+          && exists(/databases/$(database)/documents/coinWallets/$(userId))
+          && getAfter(/databases/$(database)/documents/coinWallets/$(userId)).data.coins
+            == get(/databases/$(database)/documents/coinWallets/$(userId)).data.coins - stylePrice(itemId);
+        allow update, delete: if false;
+      }
     }
 
     match /animeWallpapers/{wallpaperId} {
@@ -136,6 +164,41 @@ service cloud.firestore {
         && request.resource.data.bio.size() <= 300
         && request.resource.data.photoUrl is string
         && request.resource.data.photoUrl.size() <= 2048
+      ) || (
+        request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'customTitle', 'customTitleColor', 'customTitleEndColor', 'customTitleFont',
+          'customTitleGradient', 'customTitleGlow', 'customTitleIcon',
+          'customTitleExpiresAt', 'customTitleUpdatedAt',
+          'profileFrameId', 'profileFrameColor', 'profileDecoration', 'profileDecorationColor'
+        ])
+        && request.resource.data.get('customTitle', '') is string
+        && request.resource.data.get('customTitle', '').size() <= 32
+        && request.resource.data.get('customTitleColor', 0) is int
+        && request.resource.data.get('customTitleColor', 0) >= 0
+        && request.resource.data.get('customTitleColor', 0) <= 4294967295
+        && request.resource.data.get('customTitleEndColor', 0) is int
+        && request.resource.data.get('customTitleEndColor', 0) >= 0
+        && request.resource.data.get('customTitleEndColor', 0) <= 4294967295
+        && request.resource.data.get('customTitleFont', 'default') in ['default', 'serif', 'mono']
+        && request.resource.data.get('customTitleGradient', false) is bool
+        && request.resource.data.get('customTitleGlow', false) is bool
+        && request.resource.data.get('customTitleIcon', '') is string
+        && request.resource.data.get('customTitleIcon', '').size() <= 4
+        && (request.resource.data.get('customTitleExpiresAt', null) == null
+          || request.resource.data.get('customTitleExpiresAt', null) is timestamp)
+        && request.resource.data.customTitleUpdatedAt == request.time
+        && request.resource.data.get('profileFrameId', '') is string
+        && request.resource.data.get('profileFrameId', '').size() <= 40
+        && request.resource.data.get('profileFrameColor', 0) is int
+        && request.resource.data.get('profileFrameColor', 0) >= 0
+        && request.resource.data.get('profileFrameColor', 0) <= 4294967295
+        && request.resource.data.get('profileDecoration', '') is string
+        && request.resource.data.get('profileDecoration', '').size() <= 40
+        && request.resource.data.get('profileDecorationColor', 0) is int
+        && request.resource.data.get('profileDecorationColor', 0) >= 0
+        && request.resource.data.get('profileDecorationColor', 0) <= 4294967295
       ) || (
         isFounder()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
