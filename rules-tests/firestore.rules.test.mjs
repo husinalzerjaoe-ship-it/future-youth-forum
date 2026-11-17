@@ -700,3 +700,33 @@ test('interest clubs require membership for posts and preserve owner controls', 
   }));
 });
 
+
+
+test('V49 vertical video feed reuses secure story permissions for HTTPS videos', async () => {
+  const video = {
+    authorId: 'alice',
+    authorName: 'Alice',
+    mediaUrl: 'https://media.example.test/community-clip.mp4',
+    mediaType: 'video',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 2 * 60 * 60 * 1000)),
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'stories/v49-video-1'), video));
+  await assertSucceeds(getDoc(doc(user('bob'), 'stories/v49-video-1')));
+  await assertFails(setDoc(doc(user('mallory'), 'stories/v49-video-forged'), {
+    ...video, authorId: 'alice',
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'stories/v49-video-http'), {
+    ...video, mediaUrl: 'http://media.example.test/community-clip.mp4',
+  }));
+  await seed('userSanctions/banned-video-user', {
+    uid: 'banned-video-user', permanentBan: true, updatedBy: 'founder-uid',
+  });
+  await assertFails(setDoc(doc(user('banned-video-user'), 'stories/v49-video-banned'), {
+    ...video, authorId: 'banned-video-user',
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'stories/v49-video-expired'), {
+    ...video,
+    expiresAt: Timestamp.fromDate(new Date(Date.now() - 60 * 1000)),
+  }));
+});
