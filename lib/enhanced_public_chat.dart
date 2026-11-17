@@ -561,14 +561,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } else if (action == 'message') {
       final id = _uid.compareTo(memberUid) < 0 ? '${_uid}_${memberUid}' : '${memberUid}_${_uid}';
       final ref = _chatDb.collection('conversations').doc(id);
-      final existing = await ref.get();
-      if (!existing.exists) {
-        final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
-        await ref.set({'members': [_uid, memberUid], 'memberNames': {
+      final members = <String>[_uid, memberUid]..sort();
+      final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
+      await ref.set({
+        'members': members,
+        'memberA': members[0],
+        'memberB': members[1],
+        'memberNames': {
           _uid: me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
           memberUid: memberName,
-        }, 'updatedAt': FieldValue.serverTimestamp()});
-      }
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: memberUid, otherName: memberName)));
     } else if (action == 'report') {
       final reason = await showDialog<String>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl,
@@ -999,8 +1003,14 @@ class ChatMemberProfilePage extends StatelessWidget {
         const SizedBox(height:16),
         FilledButton.icon(onPressed:()async{
           final id=_uid.compareTo(uid)<0?'${_uid}_${uid}':'${uid}_${_uid}';
-          final ref=_chatDb.collection('conversations').doc(id);final old=await ref.get();
-          if(!old.exists){final me=await _chatDb.collection('publicProfiles').doc(_uid).get();await ref.set({'members':[_uid,uid],'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},'updatedAt':FieldValue.serverTimestamp()});}
+          final ref=_chatDb.collection('conversations').doc(id);
+          final members=<String>[_uid,uid]..sort();
+          final me=await _chatDb.collection('publicProfiles').doc(_uid).get();
+          await ref.set({
+            'members':members,'memberA':members[0],'memberB':members[1],
+            'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},
+            'updatedAt':FieldValue.serverTimestamp(),
+          },SetOptions(merge:true));
           if(context.mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>DirectChatPage(conversationId:id,otherUid:uid,otherName:name)));
         },icon:const Icon(Icons.message),label:const Text('مراسلة')),
       ]);
