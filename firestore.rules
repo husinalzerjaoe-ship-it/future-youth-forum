@@ -77,16 +77,23 @@ service cloud.firestore {
           }[id];
         }
         allow read: if request.auth != null && request.auth.uid == userId;
-        allow create: if request.auth != null && request.auth.uid == userId
-          && accountNotBanned()
+        allow create: if request.auth != null
+          && request.resource.data.keys().hasOnly(['itemId','name','category','price','purchasedAt','grantedBy'])
           && request.resource.data.itemId == itemId
           && request.resource.data.price == stylePrice(itemId)
           && request.resource.data.name is string
           && request.resource.data.category in ['ألقاب','إطارات','زخارف','فقاعات','شارات']
           && request.resource.data.purchasedAt == request.time
-          && exists(/databases/$(database)/documents/coinWallets/$(userId))
-          && getAfter(/databases/$(database)/documents/coinWallets/$(userId)).data.coins
-            == get(/databases/$(database)/documents/coinWallets/$(userId)).data.coins - stylePrice(itemId);
+          && (
+            (isFounder() && request.resource.data.grantedBy == request.auth.uid)
+            ||
+            (request.auth.uid == userId
+              && accountNotBanned()
+              && !('grantedBy' in request.resource.data)
+              && exists(/databases/$(database)/documents/coinWallets/$(userId))
+              && getAfter(/databases/$(database)/documents/coinWallets/$(userId)).data.coins
+                == get(/databases/$(database)/documents/coinWallets/$(userId)).data.coins - stylePrice(itemId))
+          );
         allow update, delete: if false;
       }
     }
