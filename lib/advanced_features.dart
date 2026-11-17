@@ -48,6 +48,50 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
     return '${date.day}/${date.month}';
   }
 
+  Future<void> _showConversationOptions(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    final data = doc.data() ?? {};
+    final pinned = (data['pinnedBy'] is List) && List<String>.from(data['pinnedBy']).contains(_uid);
+    final muted = (data['mutedBy'] is List) && List<String>.from(data['mutedBy']).contains(_uid);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            title: Text(pinned ? 'إلغاء تثبيت المحادثة' : 'تثبيت المحادثة بالأعلى'),
+            onTap: () => Navigator.pop(sheet, 'pin'),
+          ),
+          ListTile(
+            leading: Icon(muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined),
+            title: Text(muted ? 'تشغيل إشعارات المحادثة' : 'كتم إشعارات المحادثة'),
+            onTap: () => Navigator.pop(sheet, 'mute'),
+          ),
+        ])),
+      ),
+    );
+    if (action == null) return;
+    final field = action == 'pin' ? 'pinnedBy' : 'mutedBy';
+    final wasEnabled = action == 'pin' ? pinned : muted;
+    try {
+      await doc.reference.update({
+        field: wasEnabled ? FieldValue.arrayRemove([_uid]) : FieldValue.arrayUnion([_uid]),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(action == 'pin'
+              ? (wasEnabled ? 'تم إلغاء تثبيت المحادثة' : 'تم تثبيت المحادثة بالأعلى')
+              : (wasEnabled ? 'تم تشغيل الإشعارات' : 'تم كتم إشعارات المحادثة')),
+        ));
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث المحادثة: ${e.code}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
@@ -110,6 +154,9 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
             }
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             final conversations = [...s.data!.docs]..sort((a, b) {
+              final ap = (a.data()['pinnedBy'] is List) && List<String>.from(a.data()['pinnedBy']).contains(_uid);
+              final bp = (b.data()['pinnedBy'] is List) && List<String>.from(b.data()['pinnedBy']).contains(_uid);
+              if (ap != bp) return ap ? -1 : 1;
               final av = a.data()['updatedAt'] ?? a.data()['lastMessageAt'];
               final bv = b.data()['updatedAt'] ?? b.data()['lastMessageAt'];
               final at = av is Timestamp ? av : Timestamp(0, 0);
@@ -174,8 +221,15 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
                   trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Text(time, style: const TextStyle(fontSize: 10, color: Colors.white54)),
                     const SizedBox(height: 4),
-                    const Icon(Icons.chevron_left, size: 18, color: Colors.white38),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      if ((d['pinnedBy'] is List) && List<String>.from(d['pinnedBy']).contains(_uid))
+                        const Icon(Icons.push_pin_rounded, size: 15, color: Color(0xFFFFC857)),
+                      if ((d['mutedBy'] is List) && List<String>.from(d['mutedBy']).contains(_uid))
+                        const Icon(Icons.notifications_off_outlined, size: 15, color: Colors.white54),
+                      const Icon(Icons.chevron_left, size: 18, color: Colors.white38),
+                    ]),
                   ]),
+                  onLongPress: () => _showConversationOptions(doc),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: doc.id, otherUid: other, otherName: name))),
                 );
               },
@@ -349,6 +403,11 @@ class _DirectChatPageState extends State<DirectChatPage> {
       controller.clear();
       if (mounted) setState(() => replyTo = null);
       try {
+        final latestConversation = (await convo.get()).data() ?? {};
+        final mutedBy = latestConversation['mutedBy'] is List
+            ? List<String>.from(latestConversation['mutedBy'])
+            : <String>[];
+        if (mutedBy.contains(widget.otherUid)) return;
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
           'type': 'message', 'text': sticker != null ? 'أرسل لك ملصقاً' : gifUrl != null ? 'أرسل لك GIF متحركاً' : audioUrl != null ? 'أرسل لك رسالة صوتية' : videoUrl != null ? 'أرسل لك فيديو' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
