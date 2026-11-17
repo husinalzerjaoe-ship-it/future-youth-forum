@@ -204,6 +204,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   bool _busy = false;
   final AudioRecorder _commentRecorder = AudioRecorder();
   bool _recordingComment = false;
+  bool _viewRecorded = false;
   DateTime? _commentVoiceStarted;
 
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
@@ -221,7 +222,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
   @override
   void initState() {
     super.initState();
-    if (widget.active) _initializeVideo();
+    if (widget.active) { _initializeVideo(); _recordView(); }
   }
 
   @override
@@ -230,6 +231,7 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
     if (oldWidget.active != widget.active) {
       if (widget.active) {
         _initializeVideo();
+        _recordView();
       } else {
         _video?.pause();
         _video?.dispose();
@@ -273,6 +275,60 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+  }
+
+  Future<void> _recordView() async {
+    if (_viewRecorded || FirebaseAuth.instance.currentUser == null) return;
+    _viewRecorded = true;
+    try {
+      final ref = FirebaseFirestore.instance.collection('communityClips')
+          .doc(widget.clip.id).collection('views').doc(_uid);
+      final existing = await ref.get();
+      if (!existing.exists) {
+        await ref.set({'viewerId': _uid, 'createdAt': FieldValue.serverTimestamp()});
+      }
+    } catch (_) {
+      _viewRecorded = false;
+    }
+  }
+
+  Future<void> _toggleSaveClip() async {
+    final ref = FirebaseFirestore.instance.collection('users').doc(_uid)
+        .collection('savedClips').doc(widget.clip.id);
+    final existing = await ref.get();
+    if (existing.exists) {
+      await ref.delete();
+    } else {
+      final data = widget.clip.data();
+      await ref.set({
+        'clipId': widget.clip.id,
+        'authorId': (data['authorId'] ?? '').toString(),
+        'authorName': (data['authorName'] ?? 'عضو').toString(),
+        'caption': (data['caption'] ?? '').toString(),
+        'videoUrl': (data['videoUrl'] ?? '').toString(),
+        'savedAt': FieldValue.serverTimestamp(),
+      });
+    }
+  }
+
+  Future<void> _toggleFollowCreator() async {
+    final authorId = (widget.clip.data()['authorId'] ?? '').toString();
+    if (authorId.isEmpty || authorId == _uid) return;
+    final db = FirebaseFirestore.instance;
+    final following = db.collection('publicProfiles').doc(_uid)
+        .collection('following').doc(authorId);
+    final follower = db.collection('publicProfiles').doc(authorId)
+        .collection('followers').doc(_uid);
+    final existing = await following.get();
+    final batch = db.batch();
+    if (existing.exists) {
+      batch.delete(following);
+      batch.delete(follower);
+    } else {
+      batch.set(following, {'userId': authorId, 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(follower, {'userId': _uid, 'createdAt': FieldValue.serverTimestamp()});
+    }
+    await batch.commit();
   }
 
   Future<void> _showComments() async {
@@ -641,6 +697,17 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                             ),
                           ),
                         const SizedBox(height: 8),
+                        if (!isOwner && authorId.isNotEmpty)
+                          StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                            stream: FirebaseFirestore.instance.collection('publicProfiles')
+                                .doc(_uid).collection('following').doc(authorId).snapshots(),
+                            builder: (context, snapshot) => TextButton.icon(
+                              onPressed: _toggleFollowCreator,
+                              style: TextButton.styleFrom(foregroundColor: Colors.white),
+                              icon: Icon(snapshot.data?.exists == true ? Icons.person_remove_alt_1 : Icons.person_add_alt_1, size: 17),
+                              label: Text(snapshot.data?.exists == true ? 'تتابعه' : 'متابعة'),
+                            ),
+                          ),
                         const Text(
                           'مقاطع دائمة لمجتمع ملتقى شباب المستقبل',
                           style:
@@ -667,6 +734,28 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
                         builder: (context, snapshot) => Text(
                           '${snapshot.data?.docs.length ?? 0}',
                           style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance.collection('users').doc(_uid)
+                            .collection('savedClips').doc(widget.clip.id).snapshots(),
+                        builder: (context, snapshot) => IconButton(
+                          color: Colors.white,
+                          tooltip: snapshot.data?.exists == true ? 'إزالة من المحفوظات' : 'حفظ المقطع',
+                          onPressed: _toggleSaveClip,
+                          icon: Icon(snapshot.data?.exists == true ? Icons.bookmark : Icons.bookmark_border),
+                        ),
+                      ),
+                      StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance.collection('communityClips')
+                            .doc(widget.clip.id).collection('views').snapshots(),
+                        builder: (context, snapshot) => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.visibility_outlined, color: Colors.white, size: 17),
+                            const SizedBox(width: 3),
+                            Text('${snapshot.data?.docs.length ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                          ],
                         ),
                       ),
                       IconButton(
