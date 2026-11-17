@@ -2,8 +2,10 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'watch_party.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -46,6 +48,50 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
     return '${date.day}/${date.month}';
   }
 
+  Future<void> _showConversationOptions(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    final data = doc.data() ?? {};
+    final pinned = (data['pinnedBy'] is List) && List<String>.from(data['pinnedBy']).contains(_uid);
+    final muted = (data['mutedBy'] is List) && List<String>.from(data['mutedBy']).contains(_uid);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: Icon(pinned ? Icons.push_pin : Icons.push_pin_outlined),
+            title: Text(pinned ? 'إلغاء تثبيت المحادثة' : 'تثبيت المحادثة بالأعلى'),
+            onTap: () => Navigator.pop(sheet, 'pin'),
+          ),
+          ListTile(
+            leading: Icon(muted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined),
+            title: Text(muted ? 'تشغيل إشعارات المحادثة' : 'كتم إشعارات المحادثة'),
+            onTap: () => Navigator.pop(sheet, 'mute'),
+          ),
+        ])),
+      ),
+    );
+    if (action == null) return;
+    final field = action == 'pin' ? 'pinnedBy' : 'mutedBy';
+    final wasEnabled = action == 'pin' ? pinned : muted;
+    try {
+      await doc.reference.update({
+        field: wasEnabled ? FieldValue.arrayRemove([_uid]) : FieldValue.arrayUnion([_uid]),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(action == 'pin'
+              ? (wasEnabled ? 'تم إلغاء تثبيت المحادثة' : 'تم تثبيت المحادثة بالأعلى')
+              : (wasEnabled ? 'تم تشغيل الإشعارات' : 'تم كتم إشعارات المحادثة')),
+        ));
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر تحديث المحادثة: ${e.code}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Directionality(
     textDirection: TextDirection.rtl,
@@ -85,7 +131,7 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           ),
         ),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
+          stream: _db.collection('conversations').where(Filter.or(Filter('memberA', isEqualTo: _uid), Filter('memberB', isEqualTo: _uid))).snapshots(),
           builder: (context, s) {
             if (s.hasError) {
               final error = s.error;
@@ -108,6 +154,9 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
             }
             if (!s.hasData) return const Center(child: CircularProgressIndicator());
             final conversations = [...s.data!.docs]..sort((a, b) {
+              final ap = (a.data()['pinnedBy'] is List) && List<String>.from(a.data()['pinnedBy']).contains(_uid);
+              final bp = (b.data()['pinnedBy'] is List) && List<String>.from(b.data()['pinnedBy']).contains(_uid);
+              if (ap != bp) return ap ? -1 : 1;
               final av = a.data()['updatedAt'] ?? a.data()['lastMessageAt'];
               final bv = b.data()['updatedAt'] ?? b.data()['lastMessageAt'];
               final at = av is Timestamp ? av : Timestamp(0, 0);
@@ -172,8 +221,15 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
                   trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Text(time, style: const TextStyle(fontSize: 10, color: Colors.white54)),
                     const SizedBox(height: 4),
-                    const Icon(Icons.chevron_left, size: 18, color: Colors.white38),
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      if ((d['pinnedBy'] is List) && List<String>.from(d['pinnedBy']).contains(_uid))
+                        const Icon(Icons.push_pin_rounded, size: 15, color: Color(0xFFFFC857)),
+                      if ((d['mutedBy'] is List) && List<String>.from(d['mutedBy']).contains(_uid))
+                        const Icon(Icons.notifications_off_outlined, size: 15, color: Colors.white54),
+                      const Icon(Icons.chevron_left, size: 18, color: Colors.white38),
+                    ]),
                   ]),
+                  onLongPress: () => _showConversationOptions(doc),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: doc.id, otherUid: other, otherName: name))),
                 );
               },
@@ -224,6 +280,11 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                   final me = FirebaseAuth.instance.currentUser!;
                   final myProfile = await _db.collection('publicProfiles').doc(_uid).get();
                   try {
+                    final controls = (await _db.collection('chatControls').doc('main').get()).data() ?? {};
+                    if (controls['directMessagesEnabled'] == false) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المحادثات الخاصة متوقفة مؤقتاً من الإدارة.')));
+                      return;
+                    }
                     final conversation = _db.collection('conversations').doc(id);
                     // Avoid reading a missing conversation: Firestore denies get()
                     // on a non-existent private chat, preventing first-time DMs.
@@ -231,6 +292,8 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                     final members = <String>[_uid, d.id]..sort();
                     await conversation.set({
                       'members': members,
+                      'memberA': members[0],
+                      'memberB': members[1],
                       'memberNames': {
                         _uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو',
                         d.id: name,
@@ -317,11 +380,25 @@ class _DirectChatPageState extends State<DirectChatPage> {
     } finally { if (mounted) setState(() => changingBackground = false); }
   }
   @override void dispose() { controller.dispose(); voiceRecorder.dispose(); super.dispose(); }
-  Future<void> send({String? imageUrl, String? audioUrl, String? videoUrl, int? durationSeconds}) async {
-    final value = controller.text.trim();
-    if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null) || busy) return;
+  Future<void> send({String? imageUrl, String? audioUrl, String? videoUrl, String? gifUrl, String? sticker, int? durationSeconds}) async {
+    final value = (sticker ?? controller.text).trim();
+    if ((value.isEmpty && imageUrl == null && audioUrl == null && videoUrl == null && gifUrl == null) || busy) return;
     setState(() => busy = true);
     try {
+      final controls = (await _db.collection('chatControls').doc('main').get()).data() ?? {};
+      if (controls['directMessagesEnabled'] == false) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('المحادثات الخاصة متوقفة مؤقتاً من الإدارة.')));
+        return;
+      }
+      final hasMedia = imageUrl != null || audioUrl != null || videoUrl != null || gifUrl != null;
+      if (hasMedia && controls['allowMedia'] == false) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('إرسال الوسائط متوقف حالياً من الإدارة.')));
+        return;
+      }
+      if (controls['allowLinks'] == false && RegExp(r'https?://', caseSensitive: false).hasMatch(value)) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('نشر الروابط متوقف حالياً من الإدارة.')));
+        return;
+      }
       // Users may read only their own block records. Firestore rules independently check both directions before accepting a message.
       final myBlock = await _db.collection('userBlocks').doc('${_uid}_${widget.otherUid}').get();
       if (myBlock.exists) {
@@ -341,15 +418,20 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final batch = _db.batch();
       final convo = _db.collection('conversations').doc(widget.conversationId);
       final msg = convo.collection('messages').doc();
-      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': audioUrl != null ? 'voice' : videoUrl != null ? 'video' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (videoUrl != null) 'videoUrl': videoUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
-      batch.set(convo, {'lastMessage': audioUrl != null ? '🎙️ رسالة صوتية' : videoUrl != null ? '🎬 فيديو' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+      batch.set(msg, {'senderId': _uid, 'senderName': name, 'senderRole': FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? 'founder' : 'member', 'text': value, 'type': sticker != null ? 'sticker' : gifUrl != null ? 'gif' : audioUrl != null ? 'voice' : videoUrl != null ? 'video' : imageUrl != null ? 'image' : 'text', if (imageUrl != null) 'imageUrl': imageUrl, if (gifUrl != null) 'gifUrl': gifUrl, if (audioUrl != null) 'audioUrl': audioUrl, if (videoUrl != null) 'videoUrl': videoUrl, if (durationSeconds != null) 'durationSeconds': durationSeconds, if (replyTo != null) 'replyToMessageId': replyTo!['id'], if (replyTo != null) 'replyToSenderName': replyTo!['senderName'], if (replyTo != null) 'replyToText': replyTo!['preview'], 'createdAt': FieldValue.serverTimestamp()});
+      batch.set(convo, {'lastMessage': sticker != null ? '✨ ملصق' : gifUrl != null ? 'GIF متحرك' : audioUrl != null ? '🎙️ رسالة صوتية' : videoUrl != null ? '🎬 فيديو' : imageUrl != null ? '📷 صورة' : value, 'updatedAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
       await batch.commit();
       controller.clear();
       if (mounted) setState(() => replyTo = null);
       try {
+        final latestConversation = (await convo.get()).data() ?? {};
+        final mutedBy = latestConversation['mutedBy'] is List
+            ? List<String>.from(latestConversation['mutedBy'])
+            : <String>[];
+        if (mutedBy.contains(widget.otherUid)) return;
         await _db.collection('notifications').add({
           'recipientId': widget.otherUid, 'actorId': _uid, 'actorName': name,
-          'type': 'message', 'text': audioUrl != null ? 'أرسل لك رسالة صوتية' : videoUrl != null ? 'أرسل لك فيديو' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
+          'type': 'message', 'text': sticker != null ? 'أرسل لك ملصقاً' : gifUrl != null ? 'أرسل لك GIF متحركاً' : audioUrl != null ? 'أرسل لك رسالة صوتية' : videoUrl != null ? 'أرسل لك فيديو' : imageUrl != null ? 'أرسل لك صورة' : 'أرسل لك رسالة خاصة',
           'read': false, 'createdAt': FieldValue.serverTimestamp(),
         });
       } catch (_) {}
@@ -364,6 +446,82 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
   }
+  Future<void> handleKeyboardMedia(KeyboardInsertedContent content) async {
+    final bytes = content.data;
+    if (bytes == null || bytes.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لوحة المفاتيح لم توفر بيانات الملصق؛ استخدم زر GIF داخل التطبيق')));
+      return;
+    }
+    final ext = content.mimeType == 'image/gif' ? 'gif'
+        : content.mimeType == 'image/webp' ? 'webp'
+        : content.mimeType == 'image/png' ? 'png' : 'jpg';
+    try {
+      if (mounted) setState(() => busy = true);
+      final dir = await Directory.systemTemp.createTemp('forum_keyboard_media_');
+      final file = File('${dir.path}/keyboard_sticker.$ext');
+      await file.writeAsBytes(bytes, flush: true);
+      final url = await uploadForumMedia(XFile(file.path, name: 'keyboard_sticker.$ext'), folder: 'private-chat');
+      if (ext == 'gif') {
+        if (mounted) setState(() => busy = false);
+        await send(gifUrl: url);
+      } else {
+        if (mounted) setState(() => busy = false);
+        await send(imageUrl: url);
+      }
+      try { await file.delete(); await dir.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال ملصق لوحة المفاتيح: $e')));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> sendGif() async {
+    if (busy) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif'], allowMultiple: false, withData: false);
+      final file = picked?.files.single;
+      final path = file?.path;
+      if (file == null || path == null || !mounted) return;
+      if (file.size > 15 * 1024 * 1024) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('حجم GIF يجب ألا يتجاوز 15 ميغابايت')));
+        return;
+      }
+      setState(() => busy = true);
+      final url = await uploadForumMedia(XFile(path, name: file.name), folder: 'private-chat');
+      if (mounted) setState(() => busy = false);
+      await send(gifUrl: url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال GIF: $e')));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
+  Future<void> showStickerPacks() async {
+    const packs = <String, List<String>>{
+      'ضحك وميمز': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏','😅','😄','😁','😃','😆','😝','🫠','😬','😳','😱','🤯','😴','🥱','🤔','🙄','😤','🤫','🫣'],
+      'حب ومشاعر': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','💘','💝','💟','❣️','🌹','🌷','🌸','💐','🫶','🥰','😍','😘','💋','💌','💍'],
+      'ردود وتفاعل': ['👍','👎','👏','🙌','🤝','🙏','👌','✌️','🤟','🫡','💯','🔥','⭐','🌟','✨','🎉','🎊','🏆','🥇','✅','❌','👀','💪','🫰','👋','🖐️','🤌','🫂','💡','📌'],
+      'لطافة وحيوانات': ['🥹','😍','🥰','😘','🫶','🐱','🐼','🐻','🌸','🌹','✨','⭐','🐶','🐨','🦊','🐸','🐵','🐰','🐹','🐣','🦄','🐧','🦋','🐢','🐬','🦁','🐯','🐮','🐷','🐙'],
+      'رياضة وألعاب': ['⚽','🏆','🎮','🎯','🎲','🏀','🎉','🚀','👑','💎','🎵','🎧','🏐','🕹️','♟️','🏓','🎤','🎬','🎨','🌙','☀️','⚡','🛸','🏁','🎸','🥁','🎹','🧩','🪄','📚'],
+    };
+    final chosen = await showModalBottomSheet<String>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(
+        child: SizedBox(height: MediaQuery.of(sheet).size.height * .58,
+          child: DefaultTabController(length: packs.length, child: Column(children: [
+            const Padding(padding: EdgeInsets.all(12), child: Text('حزم الملصقات', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            TabBar(isScrollable: true, tabs: packs.keys.map((name) => Tab(text: name)).toList()),
+            Expanded(child: TabBarView(children: packs.values.map((items) => GridView.count(
+              crossAxisCount: 4, children: items.map((item) => InkWell(
+                onTap: () => Navigator.pop(sheet, item),
+                child: Center(child: Text(item, style: const TextStyle(fontSize: 36))),
+              )).toList(),
+            )).toList())),
+          ])),
+        ),
+      )),
+    );
+    if (chosen != null) await send(sticker: chosen);
+  }
+
   Future<void> sendImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85, maxWidth: 1600);
     if (picked == null || !mounted) return;
@@ -592,6 +750,9 @@ class _DirectChatPageState extends State<DirectChatPage> {
                     ),
                   if (d['replyToMessageId'] is String)
                     Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
+                  if (d['type'] == 'gif' && d['gifUrl'] is String)
+                    ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['gifUrl'] as String, width: 220, fit: BoxFit.contain, errorBuilder: (_,__,___) => const Text('تعذر عرض GIF'))),
+                  if (d['type'] == 'sticker') Center(child: Padding(padding: const EdgeInsets.all(5), child: Text(d['text'] as String? ?? '✨', style: const TextStyle(fontSize: 48)))),
                   if (d['type'] == 'image' && d['imageUrl'] is String)
                     ClipRRect(borderRadius: BorderRadius.circular(10), child: Image.network(d['imageUrl'] as String, width: 220, fit: BoxFit.cover, errorBuilder: (_,__,___) => const Text('تعذر عرض الصورة'))),
                   if (d['type'] == 'video' && d['videoUrl'] is String)
@@ -614,6 +775,8 @@ class _DirectChatPageState extends State<DirectChatPage> {
           if (replyTo != null) Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('الرد على ${replyTo!['senderName']}', style: const TextStyle(color: _brand, fontWeight: FontWeight.bold, fontSize: 12)), Text(replyTo!['preview'] as String, maxLines: 1, overflow: TextOverflow.ellipsis)])), IconButton(visualDensity: VisualDensity.compact, onPressed: () => setState(() => replyTo = null), icon: const Icon(Icons.close, size: 18))])),
           Row(children: [
           IconButton(onPressed: busy ? null : sendImage, tooltip: 'إرسال صورة', icon: const Icon(Icons.image_outlined)),
+          IconButton(onPressed: busy ? null : sendGif, tooltip: 'إرسال GIF متحرك', icon: const Icon(Icons.gif_box_rounded, color: Colors.deepPurple)),
+          IconButton(onPressed: busy ? null : showStickerPacks, tooltip: 'حزم الملصقات', icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.orange)),
           IconButton(onPressed: busy ? null : sendVideo, tooltip: 'إرسال فيديو', icon: const Icon(Icons.video_library_outlined)),
           IconButton(onPressed: busy ? null : toggleVoiceRecording, tooltip: recordingVoice ? 'إيقاف وإرسال التسجيل' : 'تسجيل رسالة صوتية', icon: Icon(recordingVoice ? Icons.stop_circle : Icons.mic, color: recordingVoice ? Colors.red : _brand)),
           Expanded(child: TextField(controller: controller, minLines: 1, maxLines: 4, maxLength: 1000, decoration: const InputDecoration(counterText: '', hintText: 'اكتب رسالة...', border: OutlineInputBorder()), onSubmitted: (_) => send())),

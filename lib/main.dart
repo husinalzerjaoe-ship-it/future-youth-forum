@@ -1,12 +1,18 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'community_pages.dart';
@@ -51,6 +57,11 @@ import 'godot_game_launcher.dart';
 import 'iraqi_recipes.dart';
 import 'future_life_hub.dart';
 import 'friends_fun_world.dart';
+import 'future_culture_hub.dart';
+import 'future_style_store.dart';
+import 'region_chat_hub.dart';
+import 'future_utility_studio.dart';
+import 'future_planner.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -343,7 +354,7 @@ class _AnimatedIntroGateState extends State<AnimatedIntroGate> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+    Future<void>.delayed(const Duration(milliseconds: 650), () {
       if (mounted) setState(() => _showIntro = false);
     });
   }
@@ -416,7 +427,19 @@ class AuthGate extends StatelessWidget {
     stream: FirebaseAuth.instance.authStateChanges(),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(
+          body: Center(child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('لحظات ونجهّز حسابك...', textAlign: TextAlign.center),
+              SizedBox(height: 10),
+              Text('إذا كان الاتصال بطيئاً سيكتمل التحميل عند استقرار الشبكة.', textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white60, fontSize: 12)),
+            ]),
+          )),
+        );
       }
       return snapshot.hasData ? const HomePage() : const AuthPage();
     },
@@ -760,6 +783,21 @@ class _HomePageState extends State<HomePage> {
                 case 'friendsFun':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const FriendsFunWorldPage()));
                   break;
+                case 'cultureHub':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureCultureHubPage()));
+                  break;
+                case 'styleStore':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureStyleStorePage()));
+                  break;
+                case 'regionChats':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const RegionChatHubPage()));
+                  break;
+                case 'utilityStudio':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FutureUtilityStudioPage()));
+                  break;
+                case 'planner':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const FuturePlannerPage()));
+                  break;
                 case 'v6':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V6CommunitySuitePage()));
                   break;
@@ -873,6 +911,11 @@ class _HomePageState extends State<HomePage> {
               const PopupMenuItem(value: 'recipes', child: ListTile(leading: Icon(Icons.restaurant_menu_rounded), title: Text('مطبخ المستقبل – وصفات عراقية وعربية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'lifeHub', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز حياة المستقبل – 57 أداة شخصية'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'friendsFun', child: ListTile(leading: Icon(Icons.celebration_rounded), title: Text('عالم الوناسة – ألعاب وتحديات الأصدقاء'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'cultureHub', child: ListTile(leading: Icon(Icons.menu_book_rounded), title: Text('مكتبة الشعر والاقتباسات والتحديات'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'styleStore', child: ListTile(leading: Icon(Icons.storefront_rounded), title: Text('متجر ستايل المستقبل'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'regionChats', child: ListTile(leading: Icon(Icons.public_rounded), title: Text('مجالس العراق وسوريا والخليج'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'utilityStudio', child: ListTile(leading: Icon(Icons.calculate_rounded), title: Text('استوديو أدوات المستقبل – 11 أداة عملية'), contentPadding: EdgeInsets.zero)),
+              const PopupMenuItem(value: 'planner', child: ListTile(leading: Icon(Icons.event_note_rounded), title: Text('مخطط المستقبل – المهام والعادات والمذكرة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v6', child: ListTile(leading: Icon(Icons.groups_rounded), title: Text('المجتمع الشامل والأندية والمهام'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'dashboard', child: ListTile(leading: Icon(Icons.dashboard_customize_rounded), title: Text('بوابة المستقبل – لوحة يومي'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'knowledge', child: ListTile(leading: Icon(Icons.lightbulb_outline_rounded), title: Text('ركن المعرفة والاكتشاف اليومي'), contentPadding: EdgeInsets.zero)),
@@ -1143,13 +1186,104 @@ class PostsPage extends StatelessWidget {
     }
   }
 
+  Future<void> addVideoPost(BuildContext context) async {
+    final file=await ImagePicker().pickVideo(source:ImageSource.gallery,maxDuration:const Duration(minutes:5));
+    if(file==null)return;
+    try {
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final url=await uploadForumMedia(file,folder:'posts');
+      await db.collection('posts').add({
+        'text':'','videoMediaUrl':url,'mediaType':'video','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الفيديو')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الفيديو: $e')));}
+  }
+  Future<void> recordVoicePost(BuildContext context) async {
+    final recorder=AudioRecorder();
+    String? path;
+    try {
+      if(!await recorder.hasPermission()) {
+        if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اسمح للتطبيق باستخدام المايك لتسجيل المنشور الصوتي.')));
+        return;
+      }
+      final dir=await Directory.systemTemp.createTemp('future_post_voice_');
+      path='${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await recorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:96000,sampleRate:44100),path:path);
+      final publish=await showDialog<bool>(context:context,barrierDismissible:false,builder:(dialogContext)=>Directionality(
+        textDirection:TextDirection.rtl,
+        child:AlertDialog(
+          title:const Text('تسجيل منشور صوتي 🎙️'),
+          content:const Text('التسجيل جارٍ. اضغط إيقاف ونشر عند الانتهاء. الحد الأقصى 3 دقائق.'),
+          actions:[
+            TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('إلغاء')),
+            FilledButton.icon(onPressed:()=>Navigator.pop(dialogContext,true),icon:const Icon(Icons.stop_circle),label:const Text('إيقاف ونشر')),
+          ],
+        )));
+      final stopped=await recorder.stop();
+      if(publish!=true)return;
+      final finalPath=stopped??path;
+      final file=File(finalPath);
+      if(!await file.exists()||await file.length()==0)throw StateError('التسجيل فارغ.');
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final url=await uploadForumMedia(XFile(finalPath,name:'voice_post_${DateTime.now().millisecondsSinceEpoch}.m4a'),folder:'posts');
+      await db.collection('posts').add({
+        'text':'','audioUrl':url,'mediaType':'audio','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر تسجيلك الصوتي')));
+    }catch(e){
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تسجيل المنشور: $e')));
+    }finally{
+      try{await recorder.dispose();}catch(_){}
+      if(path!=null){try{final file=File(path);if(await file.exists())await file.delete();}catch(_){}}
+    }
+  }
+
+  Future<void> addAudioPost(BuildContext context) async {
+    final picked=await FilePicker.platform.pickFiles(type:FileType.audio,withData:false);
+    final path=picked?.files.single.path;
+    if(path==null||path.isEmpty)return;
+    try {
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final file=XFile(path,name:picked!.files.single.name);
+      final url=await uploadForumMedia(file,folder:'posts');
+      await db.collection('posts').add({
+        'text':'','audioUrl':url,'mediaType':'audio','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر المقطع الصوتي')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الصوت: $e')));}
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: db.collection('posts').orderBy('createdAt', descending: true).limit(70).snapshots(),
       builder: (context, s) {
-        if (s.hasError) return const Center(child: Text('تعذر تحميل المنشورات.'));
+        if (s.hasError) return Center(child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.cloud_off_rounded, size: 42, color: Colors.orangeAccent),
+            const SizedBox(height: 12),
+            const Text('تعذر تحميل المنشورات حالياً', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            const SizedBox(height: 8),
+            const Text('قد يكون الاتصال ضعيفاً أو توجد مشكلة بصلاحيات قاعدة البيانات. جرّب مرة ثانية.', textAlign: TextAlign.center),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة تحميل الصفحة'),
+            ),
+          ]),
+        ));
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final posts = s.data!.docs;
         return Scaffold(
@@ -1275,7 +1409,10 @@ class PostsPage extends StatelessWidget {
                 const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 Wrap(spacing: 4, children: [
                   TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.edit_outlined), label: const Text('اكتب منشوراً')),
-                  TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('نشر صورة')),
+                  TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('صورة')),
+                  TextButton.icon(onPressed: () => addVideoPost(context), icon: const Icon(Icons.video_library_outlined), label: const Text('فيديو')),
+                  TextButton.icon(onPressed: () => recordVoicePost(context), icon: const Icon(Icons.mic_rounded), label: const Text('سجّل فويس')),
+                  TextButton.icon(onPressed: () => addAudioPost(context), icon: const Icon(Icons.audio_file_rounded), label: const Text('ملف صوت')),
                 ]),
               ],
             ),
@@ -1285,10 +1422,10 @@ class PostsPage extends StatelessWidget {
               return Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 ListTile(contentPadding: EdgeInsets.zero, leading: UserAvatar(url: d['authorPhoto'] as String?),
                   title: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream: db.collection('publicProfiles').doc(d['authorId'] as String? ?? '').snapshots(), builder: (context, profile) {
-                    final p = profile.data?.data() ?? {}; final title = (p['customTitle'] ?? '').toString().trim();
+                    final p = profile.data?.data() ?? {};
                     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge.fromProfile(title: title, profile: p, compact: true)),
+                      MemberStoreTitleBadges(profile: p, compact: true),
                     ]);
                   }),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
@@ -1297,6 +1434,10 @@ class PostsPage extends StatelessWidget {
                   Padding(padding: const EdgeInsets.only(top: 10), child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(d['imageUrl'] as String, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الصورة'))))),
                 if ((d['videoUrl'] as String? ?? '').trim().isNotEmpty)
                   Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: d['videoUrl'] as String)),
+                if ((d['videoMediaUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 10), child: InlineVideoPost(url: d['videoMediaUrl'] as String)),
+                if ((d['audioUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 8), child: InlineAudioPost(url: d['audioUrl'] as String)),
                 PostSocialActions(postId: doc.id, authorId: d['authorId'] as String? ?? ''),
               ])));
             }),
@@ -1333,8 +1474,8 @@ class _PublicChatPageState extends State<PublicChatPage> {
     return profile.data()?['name'] as String? ?? user.displayName ?? 'عضو';
   }
 
-  Future<void> _send({String text = '', String? imageUrl, String type = 'text'}) async {
-    if (sending || (text.trim().isEmpty && imageUrl == null)) return;
+  Future<void> _send({String text = '', String? imageUrl, String type = 'text', bool uploadInProgress = false}) async {
+    if ((sending && !uploadInProgress) || (text.trim().isEmpty && imageUrl == null)) return;
     final user = FirebaseAuth.instance.currentUser!;
     setState(() { sending = true; sendError = null; });
     try {
@@ -1361,18 +1502,64 @@ class _PublicChatPageState extends State<PublicChatPage> {
     } on StorageException catch (e) { if (mounted) setState(() => sendError = 'فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}'); } catch (e) { if (mounted) setState(() => sendError = 'تعذر رفع الصورة: $e'); }
   }
 
+  Future<void> sendGif() async {
+    if (sending) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['gif']);
+      final path = picked?.files.single.path;
+      if (path == null) return;
+      setState(() { sending = true; sendError = null; });
+      final url = await uploadForumMedia(XFile(path, name: picked!.files.single.name), folder: 'public-chat');
+      await _send(imageUrl: url, type: 'gif', uploadInProgress: true);
+    } catch (e) {
+      if (mounted) setState(() => sendError = 'تعذر إرسال GIF: $e');
+    } finally { if (mounted) setState(() => sending = false); }
+  }
+
+  Future<void> _handleKeyboardMedia(KeyboardInsertedContent content) async {
+    final bytes = content.data;
+    if (bytes == null || bytes.isEmpty) {
+      if (mounted) setState(() => sendError = 'لوحة المفاتيح لم توفر بيانات الملصق؛ استخدم زر GIF داخل التطبيق.');
+      return;
+    }
+    final ext = content.mimeType == 'image/gif' ? 'gif'
+        : content.mimeType == 'image/webp' ? 'webp'
+        : content.mimeType == 'image/png' ? 'png' : 'jpg';
+    try {
+      if (mounted) setState(() { sending = true; sendError = null; });
+      final dir = await Directory.systemTemp.createTemp('forum_keyboard_media_');
+      final file = File('${dir.path}/keyboard_sticker.$ext');
+      await file.writeAsBytes(bytes, flush: true);
+      final url = await uploadForumMedia(XFile(file.path, name: 'keyboard_sticker.$ext'), folder: 'public-chat');
+      await _send(imageUrl: url, type: ext == 'gif' ? 'gif' : 'image', uploadInProgress: true);
+      try { await file.delete(); await dir.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => sendError = 'تعذر إرسال ملصق لوحة المفاتيح: $e');
+    } finally { if (mounted) setState(() => sending = false); }
+  }
+
   void showStickers() {
-    showModalBottomSheet<void>(context: context, showDragHandle: true, backgroundColor: Colors.white,
-      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Row(children: [Icon(Icons.emoji_emotions_outlined, color: brand), SizedBox(width: 8), Text('ملصقات سريعة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17))]),
-          const SizedBox(height: 12),
-          GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 4, childAspectRatio: 1.35,
-            children: stickers.map((sticker) => InkWell(borderRadius: BorderRadius.circular(16),
-              onTap: () { Navigator.pop(sheet); _send(text: sticker, type: 'sticker'); },
-              child: Center(child: Text(sticker, style: const TextStyle(fontSize: 34))))).toList()),
-        ]),
+    const packs = <String, List<String>>{
+      'ضحك': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏'],
+      'حب': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','💖','💘','💕'],
+      'تفاعل': ['👍','👎','👏','🙌','🤝','🙏','👌','✌️','🤟','🫡','💯','🔥'],
+      'لطافة': ['🥹','😍','🥰','😘','🫶','🐱','🐼','🐻','🌸','🌹','✨','⭐'],
+      'ألعاب': ['⚽','🏆','🎮','🎯','🎲','🏀','🎉','🚀','👑','💎','🎵','🎧'],
+    };
+    showModalBottomSheet<void>(context: context, isScrollControlled: true, showDragHandle: true, backgroundColor: Colors.white,
+      builder: (sheet) => Directionality(textDirection: TextDirection.rtl, child: SafeArea(
+        child: SizedBox(height: MediaQuery.of(sheet).size.height * .58,
+          child: DefaultTabController(length: packs.length, child: Column(children: [
+            const Padding(padding: EdgeInsets.all(12), child: Text('حزم الملصقات', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+            TabBar(isScrollable: true, tabs: packs.keys.map((name) => Tab(text: name)).toList()),
+            Expanded(child: TabBarView(children: packs.values.map((items) => GridView.count(
+              crossAxisCount: 4, children: items.map((sticker) => InkWell(
+                onTap: () { Navigator.pop(sheet); _send(text: sticker, type: 'sticker'); },
+                child: Center(child: Text(sticker, style: const TextStyle(fontSize: 36))),
+              )).toList(),
+            )).toList())),
+          ])),
+        ),
       )));
   }
 
@@ -1429,7 +1616,7 @@ class _PublicChatPageState extends State<PublicChatPage> {
                     const Text('المؤسس', style: TextStyle(fontSize: 10, color: Color(0xFFB77900), fontWeight: FontWeight.bold))],
                 ])));
             }),
-        if (type == 'image' && imageUrl != null)
+        if ((type == 'image' || type == 'gif') && imageUrl != null)
           ClipRRect(borderRadius: BorderRadius.circular(13), child: Image.network(imageUrl, width: 230, fit: BoxFit.cover,
             loadingBuilder: (c, child, progress) => progress == null ? child : const SizedBox(width: 230, height: 150, child: Center(child: CircularProgressIndicator())),
             errorBuilder: (c, e, st) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر عرض الصورة')))),
@@ -1456,7 +1643,22 @@ class _PublicChatPageState extends State<PublicChatPage> {
     Expanded(child: Container(color: chatBackgrounds[backgroundIndex], child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).limit(100).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Padding(padding: EdgeInsets.all(22), child: Text('تعذر تحميل المحادثة. تأكد من قواعد Firebase.')));
+        if (snapshot.hasError) return Center(child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.cloud_off_rounded, size: 40, color: Colors.orangeAccent),
+            const SizedBox(height: 10),
+            const Text('تعذر تحميل المحادثة حالياً', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('تحقق من الإنترنت أو صلاحيات المحادثة، ثم أعد تحميل الصفحة.', textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ]),
+        ));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final messages = snapshot.data!.docs;
         if (messages.isEmpty) return const Center(child: Text('الساحة هادئة حالياً… كن أول من يبدأ الحديث ✨'));
@@ -1468,10 +1670,15 @@ class _PublicChatPageState extends State<PublicChatPage> {
     Container(padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .06), blurRadius: 12, offset: const Offset(0, -3))]),
       child: SafeArea(top: false, child: Row(children: [
-        IconButton(onPressed: sending ? null : sendImage, tooltip: 'إرسال صورة أو GIF', icon: const Icon(Icons.image_rounded, color: brand, size: 25)),
+        IconButton(onPressed: sending ? null : sendImage, tooltip: 'إرسال صورة', icon: const Icon(Icons.image_rounded, color: brand, size: 25)),
+        IconButton(onPressed: sending ? null : sendGif, tooltip: 'إرسال GIF متحرك', icon: const Icon(Icons.gif_box_rounded, color: Colors.deepPurple, size: 27)),
         IconButton(onPressed: sending ? null : showStickers, tooltip: 'ملصقات', icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFE6A52C), size: 25)),
         Expanded(child: TextField(controller: messageController, minLines: 1, maxLines: 4, maxLength: 1000,
           textInputAction: TextInputAction.send, onSubmitted: (_) => sendMessage(),
+          contentInsertionConfiguration: ContentInsertionConfiguration(
+            allowedMimeTypes: const ['image/gif', 'image/png', 'image/jpeg', 'image/webp'],
+            onContentInserted: _handleKeyboardMedia,
+          ),
           decoration: InputDecoration(hintText: 'اكتب رسالتك…', counterText: '', filled: true, fillColor: const Color(0xFFF4F2FA),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))),
@@ -1491,7 +1698,17 @@ class MyProfilePage extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: db.collection('publicProfiles').doc(uid).snapshots(),
       builder: (context, s) {
-        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        if (s.hasError) return Center(child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.person_off_rounded, size: 40),
+          const SizedBox(height: 10),
+          const Text('تعذر تحميل الملف الشخصي'),
+          const SizedBox(height: 10),
+          FilledButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())), child: const Text('إعادة المحاولة')),
+        ]),
+      ));
+      if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final d = s.data!.data() ?? {};
         return ListView(padding: const EdgeInsets.all(18), children: [
           const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
@@ -1503,18 +1720,16 @@ class MyProfilePage extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com'
-                      ? const Color(0xFFFFB52E) : accent,
+                  color: d['profileFrameColor'] is int ? Color(d['profileFrameColor'] as int) : (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFFFB52E) : accent),
                   width: 4,
                 ),
               ),
-              child: UserAvatar(url: d['photoUrl'] as String?),
+              child: ProfileIdentityAvatar(profile:d,radius:39),
             )),
           ),
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
-          if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
+          Center(child: MemberStoreTitleBadges(profile: d)),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
@@ -1572,6 +1787,66 @@ class _MembershipCard extends StatelessWidget {
   }
 }
 
+class ProfileIdentityAvatar extends StatelessWidget {
+  final Map<String,dynamic> profile;
+  final double radius;
+  const ProfileIdentityAvatar({super.key,required this.profile,this.radius=42});
+  @override Widget build(BuildContext context) {
+    final frame=profile['profileFrameColor'] is int ? profile['profileFrameColor'] as int : null;
+    final decoration=(profile['profileDecoration']??'').toString();
+    return Column(mainAxisSize:MainAxisSize.min,children:[
+      Container(padding:const EdgeInsets.all(4),decoration:BoxDecoration(
+        shape:BoxShape.circle,
+        border:Border.all(color:frame==null?Theme.of(context).colorScheme.primary:Color(frame),width:frame==null?2:4),
+        boxShadow:frame==null?const[]:[BoxShadow(color:Color(frame).withValues(alpha:.35),blurRadius:14)],
+      ),child:UserAvatar(url:profile['photoUrl'] as String?,radius:radius)),
+      if(decoration.isNotEmpty) Padding(padding:const EdgeInsets.only(top:4),child:Text(
+        decoration=='spark'?'✨':decoration=='flame'?'🔥':decoration=='diamond'?'💎':decoration=='moon'?'🌙':decoration=='comet'?'☄️':'🌿',
+        style:const TextStyle(fontSize:18))),
+    ]);
+  }
+}
+
+class InlineVideoPost extends StatefulWidget {
+  final String url;
+  const InlineVideoPost({super.key,required this.url});
+  @override State<InlineVideoPost> createState()=>_InlineVideoPostState();
+}
+class _InlineVideoPostState extends State<InlineVideoPost> {
+  late final VideoPlayerController _controller=VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  @override void initState(){super.initState();_controller.initialize().then((_){if(mounted)setState((){});}).catchError((_){if(mounted)setState((){});});}
+  @override void dispose(){_controller.dispose();super.dispose();}
+  @override Widget build(BuildContext context){
+    if(!_controller.value.isInitialized)return const Padding(padding:EdgeInsets.all(16),child:Center(child:CircularProgressIndicator()));
+    return Column(children:[
+      AspectRatio(aspectRatio:_controller.value.aspectRatio,child:ClipRRect(borderRadius:BorderRadius.circular(14),child:VideoPlayer(_controller))),
+      Row(children:[
+        IconButton(onPressed:()=>setState(()=>_controller.value.isPlaying?_controller.pause():_controller.play()),
+          icon:Icon(_controller.value.isPlaying?Icons.pause_circle:Icons.play_circle)),
+        Expanded(child:VideoProgressIndicator(_controller,allowScrubbing:true)),
+      ]),
+    ]);
+  }
+}
+class InlineAudioPost extends StatefulWidget {
+  final String url;
+  const InlineAudioPost({super.key,required this.url});
+  @override State<InlineAudioPost> createState()=>_InlineAudioPostState();
+}
+class _InlineAudioPostState extends State<InlineAudioPost>{
+  late final AudioPlayer _player=AudioPlayer();
+  @override void initState(){super.initState();_player.setUrl(widget.url).catchError((_) => null);}
+  @override void dispose(){_player.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Row(children:[
+    StreamBuilder<PlayerState>(stream:_player.playerStateStream,builder:(context,s){
+      final playing=s.data?.playing??false;
+      return IconButton(onPressed:()=>playing?_player.pause():_player.play(),icon:Icon(playing?Icons.pause_circle_filled:Icons.play_circle_fill));
+    }),
+    const Expanded(child:Text('رسالة صوتية / مقطع صوتي',style:TextStyle(fontWeight:FontWeight.bold))),
+    StreamBuilder<Duration>(stream:_player.positionStream,builder:(context,s)=>Text('${s.data?.inSeconds??0} ث')),
+  ])));
+}
+
 class UserAvatar extends StatelessWidget {
   final String? url;
   final double radius;
@@ -1607,7 +1882,7 @@ class EditProfilePage extends StatefulWidget {
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 class _EditProfilePageState extends State<EditProfilePage> {
-  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController();
+  final name = TextEditingController(), bio = TextEditingController(), photo = TextEditingController(), title = TextEditingController();
   bool loading = true, saving = false, uploadingPhoto = false;
   @override
   void initState() {
@@ -1617,11 +1892,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
       name.text = d['name'] as String? ?? '';
       bio.text = d['bio'] as String? ?? '';
       photo.text = d['photoUrl'] as String? ?? '';
+      title.text = d['customTitle'] as String? ?? '';
       if (mounted) setState(() => loading = false);
     });
   }
   @override
-  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); bio.dispose(); photo.dispose(); title.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) => Directionality(textDirection: TextDirection.rtl, child: Scaffold(
     appBar: AppBar(title: const Text('تعديل الملف الشخصي')),
@@ -1629,6 +1905,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       TextField(controller: name, decoration: const InputDecoration(labelText: 'الاسم الظاهر', border: OutlineInputBorder())),
       const SizedBox(height: 12),
       TextField(controller: bio, maxLines: 4, maxLength: 300, decoration: const InputDecoration(labelText: 'السيرة الذاتية', border: OutlineInputBorder())),
+      const SizedBox(height: 12),
+      TextField(controller: title, maxLength: 32, decoration: const InputDecoration(labelText: 'لقبك الشخصي', hintText: 'مثلاً: عاشق الأنمي ⭐', border: OutlineInputBorder())),
+      const SizedBox(height: 6),
+      const Text('تگدر تختار لقب لنفسك، أو تشتري ألقاب جاهزة من المتجر. اللقب يظهر بملفك والدردشة.',style:TextStyle(fontSize:12,color:Colors.grey)),
       const SizedBox(height: 12),
       TextField(controller: photo, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط الصورة (اختياري)', border: OutlineInputBorder())),
       const SizedBox(height: 10),
@@ -1655,7 +1935,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() => saving = true);
         try {
           final u = FirebaseAuth.instance.currentUser!;
-          await db.collection('publicProfiles').doc(u.uid).set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          final profileRef = db.collection('publicProfiles').doc(u.uid);
+          await profileRef.set({'name': name.text.trim(), 'bio': bio.text.trim(), 'photoUrl': photo.text.trim()}, SetOptions(merge: true));
+          await profileRef.update({
+            'customTitle': title.text.trim(),
+            'customTitleColor': 0xFF6554D9,
+            'customTitleEndColor': 0xFF168E9B,
+            'customTitleFont': 'default',
+            'customTitleGradient': true,
+            'customTitleGlow': false,
+            'customTitleIcon': '',
+            'customTitleExpiresAt': null,
+            'customTitleUpdatedAt': FieldValue.serverTimestamp(),
+          });
           await u.updateDisplayName(name.text.trim());
           if (context.mounted) Navigator.pop(context);
         } catch (_) {
@@ -1700,8 +1992,14 @@ class MemberPosts extends StatelessWidget {
         return Card(clipBehavior: Clip.antiAlias, margin: const EdgeInsets.symmetric(vertical: 7),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if ((data['text'] as String? ?? '').isNotEmpty) Text(data['text'] as String, style: const TextStyle(fontSize: 16)),
+            if ((data['imageUrl'] as String? ?? '').isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(data['imageUrl'] as String, width: double.infinity, fit: BoxFit.cover))),
             if (videoUrl.trim().isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: videoUrl)),
+            if ((data['videoMediaUrl'] as String? ?? '').trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: InlineVideoPost(url: data['videoMediaUrl'] as String)),
+            if ((data['audioUrl'] as String? ?? '').trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 8), child: InlineAudioPost(url: data['audioUrl'] as String)),
             PostSocialActions(postId: post.id, authorId: data['authorId'] as String? ?? ''),
           ])));
       }).toList());
@@ -1723,11 +2021,10 @@ class MemberProfilePage extends StatelessWidget {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final d = s.data!.data() ?? {};
           return ListView(padding: const EdgeInsets.all(18), children: [
-            Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+            Center(child: ProfileIdentityAvatar(profile:d)),
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-            if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
+            Center(child: MemberStoreTitleBadges(profile: d)),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
             if (uid != FirebaseAuth.instance.currentUser!.uid)
@@ -1736,14 +2033,18 @@ class MemberProfilePage extends StatelessWidget {
                   final me = FirebaseAuth.instance.currentUser!.uid;
                   final id = me.compareTo(uid) < 0 ? '${me}_${uid}' : '${uid}_${me}';
                   final ref = db.collection('conversations').doc(id);
-                  final old = await ref.get();
-                  if (!old.exists) {
-                    final mine = await db.collection('publicProfiles').doc(me).get();
-                    await ref.set({'members': [me, uid], 'memberNames': {
+                  final members = <String>[me, uid]..sort();
+                  final mine = await db.collection('publicProfiles').doc(me).get();
+                  await ref.set({
+                    'members': members,
+                    'memberA': members[0],
+                    'memberB': members[1],
+                    'memberNames': {
                       me: mine.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
                       uid: d['name'] ?? fallbackName,
-                    }, 'updatedAt': FieldValue.serverTimestamp()});
-                  }
+                    },
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  }, SetOptions(merge: true));
                   if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(
                     conversationId: id, otherUid: uid, otherName: d['name'] as String? ?? fallbackName)));
                 },
@@ -1983,7 +2284,7 @@ class PostSocialActions extends StatelessWidget {
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: comments.snapshots(),
           builder: (context, snap) => TextButton.icon(
-            onPressed: () => _openComments(context, comments),
+            onPressed: () => _openComments(context, comments, authorId),
             icon: const Icon(Icons.mode_comment_outlined),
             label: Text('تعليقات ${snap.data?.docs.length ?? 0}')),
         ),
@@ -2003,7 +2304,7 @@ class PostSocialActions extends StatelessWidget {
       ]),
     ]);
   }
-  Future<void> _openComments(BuildContext context, CollectionReference<Map<String,dynamic>> comments) async {
+  Future<void> _openComments(BuildContext context, CollectionReference<Map<String,dynamic>> comments, String postAuthorId) async {
     final controller = TextEditingController();
     await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(sc)=>Directionality(
       textDirection:TextDirection.rtl,
@@ -2014,19 +2315,27 @@ class PostSocialActions extends StatelessWidget {
             if(!s.hasData)return const Center(child:CircularProgressIndicator());
             if(s.data!.docs.isEmpty)return const Center(child:Text('كن أول من يعلّق'));
             return ListView(children:s.data!.docs.map((doc){final d=doc.data();return ListTile(
-              leading:const CircleAvatar(child:Icon(Icons.person)),title:Text(d['authorName'] as String? ?? 'عضو'),
-              subtitle:Text(d['text'] as String? ?? ''));}).toList());
+              leading:const CircleAvatar(child:Icon(Icons.person)),
+              title:Text(d['authorName'] as String? ?? 'عضو'),
+              subtitle: (d['mediaType'] == 'audio' && d['audioUrl'] is String)
+                ? _VoiceCommentPlayer(url: d['audioUrl'] as String)
+                : Text(d['text'] as String? ?? ''));}).toList());
           })),
           SafeArea(child:Padding(padding:const EdgeInsets.all(10),child:Row(children:[
             Expanded(child:TextField(controller:controller,maxLength:500,decoration:const InputDecoration(hintText:'اكتب تعليقك...',counterText:'',border:OutlineInputBorder()))),
+            IconButton(
+              tooltip: 'تسجيل تعليق صوتي',
+              onPressed: () => _recordVoiceComment(context, comments, postAuthorId),
+              icon: const Icon(Icons.mic_rounded, color: brand),
+            ),
             IconButton.filled(onPressed:() async {
               final value=controller.text.trim();if(value.isEmpty)return;
               final user=FirebaseAuth.instance.currentUser!;
               final profile=await db.collection('publicProfiles').doc(user.uid).get();
               await comments.add({'text':value,'authorId':user.uid,'authorName':profile.data()?['name'] ?? user.displayName ?? 'عضو','createdAt':FieldValue.serverTimestamp()});
-              if (authorId.isNotEmpty && authorId != user.uid) {
+              if (postAuthorId.isNotEmpty && postAuthorId != user.uid) {
                 await db.collection('notifications').add({
-                  'recipientId': authorId, 'actorId': user.uid,
+                  'recipientId': postAuthorId, 'actorId': user.uid,
                   'actorName': profile.data()?['name'] ?? user.displayName ?? 'عضو',
                   'type': 'comment', 'text': 'علّق على منشورك',
                   'read': false, 'createdAt': FieldValue.serverTimestamp(),
@@ -2039,6 +2348,153 @@ class PostSocialActions extends StatelessWidget {
     ));
     controller.dispose();
   }
+}
+
+
+Future<void> _recordVoiceComment(
+  BuildContext context,
+  CollectionReference<Map<String, dynamic>> comments,
+  String postAuthorId,
+) async {
+  final recorder = AudioRecorder();
+  String? path;
+  var recordingStarted = false;
+  try {
+    if (!await recorder.hasPermission()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اسمح للتطبيق باستخدام المايك لتسجيل التعليق الصوتي.')),
+        );
+      }
+      return;
+    }
+    final dir = await Directory.systemTemp.createTemp('future_comment_voice_');
+    path = '${dir.path}/comment_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await recorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 96000, sampleRate: 44100),
+      path: path,
+    );
+    recordingStarted = true;
+    final publish = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تسجيل تعليق صوتي'),
+          content: const Text('سجّل تعليقك، ثم اضغط إيقاف وإرسال.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.stop_circle),
+              label: const Text('إيقاف وإرسال'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final stopped = await recorder.stop();
+    recordingStarted = false;
+    if (publish != true) return;
+    final finalPath = stopped ?? path;
+    final file = File(finalPath);
+    if (!await file.exists() || await file.length() == 0) {
+      throw StateError('التسجيل فارغ.');
+    }
+    final user = FirebaseAuth.instance.currentUser!;
+    final profile = await db.collection('publicProfiles').doc(user.uid).get();
+    final name = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
+    final url = await uploadForumMedia(
+      XFile(finalPath, name: 'voice_comment_${DateTime.now().millisecondsSinceEpoch}.m4a'),
+      folder: 'posts',
+    );
+    await comments.add({
+      'text': '',
+      'audioUrl': url,
+      'mediaType': 'audio',
+      'authorId': user.uid,
+      'authorName': name,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    if (postAuthorId.isNotEmpty && postAuthorId != user.uid) {
+      await db.collection('notifications').add({
+        'recipientId': postAuthorId,
+        'actorId': user.uid,
+        'actorName': name,
+        'type': 'comment',
+        'text': 'أرسل تعليقاً صوتياً على منشورك',
+        'read': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم إرسال التعليق الصوتي')),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذر إرسال التعليق الصوتي: $e')),
+      );
+    }
+  } finally {
+    if (recordingStarted) { try { await recorder.stop(); } catch (_) {} }
+    try { await recorder.dispose(); } catch (_) {}
+    if (path != null) {
+      try { final file = File(path); if (await file.exists()) await file.delete(); } catch (_) {}
+    }
+  }
+}
+
+class _VoiceCommentPlayer extends StatefulWidget {
+  const _VoiceCommentPlayer({required this.url});
+  final String url;
+  @override
+  State<_VoiceCommentPlayer> createState() => _VoiceCommentPlayerState();
+}
+class _VoiceCommentPlayerState extends State<_VoiceCommentPlayer> {
+  late final AudioPlayer _player = AudioPlayer();
+  bool _failed = false;
+  @override
+  void initState() {
+    super.initState();
+    _prepare();
+  }
+  Future<void> _prepare() async {
+    try { await _player.setUrl(widget.url); }
+    catch (_) { if (mounted) setState(() => _failed = true); }
+  }
+  @override
+  void dispose() { _player.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    StreamBuilder<PlayerState>(
+      stream: _player.playerStateStream,
+      builder: (context, snapshot) {
+        final playing = snapshot.data?.playing ?? false;
+        return IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'تشغيل التعليق الصوتي',
+          onPressed: _failed ? null : () async {
+            if (_player.playing) { await _player.pause(); } else { await _player.play(); }
+          },
+          icon: Icon(_failed ? Icons.error_outline : (playing ? Icons.pause_circle : Icons.play_circle)),
+        );
+      },
+    ),
+    const Text('تعليق صوتي'),
+    StreamBuilder<Duration?>(
+      stream: _player.durationStream,
+      builder: (context, snapshot) {
+        final duration = snapshot.data;
+        if (duration == null) return const SizedBox.shrink();
+        final seconds = duration.inSeconds;
+        return Text('  $seconds ث');
+      },
+    ),
+  ]);
 }
 
 

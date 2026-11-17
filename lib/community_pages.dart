@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'youtube_video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -31,6 +32,10 @@ import 'daily_world.dart';
 import 'v6_community_suite.dart';
 import 'knowledge_corner.dart';
 import 'v31_member_titles.dart';
+import 'friends_fun_world.dart';
+import 'future_arcade.dart';
+import 'v39_daily_challenges.dart';
+import 'v39_creator_links.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -47,6 +52,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
  String _category='الكل';
 
  late final List<({String title,String subtitle,String category,IconData icon,Widget page})> _items=[
+  (title:'حسابات المطوّر',subtitle:'روابط التواصل الرسمية وإعدادات الدردشة بإدارة المؤسس',category:'المجتمع',icon:Icons.verified_user_rounded,page:const V39CreatorLinksPage()),
   (title:'الستوريات',subtitle:'صور وفيديوهات لمدة 24 ساعة',category:'التواصل',icon:Icons.camera_alt,page:const StoriesPage()),
   (title:'دردشات الدول',subtitle:'غرف العراق حسب المحافظات والاهتمامات وغرف عربية',category:'التواصل',icon:Icons.forum,page:const RegionChatRoomsPage()),
   (title:'المشاهدة الجماعية',subtitle:'شاهدوا يوتيوب والبث المباشر معاً',category:'الترفيه',icon:Icons.groups_rounded,page:const WatchPartyLobbyPage()),
@@ -54,8 +60,11 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'مكالمات الصوت والفيديو',subtitle:'اتصلوا بالصوت وانتقلوا بين الأقسام والمكالمة مستمرة',category:'التواصل',icon:Icons.video_call_rounded,page:LiveKitCallsPage(onContinue:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>const CommunityHubPage())))),
   (title:'اتصال احتياطي Jitsi',subtitle:'بديل للصوت والفيديو مع دردشة الاجتماع ورمز غرفة',category:'التواصل',icon:Icons.video_camera_front_rounded,page:const JitsiBackupCallsPage()),
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
+  (title:'عالم الوناسة',subtitle:'تحديات جماعية وألغاز وتمثيل وألعاب خفيفة بدون إنترنت',category:'الألعاب',icon:Icons.celebration_rounded,page:const FriendsFunWorldPage()),
+  (title:'مدينة الألعاب 2D',subtitle:'ألعاب أركيد وطاولات وألغاز ومغامرات',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const FutureArcadePage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
+  (title:'تحديات وإنجازات V39',subtitle:'مهمة يومية وسلسلة استمرار ومستويات وشارات محلية',category:'الألعاب',icon:Icons.military_tech_rounded,page:const V39DailyChallengesPage()),
   (title:'مركز المباريات',subtitle:'مواعيد ونتائج ومتابعة أخبار الكرة',category:'الألعاب',icon:Icons.sports_soccer,page:const MatchCenterPage()),
   (title:'المساعد الذكي',subtitle:'مساعد مجاني داخل التطبيق',category:'المعرفة',icon:Icons.smart_toy,page:const LocalHelperBotPage()),
   (title:'ركن المعرفة والترفيه',subtitle:'معلومات يومية ونصائح وألغاز وكتابة إبداعية',category:'المعرفة',icon:Icons.auto_stories_rounded,page:const KnowledgeCornerPage()),
@@ -219,7 +228,32 @@ class _TextShelfState extends State<TextShelf> {
   appBar:AppBar(title:Text(widget.title)),body:Column(children:[
    if(widget.collection=='poems') Padding(padding:const EdgeInsets.fromLTRB(12,8,12,2),child:Wrap(spacing:8,children:['الكل','شعبي','فصحى'].map((v)=>ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v))).toList())),
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection(widget.collection).orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
-    if(s.hasError)return const Center(child:Text('تعذر تحميل المشاركات. تأكد من قواعد Firestore.'));
+    if(s.hasError) return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: .35),
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('الاتصال بالمكتبة غير متاح حالياً. تقدر تتصفح المحتوى المحفوظ داخل التطبيق، والمنشورات الجديدة تظهر عند رجوع الاتصال.'),
+          ),
+        ),
+        ..._builtIns.take(80).where((d)=>category=='الكل'||d['category']==category).map((d) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [const Icon(Icons.auto_awesome, color: p), const SizedBox(width: 8), Expanded(child: Text(d['authorName']!, style: const TextStyle(fontWeight: FontWeight.bold))), Chip(label: Text(d['category']!))]),
+              const SizedBox(height: 8),
+              SelectableText(d['text']!, style: const TextStyle(fontSize: 16, height: 1.6)),
+              Align(alignment: Alignment.centerLeft, child: IconButton(
+                tooltip: 'نسخ النص', icon: const Icon(Icons.copy_rounded),
+                onPressed: () { Clipboard.setData(ClipboardData(text: d['text']!)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم النسخ'))); },
+              )),
+            ]),
+          ),
+        )),
+      ],
+    );
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final userItems=s.data!.docs.map((doc)=>{'text':doc.data()['text'] as String? ??'','category':doc.data()['category'] as String? ??(widget.collection=='poems'?'فصحى':'اقتباسات'),'authorName':doc.data()['authorName'] as String? ??'عضو','id':doc.id}).where((d)=>category=='الكل'||d['category']==category).toList();
     final built=_builtIns.where((d)=>category=='الكل'||d['category']==category).toList(); final items=[...userItems,...built];
@@ -462,7 +496,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
  int backgroundIndex=0;
  bool get founder=>isForumFounder;
  static const backgrounds=[Color(0xFFF5F3FF),Color(0xFFEAF6FF),Color(0xFFFFF3E8),Color(0xFFF0F7F1),Color(0xFF171936)];
- static const stickers=['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍'];
+ static const stickers=['😂','🤣','😹','🥹','😭','😍','🥰','😎','🤩','😱','🤯','😴','🤔','🙄','😅','🥳','🤗','🫠','😤','🤭','😋','😜','🤪','😇','❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','💘','💝','💟','❣️','🌹','🌷','🌸','💐','🫶','👍','👎','👏','🙌','🤝','🙏','💪','👌','✌️','🤟','🫡','🫰','👋','💯','🔥','⭐','🌟','🎉','🏆','🥇','✅','❌','👀','🫂','🐱','🐶','🐼','🐻','🐨','🦊','🐸','🐵','🐰','🐹','🐣','🦄','🐧','🦋','🐢','🐬','🦁','🐯','🐮','🐷','🐙','🌈','🍓','🍉','⚽','🏀','🏐','🎮','🕹️','🎯','🎲','♟️','🏓','🎧','🎤','🎬','🎨','🚀','🌙','☀️','⚡','💎','👑','🛸','🏁','🎸','🥁','🎹'];
 
  Future<bool> blocked(String uid) async {
   final snap=await db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid).get();
@@ -521,6 +555,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
  }
 
+ Future<void> sendGif() async { if(busy)return; try { final result=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:const ['gif'],allowMultiple:false,withData:false); final file=result?.files.single; final path=file?.path; if(file==null||path==null)return; if(file.size>15*1024*1024){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حجم GIF يجب ألا يتجاوز 15 ميغابايت')));return;} setState(()=>busy=true); final url=await uploadForumMedia(XFile(path,name:file.name),folder:'regional-chat',roomId:widget.id); await send(text:'GIF متحرك',imageUrl:url,type:'image'); } catch(e){if(mounted)setState(()=>error='تعذر إرسال GIF: $e');} finally{if(mounted)setState(()=>busy=false);} }
+
  Future<void> toggleVoiceRecording() async {
   if(busy)return;
   if(!recordingVoice){
@@ -549,11 +585,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   }finally{if(mounted)setState(()=>busy=false);}
  }
 
- void showStickers()=>showModalBottomSheet<void>(context:context,showDragHandle:true,
-  builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),
-   child:GridView.count(shrinkWrap:true,crossAxisCount:4,childAspectRatio:1.3,children:stickers.map((s)=>InkWell(
-    onTap:(){Navigator.pop(sheet);send(text:s,type:'sticker');},
-    child:Center(child:Text(s,style:const TextStyle(fontSize:34))))).toList()))));
+ Future<void> showStickers() async { final selected=await showModalBottomSheet<String>(context:context,isScrollControlled:true,showDragHandle:true,builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:SizedBox(height:MediaQuery.of(sheet).size.height*.62,child:Column(children:[const Padding(padding:EdgeInsets.all(12),child:Text('حزم الملصقات',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),Expanded(child:GridView.builder(padding:const EdgeInsets.all(12),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5,mainAxisSpacing:8,crossAxisSpacing:8),itemCount:stickers.length,itemBuilder:(c,i)=>InkWell(onTap:()=>Navigator.pop(sheet,stickers[i]),child:Container(decoration:BoxDecoration(color:const Color(0xFFF1EDFF),borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:Text(stickers[i],style:const TextStyle(fontSize:30))))))])))); if(selected!=null)await send(text:selected,type:'sticker'); }
+
 
  Future<void> chooseBackground() async {
   final selected=await showModalBottomSheet<int>(context:context,showDragHandle:true,
@@ -627,7 +660,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
     }))),
    if(error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text(error!,style:const TextStyle(color:Colors.red,fontSize:11))),
    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:6,vertical:6),child:SafeArea(top:false,child:Row(children:[
-    IconButton(onPressed:busy?null:sendImage,tooltip:'صورة أو GIF',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:sendGif,tooltip:'إرسال GIF متحرك',icon:const Icon(Icons.gif_box_outlined,color:p)),
     IconButton(onPressed:busy?null:toggleVoiceRecording,tooltip:recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(recordingVoice?Icons.stop_circle:Icons.mic,color:recordingVoice?Colors.red:p)),
     IconButton(onPressed:busy?null:showStickers,tooltip:'ملصقات',icon:const Icon(Icons.emoji_emotions,color:Color(0xFFE6A52C))),
     Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(text:t.text),

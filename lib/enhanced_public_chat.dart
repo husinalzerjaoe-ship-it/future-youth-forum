@@ -6,7 +6,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'advanced_features.dart';
@@ -110,7 +113,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
   }
 
-  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false,int? durationSeconds}) async {
+  Future<void> _send({String body='',String? mediaUrl,String type='text',bool uploadInProgress=false,int? durationSeconds,String? mediaFormat}) async {
     if((_sending && !uploadInProgress) || (body.trim().isEmpty && mediaUrl==null)) return;
     final now = DateTime.now();
     final last = _lastSuccessfulSend;
@@ -125,6 +128,19 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
     setState(()=>_sending=true); setState(()=>_error=null);
     try {
+      final controls = (await _chatDb.collection('chatControls').doc('main').get()).data() ?? {};
+      if (controls['publicChatEnabled'] == false) {
+        if (mounted) setState(() => _error = 'الدردشة العامة متوقفة مؤقتاً من الإدارة.');
+        return;
+      }
+      if (type != 'text' && type != 'sticker' && controls['allowMedia'] == false) {
+        if (mounted) setState(() => _error = 'إرسال الوسائط متوقف حالياً من الإدارة.');
+        return;
+      }
+      if (type == 'text' && controls['allowLinks'] == false && RegExp(r'https?://', caseSensitive: false).hasMatch(body)) {
+        if (mounted) setState(() => _error = 'نشر الروابط متوقف حالياً من الإدارة.');
+        return;
+      }
       final sanction = (await _chatDb.collection('userSanctions').doc(_uid).get()).data() ?? {};
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       final muteUntil = sanction['muteUntil'] is Timestamp ? (sanction['muteUntil'] as Timestamp).millisecondsSinceEpoch : 0;
@@ -142,7 +158,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
       final expiry = membership['expiresAt'];
       final membershipTier = expiry is Timestamp && expiry.toDate().isAfter(DateTime.now()) ? (membership['tier'] ?? 'premium').toString() : '';
       final sentMessage = await _chatDb.collection('messages').add({
-        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':'imageUrl'):mediaUrl,if(durationSeconds!=null)'durationSeconds':durationSeconds,
+        'text':body.trim(),'type':type,if(mediaUrl!=null)(type=='voice'?'audioUrl':type=='video'?'videoUrl':type=='gif'?'gifUrl':'imageUrl'):mediaUrl,if(mediaFormat!=null)'mediaFormat':mediaFormat,if(durationSeconds!=null)'durationSeconds':durationSeconds,
         'senderId':_uid,'senderRole':_isFounder?'founder':'member','senderName':senderName,
         if (membershipTier.isNotEmpty) 'membershipTier': membershipTier,
         'createdAt':FieldValue.serverTimestamp(),
@@ -178,6 +194,59 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } on StorageException catch(e) { if(mounted)setState(()=>_error='فشل رفع الصورة: ${e.message}'); } catch(e) { if(mounted)setState(()=>_error='تعذر رفع الصورة: $e'); }
     finally { if(mounted)setState(()=>_sending=false); }
   }
+  Future<void> _handleKeyboardMedia(KeyboardInsertedContent content) async {
+    final bytes = content.data;
+    if (bytes == null || bytes.isEmpty) {
+      _snack('لوحة المفاتيح لم توفر بيانات الملصق؛ استخدم زر GIF داخل التطبيق');
+      return;
+    }
+    final ext = content.mimeType == 'image/gif' ? 'gif'
+        : content.mimeType == 'image/webp' ? 'webp'
+        : content.mimeType == 'image/png' ? 'png' : 'jpg';
+    try {
+      if (mounted) setState(() { _sending = true; _error = null; });
+      final dir = await Directory.systemTemp.createTemp('forum_keyboard_media_');
+      final file = File('${dir.path}/keyboard_sticker.$ext');
+      await file.writeAsBytes(bytes, flush: true);
+      final url = await uploadForumMedia(XFile(file.path, name: 'keyboard_sticker.$ext'), folder: 'public-chat');
+      await _send(body: 'ملصق من لوحة المفاتيح', mediaUrl: url, type: 'image',
+        uploadInProgress: true, mediaFormat: content.mimeType);
+      try { await file.delete(); await dir.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر إرسال ملصق لوحة المفاتيح: $e');
+    } finally { if (mounted) setState(() => _sending = false); }
+  }
+
+  Future<void> _sendGif() async {
+    if (_sending) return;
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['gif'],
+        allowMultiple: false,
+        withData: false,
+      );
+      final file = picked?.files.single;
+      final path = file?.path;
+      if (file == null || path == null) {
+        if (file != null) _snack('تعذر قراءة ملف GIF من الجهاز');
+        return;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        _snack('حجم GIF يجب ألا يتجاوز 15 ميغابايت');
+        return;
+      }
+      if (mounted) setState(() { _sending = true; _error = null; });
+      final url = await uploadForumMedia(XFile(path, name: file.name), folder: 'public-chat');
+      await _send(body: 'GIF متحرك', mediaUrl: url, type: 'image',
+        mediaFormat: 'gif', uploadInProgress: true);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'تعذر إرسال GIF: $e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   Future<void> _sendVideo() async {
     if (_sending) return;
     try {
@@ -235,12 +304,52 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     }
   }
 
+  static const Map<String, List<String>> _stickerPacks = {
+    'ضحك ومشاعر': ['😂','🤣','😹','🥹','😭','😍','🥰','😘','😎','🤩','😱','🤯','😴','🤔','🙄','😅','😆','😇','🥳','🤗','🫠','😤','😡','🤫','🫣','😏','🤭','😋','😜','🤪'],
+    'حب وقلوب': ['❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','💘','💝','💟','❣️','💌','🌹','🌷','🌸','💐','🫶','😘','💋','✨','💍','🥰'],
+    'ردود وتفاعل': ['👍','👎','👏','🙌','🤝','🙏','💪','👌','✌️','🤟','🫡','🫰','🖐️','👋','🫵','💯','🔥','⭐','🌟','🎉','🎊','🏆','🥇','✅','❌','💡','📌','👀','🤌','🫂'],
+    'حيوانات ولطافة': ['🐱','🐈','🐶','🐼','🐻','🐨','🦊','🐸','🐵','🐰','🐹','🐣','🐥','🦄','🐧','🦋','🐢','🐬','🦁','🐯','🐮','🐷','🐙','🦖','🐾','🌈','🍓','🍉','🍒','🍕'],
+    'العاب ورياضة': ['⚽','🏀','🏐','🎮','🕹️','🎯','🎲','♟️','🏓','🎧','🎤','🎬','🎨','🚀','🌙','☀️','⚡','💎','👑','🛸','🏁','🎸','🥁','🎹','🏅','🏹','🧩','🪄','📚','🎓'],
+  };
+
   Future<void> _showStickers() async {
-    final v=await showModalBottomSheet<String>(context:context,showDragHandle:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const Text('الملصقات',style:TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
-      GridView.count(shrinkWrap:true,crossAxisCount:5,physics:const NeverScrollableScrollPhysics(),children:_stickers.map((e)=>InkWell(onTap:()=>Navigator.pop(c,e),child:Center(child:Text(e,style:const TextStyle(fontSize:32))))).toList())
-    ]))));
-    if(v!=null)await _send(body:v,type:'sticker');
+    final selected = await showModalBottomSheet<String>(
+      context: context, isScrollControlled: true, showDragHandle: true,
+      builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: SizedBox(
+          height: MediaQuery.of(c).size.height * .62,
+          child: DefaultTabController(
+            length: _stickerPacks.length,
+            child: Column(children: [
+              const Padding(padding: EdgeInsets.all(12), child: Text('حزم الملصقات',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold))),
+              TabBar(isScrollable: true, tabs: _stickerPacks.keys.map((name) => Tab(text: name)).toList()),
+              Expanded(child: TabBarView(children: _stickerPacks.values.map((pack) =>
+                GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 5, mainAxisSpacing: 8, crossAxisSpacing: 8),
+                  itemCount: pack.length,
+                  itemBuilder: (ctx, i) => InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => Navigator.pop(c, pack[i]),
+                    child: Container(
+                      decoration: BoxDecoration(color: const Color(0xFFF1EDFF),
+                        borderRadius: BorderRadius.circular(14)),
+                      alignment: Alignment.center,
+                      child: Text(pack[i], style: const TextStyle(fontSize: 31)),
+                    ),
+                  ),
+                )).toList())),
+              const Padding(padding: EdgeInsets.only(bottom: 12),
+                child: Text('وتكدر ترسل GIF متحرك من ملفات جهازك', style: TextStyle(color: Colors.grey))),
+            ]),
+          ),
+        ),
+      ),
+    );
+    if (selected != null) await _send(body: selected, type: 'sticker');
   }
   Future<void> _react(String id,String emoji) async {
     final r=_chatDb.collection('messages').doc(id).collection('reactions').doc(_uid);
@@ -452,14 +561,18 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
     } else if (action == 'message') {
       final id = _uid.compareTo(memberUid) < 0 ? '${_uid}_${memberUid}' : '${memberUid}_${_uid}';
       final ref = _chatDb.collection('conversations').doc(id);
-      final existing = await ref.get();
-      if (!existing.exists) {
-        final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
-        await ref.set({'members': [_uid, memberUid], 'memberNames': {
+      final members = <String>[_uid, memberUid]..sort();
+      final me = await _chatDb.collection('publicProfiles').doc(_uid).get();
+      await ref.set({
+        'members': members,
+        'memberA': members[0],
+        'memberB': members[1],
+        'memberNames': {
           _uid: me.data()?['name'] ?? FirebaseAuth.instance.currentUser?.displayName ?? 'عضو',
           memberUid: memberName,
-        }, 'updatedAt': FieldValue.serverTimestamp()});
-      }
+        },
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => DirectChatPage(conversationId: id, otherUid: memberUid, otherName: memberName)));
     } else if (action == 'report') {
       final reason = await showDialog<String>(context: context, builder: (c) => Directionality(textDirection: TextDirection.rtl,
@@ -529,7 +642,7 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
         const SizedBox(height:6),
         if(reply!=null)Text('رد على '+(reply['senderName']??'عضو').toString()+': '+(reply['text']??'مرفق').toString(),maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11)),
         if(type=='voice'&&d['audioUrl'] is String)_VoiceMessagePlayer(url:d['audioUrl'] as String,durationSeconds:(d['durationSeconds'] as num?)?.toInt()??0),
-        if(type=='image'&&d['imageUrl'] is String)ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network(d['imageUrl'] as String,width:230,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
+        if((type=='image'&&d['imageUrl'] is String)||(type=='gif'&&d['gifUrl'] is String))ClipRRect(borderRadius:BorderRadius.circular(12),child:Image.network((type=='gif'?d['gifUrl']:d['imageUrl']) as String,width:230,fit:BoxFit.contain,errorBuilder:(_,__,___)=>const Text('تعذر عرض الصورة'))),
         if(type=='video'&&d['videoUrl'] is String)_ChatVideoMessage(url:d['videoUrl'] as String),
         if(type=='sticker')Center(child:Text(body,style:const TextStyle(fontSize:48))),
         if(type=='text'&&body.isNotEmpty)Text(body,style:TextStyle(fontSize:founder?19:18,height:1.7,color:founder?const Color(0xFF54227A):const Color(0xFF172033),fontWeight:founder?FontWeight.w800:FontWeight.w600,letterSpacing: founder ? 0.15 : 0)),
@@ -802,12 +915,14 @@ class _EnhancedPublicChatPageState extends State<EnhancedPublicChatPage> with Wi
               onSelected: (value) {
                 if (value == 'image') _sendImage();
                 if (value == 'video') _sendVideo();
+                if (value == 'gif') _sendGif();
                 if (value == 'stickers') _showStickers();
                 if (value == 'voice') _toggleVoiceRecording();
               },
               itemBuilder: (c) => [
                 const PopupMenuItem(value: 'image', child: Row(children: [Icon(Icons.image_outlined, size: 19), SizedBox(width: 9), Text('إرسال صورة')])),
                 const PopupMenuItem(value: 'video', child: Row(children: [Icon(Icons.video_library_outlined, size: 19), SizedBox(width: 9), Text('إرسال فيديو')])),
+                const PopupMenuItem(value: 'gif', child: Row(children: [Icon(Icons.gif_box_outlined, size: 19), SizedBox(width: 9), Text('إرسال GIF متحرك')])),
                 const PopupMenuItem(value: 'stickers', child: Row(children: [Icon(Icons.emoji_emotions_outlined, size: 19), SizedBox(width: 9), Text('ملصقات وإيموجي')])),
                 PopupMenuItem(value: 'voice', child: Row(children: [
                   Icon(_recordingVoice ? Icons.stop_circle : Icons.mic_none, color: _recordingVoice ? Colors.red : _chatBrand, size: 19),
@@ -888,8 +1003,14 @@ class ChatMemberProfilePage extends StatelessWidget {
         const SizedBox(height:16),
         FilledButton.icon(onPressed:()async{
           final id=_uid.compareTo(uid)<0?'${_uid}_${uid}':'${uid}_${_uid}';
-          final ref=_chatDb.collection('conversations').doc(id);final old=await ref.get();
-          if(!old.exists){final me=await _chatDb.collection('publicProfiles').doc(_uid).get();await ref.set({'members':[_uid,uid],'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},'updatedAt':FieldValue.serverTimestamp()});}
+          final ref=_chatDb.collection('conversations').doc(id);
+          final members=<String>[_uid,uid]..sort();
+          final me=await _chatDb.collection('publicProfiles').doc(_uid).get();
+          await ref.set({
+            'members':members,'memberA':members[0],'memberB':members[1],
+            'memberNames':{_uid:me.data()?['name']??'عضو',uid:name},
+            'updatedAt':FieldValue.serverTimestamp(),
+          },SetOptions(merge:true));
           if(context.mounted)Navigator.push(context,MaterialPageRoute(builder:(_)=>DirectChatPage(conversationId:id,otherUid:uid,otherName:name)));
         },icon:const Icon(Icons.message),label:const Text('مراسلة')),
       ]);
