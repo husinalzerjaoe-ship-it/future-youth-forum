@@ -1395,10 +1395,10 @@ class PostsPage extends StatelessWidget {
               return Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 ListTile(contentPadding: EdgeInsets.zero, leading: UserAvatar(url: d['authorPhoto'] as String?),
                   title: StreamBuilder<DocumentSnapshot<Map<String,dynamic>>>(stream: db.collection('publicProfiles').doc(d['authorId'] as String? ?? '').snapshots(), builder: (context, profile) {
-                    final p = profile.data?.data() ?? {}; final title = (p['customTitle'] ?? '').toString().trim();
+                    final p = profile.data?.data() ?? {};
                     return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                       Text(p['name'] as String? ?? d['authorName'] as String? ?? 'عضو', style: const TextStyle(fontWeight: FontWeight.bold)),
-                      if (title.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 3), child: MemberTitleBadge.fromProfile(title: title, profile: p, compact: true)),
+                      MemberStoreTitleBadges(profile: p, compact: true),
                     ]);
                   }),
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MemberProfilePage(uid: d['authorId'] as String? ?? '', fallbackName: d['authorName'] as String? ?? 'عضو')))),
@@ -1677,8 +1677,7 @@ class MyProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Center(child: Text(d['name'] as String? ?? 'عضو', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFB77900) : darkBrand))),
-          if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-            Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
+          Center(child: MemberStoreTitleBadges(profile: d)),
           if (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com')
             const Center(child: Padding(padding: EdgeInsets.only(top: 5), child: Chip(avatar: Icon(Icons.workspace_premium, color: Color(0xFFB77900)), label: Text('المؤسس والمالك'), backgroundColor: Color(0xFFFFF1C9)))),
           Center(child: Text(d['bio'] as String? ?? 'أضف نبذة عن نفسك')),
@@ -1973,8 +1972,7 @@ class MemberProfilePage extends StatelessWidget {
             Center(child: ProfileIdentityAvatar(profile:d)),
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
-            if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
-              Center(child: Padding(padding: const EdgeInsets.only(top: 7), child: MemberTitleBadge.fromProfile(title: (d['customTitle'] as String).trim(), profile: d))),
+            Center(child: MemberStoreTitleBadges(profile: d)),
             Center(child: Text(d['bio'] as String? ?? '')),
             const SizedBox(height: 12),
             if (uid != FirebaseAuth.instance.currentUser!.uid)
@@ -2304,6 +2302,7 @@ Future<void> _recordVoiceComment(
 ) async {
   final recorder = AudioRecorder();
   String? path;
+  var recordingStarted = false;
   try {
     if (!await recorder.hasPermission()) {
       if (context.mounted) {
@@ -2314,11 +2313,12 @@ Future<void> _recordVoiceComment(
       return;
     }
     final dir = await Directory.systemTemp.createTemp('future_comment_voice_');
-    path = '\${dir.path}/comment_\${DateTime.now().millisecondsSinceEpoch}.m4a';
+    path = '${dir.path}/comment_${DateTime.now().millisecondsSinceEpoch}.m4a';
     await recorder.start(
       const RecordConfig(encoder: AudioEncoder.aacLc, bitRate: 96000, sampleRate: 44100),
       path: path,
     );
+    recordingStarted = true;
     final publish = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -2339,6 +2339,7 @@ Future<void> _recordVoiceComment(
       ),
     );
     final stopped = await recorder.stop();
+    recordingStarted = false;
     if (publish != true) return;
     final finalPath = stopped ?? path;
     final file = File(finalPath);
@@ -2349,7 +2350,7 @@ Future<void> _recordVoiceComment(
     final profile = await db.collection('publicProfiles').doc(user.uid).get();
     final name = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
     final url = await uploadForumMedia(
-      XFile(finalPath, name: 'voice_comment_\${DateTime.now().millisecondsSinceEpoch}.m4a'),
+      XFile(finalPath, name: 'voice_comment_${DateTime.now().millisecondsSinceEpoch}.m4a'),
       folder: 'posts',
     );
     await comments.add({
@@ -2383,6 +2384,7 @@ Future<void> _recordVoiceComment(
       );
     }
   } finally {
+    if (recordingStarted) { try { await recorder.stop(); } catch (_) {} }
     try { await recorder.dispose(); } catch (_) {}
     if (path != null) {
       try { final file = File(path); if (await file.exists()) await file.delete(); } catch (_) {}
