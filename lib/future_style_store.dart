@@ -48,7 +48,8 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
   @override
   Widget build(BuildContext context) {
     final list = _items.where((e) => _category == 'الكل' || e.category == _category).toList();
-    final selected = _items.where((e) => e.id == _equipped).firstOrNull;
+    final matches = _items.where((e) => e.id == _equipped).toList();
+    final selected = matches.isEmpty ? null : matches.first;
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(title: const Text('متجر ستايل المستقبل')),
       body: !_ready ? const Center(child: CircularProgressIndicator()) : Column(children: [
