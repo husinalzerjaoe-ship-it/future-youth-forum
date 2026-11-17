@@ -31,6 +31,7 @@ import 'football_live_center.dart';
 import 'watch_party.dart';
 import 'cinema_hub.dart';
 import 'match_center.dart';
+import 'iptv_center.dart';
 import 'game_center.dart';
 import 'community_expansion.dart' hide CommunityEventsPage;
 import 'v6_community_suite.dart';
@@ -777,6 +778,9 @@ class _HomePageState extends State<HomePage> {
                       case 'media':
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumMediaHubPage()));
                         break;
+                      case 'iptv':
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const IptvCenterPage()));
+                        break;
                       case 'community':
                         Navigator.push(context, MaterialPageRoute(builder: (_) => const CommunityPlusPage()));
                         break;
@@ -1377,6 +1381,15 @@ class PostsPage extends StatelessWidget {
                 subtitle: const Text('مواعيد ونتائج بطولات كرة القدم'),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MatchCenterPage())),
+              ),
+            ),
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(backgroundColor: Color(0xFF123A46), child: Icon(Icons.live_tv_rounded, color: Color(0xFF7DE3E7))),
+                title: const Text('مركز التلفزيون وIPTV', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('استيراد قوائم M3U وM3U8 وتشغيل القنوات والمفضلة'),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IptvCenterPage())),
               ),
             ),
             Card(
