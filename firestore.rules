@@ -264,16 +264,25 @@ service cloud.firestore {
 
       match /followers/{followerId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == followerId;
+        // A follower record can only be created for the signed-in member,
+        // with the exact fields written by the V53/V54 follow transaction.
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == followerId
+          && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
+          && request.resource.data.userId == followerId
+          && request.resource.data.createdAt == request.time;
         allow delete: if request.auth != null && request.auth.uid == followerId;
         allow update: if false;
       }
 
       match /following/{followedId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == userId
+        allow create: if request.auth != null && accountNotBanned()
+          && request.auth.uid == userId
           && followedId != userId
-          && request.resource.data.userId == followedId;
+          && request.resource.data.keys().hasOnly(['userId', 'createdAt'])
+          && request.resource.data.userId == followedId
+          && request.resource.data.createdAt == request.time;
         allow delete: if request.auth != null && request.auth.uid == userId;
         allow update: if false;
       }
