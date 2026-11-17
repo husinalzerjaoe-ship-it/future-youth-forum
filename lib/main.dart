@@ -12,6 +12,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'community_pages.dart';
@@ -1488,6 +1489,28 @@ class _PublicChatPageState extends State<PublicChatPage> {
     } finally { if (mounted) setState(() => sending = false); }
   }
 
+  Future<void> _handleKeyboardMedia(KeyboardInsertedContent content) async {
+    final bytes = content.data;
+    if (bytes == null || bytes.isEmpty) {
+      if (mounted) setState(() => sendError = 'لوحة المفاتيح لم توفر بيانات الملصق؛ استخدم زر GIF داخل التطبيق.');
+      return;
+    }
+    final ext = content.mimeType == 'image/gif' ? 'gif'
+        : content.mimeType == 'image/webp' ? 'webp'
+        : content.mimeType == 'image/png' ? 'png' : 'jpg';
+    try {
+      if (mounted) setState(() { sending = true; sendError = null; });
+      final dir = await Directory.systemTemp.createTemp('forum_keyboard_media_');
+      final file = File('${dir.path}/keyboard_sticker.$ext');
+      await file.writeAsBytes(bytes, flush: true);
+      final url = await uploadForumMedia(XFile(file.path, name: 'keyboard_sticker.$ext'), folder: 'public-chat');
+      await _send(imageUrl: url, type: ext == 'gif' ? 'gif' : 'image', uploadInProgress: true);
+      try { await file.delete(); await dir.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) setState(() => sendError = 'تعذر إرسال ملصق لوحة المفاتيح: $e');
+    } finally { if (mounted) setState(() => sending = false); }
+  }
+
   void showStickers() {
     const packs = <String, List<String>>{
       'ضحك': ['😂','🤣','😹','😆','🙃','🤪','😜','🤭','😎','🤓','🥸','😏'],
@@ -1610,6 +1633,10 @@ class _PublicChatPageState extends State<PublicChatPage> {
         IconButton(onPressed: sending ? null : showStickers, tooltip: 'ملصقات', icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFE6A52C), size: 25)),
         Expanded(child: TextField(controller: messageController, minLines: 1, maxLines: 4, maxLength: 1000,
           textInputAction: TextInputAction.send, onSubmitted: (_) => sendMessage(),
+          contentInsertionConfiguration: ContentInsertionConfiguration(
+            allowedMimeTypes: const ['image/gif', 'image/png', 'image/jpeg', 'image/webp'],
+            onContentInserted: _handleKeyboardMedia,
+          ),
           decoration: InputDecoration(hintText: 'اكتب رسالتك…', counterText: '', filled: true, fillColor: const Color(0xFFF4F2FA),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none)))),
