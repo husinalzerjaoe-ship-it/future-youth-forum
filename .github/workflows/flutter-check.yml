@@ -4,7 +4,7 @@ on:
   # Feature branches are accumulated without repeated APK builds.
   # Run the complete validation/build manually when the user requests the final package.
   push:
-    branches: [main, release/combined-mainline]
+    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one]
   pull_request:
     branches: [main]
 
