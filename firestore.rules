@@ -246,14 +246,14 @@ service cloud.firestore {
 
       match /followers/{followerId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == followerId;
+        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == followerId;
         allow delete: if request.auth != null && request.auth.uid == followerId;
         allow update: if false;
       }
 
       match /following/{followedId} {
         allow read: if request.auth != null;
-        allow create: if request.auth != null && request.auth.uid == userId
+        allow create: if request.auth != null && accountNotBanned() && request.auth.uid == userId
           && followedId != userId
           && request.resource.data.userId == followedId;
         allow delete: if request.auth != null && request.auth.uid == userId;
@@ -627,7 +627,7 @@ service cloud.firestore {
 
     match /poems/{itemId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
@@ -641,7 +641,7 @@ service cloud.firestore {
 
     match /quotes/{itemId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.text is string
         && request.resource.data.text.size() > 0
@@ -655,7 +655,7 @@ service cloud.firestore {
 
     match /mediaLinks/{linkId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null
+      allow create: if request.auth != null && accountNotBanned()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.title is string
         && request.resource.data.title.size() > 0
