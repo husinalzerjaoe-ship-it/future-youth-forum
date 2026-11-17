@@ -92,8 +92,36 @@ jobs:
               raise SystemExit("Flutter embedding v2 marker is missing or unreadable")
           print("Verified Flutter Android embedding v2 in the generated manifest.")
           PY
+      - name: Verify Activepieces webhook secret
+        env:
+          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
+        run: test -n "$ACTIVEPIECES_WEBHOOK_URL"
       - name: Build release APK
-        run: flutter build apk --release
+        env:
+          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          url = os.environ.get("ACTIVEPIECES_WEBHOOK_URL", "").strip()
+          if not url:
+              raise SystemExit("ACTIVEPIECES_WEBHOOK_URL is empty")
+          Path("/tmp/assistant-dart-defines.json").write_text(
+              json.dumps({"ACTIVEPIECES_WEBHOOK_URL": url})
+          )
+          PY
+          flutter build apk --release --dart-define-from-file=/tmp/assistant-dart-defines.json
+      - name: Verify Godot project and native runtime inside APK
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          test -s "$APK"
+          unzip -l "$APK" > /tmp/fyf-apk-contents.txt
+          grep -F "assets/project.godot" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scenes/main.tscn" /tmp/fyf-apk-contents.txt
+          grep -F "assets/scripts/main.gd" /tmp/fyf-apk-contents.txt
+          grep -E "lib/[^ ]+/libgodot_android.so" /tmp/fyf-apk-contents.txt
+          echo "Godot project files and Android runtime library are present in the APK."
       - name: Upload release APK
         uses: actions/upload-artifact@v4
         with:
