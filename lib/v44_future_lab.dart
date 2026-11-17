@@ -397,6 +397,7 @@ class _V44FutureLabPageState extends State<V44FutureLabPage> {
           _shortcut(Icons.auto_awesome_rounded, 'استوديو الإبداع', 'studio'),
           _shortcut(Icons.menu_book_rounded, 'ركن المعرفة', 'knowledge'),
           _shortcut(Icons.library_music_rounded, 'مكتبة ومشغل الميديا', 'media'),
+          _shortcut(Icons.live_tv_rounded, 'مركز التلفزيون وIPTV', 'iptv'),
           _shortcut(Icons.groups_rounded, 'المجتمع والأندية', 'community'),
         ]),
       );
