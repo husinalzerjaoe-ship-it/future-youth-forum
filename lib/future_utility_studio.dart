@@ -94,7 +94,7 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
           final values=fields.map((f)=>double.tryParse(f.text.trim())).toList();
           if(values.any((x)=>x==null)){refresh(()=>result='أدخل أرقاماً صحيحة بكل الحقول');return;}
           try{refresh(()=>result=calc(values.cast<double>()));}catch(_){refresh(()=>result='تعذر الحساب؛ راجع القيم');}
-        },child:const Text('احسب')],
+        },child:const Text('احسب'))],
     )));
     for(final f in fields){f.dispose();}
   }
@@ -105,7 +105,7 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
     showDialog<void>(context:context,builder:(c)=>StatefulBuilder(builder:(c,refresh)=>AlertDialog(
       title:const Text('تحويل الوحدات'),
       content:Column(mainAxisSize:MainAxisSize.min,children:[
-        DropdownButtonFormField<String>(value:kind,items:choices.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(x)=>refresh(()=>kind=x??kind)),
+        DropdownButtonFormField<String>(initialValue:kind,items:choices.map((x)=>DropdownMenuItem(value:x,child:Text(x))).toList(),onChanged:(x)=>refresh(()=>kind=x??kind)),
         const SizedBox(height:10),
         TextField(controller:input,keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(labelText:'القيمة',border:OutlineInputBorder())),
         const SizedBox(height:10),SelectableText(result,style:const TextStyle(fontSize:18,fontWeight:FontWeight.bold)),
@@ -116,7 +116,7 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
           'كيلومتر إلى متر'=>n*1000,'متر إلى كيلومتر'=>n/1000,'كيلوغرام إلى غرام'=>n*1000,'غرام إلى كيلوغرام'=>n/1000,
           'ساعات إلى دقائق'=>n*60,'دقائق إلى ثوانٍ'=>n*60,'مئوية إلى فهرنهايت'=>n*9/5+32,'فهرنهايت إلى مئوية'=>(n-32)*5/9,_=>n};
         refresh(()=>result=_fmt(out));
-      },child:const Text('حوّل')],
+      },child:const Text('حوّل'))],
     ))).then((_)=>input.dispose());
   }
 
