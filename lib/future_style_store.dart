@@ -52,19 +52,66 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
   DocumentReference<Map<String,dynamic>> get _profile=>_db.collection('publicProfiles').doc(_uid);
   List<String> get _categories=>['الكل',..._items.map((e)=>e.category).toSet()];
   bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com';
-  Future<void> _grantFounderCoins() async {
-    if(!_isFounder||_busy)return;
+  Future<void> _giftCoins(String targetUid,int amount) async {
+    if(!_isFounder||_busy||targetUid.trim().isEmpty||amount<=0)return;
     setState(()=>_busy=true);
     try{
+      final ref=_db.collection('coinWallets').doc(targetUid.trim());
       await _db.runTransaction((tx)async{
-        final snap=await tx.get(_wallet);
+        final snap=await tx.get(ref);
         final old=(snap.data()?['coins'] as num?)?.toInt()??0;
-        final values={'coins':old+500,'updatedAt':FieldValue.serverTimestamp(),'grantedBy':_uid};
-        if(snap.exists)tx.update(_wallet,values);else tx.set(_wallet,values);
+        final values={'coins':old+amount,'updatedAt':FieldValue.serverTimestamp(),'grantedBy':_uid};
+        if(snap.exists)tx.update(ref,values);else tx.set(ref,values);
       });
-      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إضافة 500 عملة إلى رصيد المؤسس')));
-    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إضافة العملات: $e')));}
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم شحن العضو بـ $amount عملة')));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر الشحن: $e')));}
     finally{if(mounted)setState(()=>_busy=false);}
+  }
+  Future<void> _giftItem(String targetUid,_StyleItem item) async {
+    if(!_isFounder||_busy||targetUid.trim().isEmpty)return;
+    setState(()=>_busy=true);
+    try{
+      final ref=_db.collection('users').doc(targetUid.trim()).collection('styleInventory').doc(item.id);
+      await _db.runTransaction((tx)async{
+        final snap=await tx.get(ref);
+        if(snap.exists)throw StateError('العضو يمتلك العنصر مسبقاً');
+        tx.set(ref,{'itemId':item.id,'name':item.name,'category':item.category,'price':item.price,
+          'purchasedAt':FieldValue.serverTimestamp(),'grantedBy':_uid});
+      });
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم إهداء العنصر للعضو')));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إرسال الهدية: $e')));}
+    finally{if(mounted)setState(()=>_busy=false);}
+  }
+  Future<void> _showFounderTools() async {
+    if(!_isFounder||_busy)return;
+    final uidController=TextEditingController();
+    final amountController=TextEditingController(text:'500');
+    _StyleItem selected=_items.first;
+    await showDialog<void>(context:context,builder:(dialogContext)=>StatefulBuilder(builder:(context,setDialogState)=>AlertDialog(
+      title:const Text('إدارة رصيد وهدايا الأعضاء'),
+      content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(controller:uidController,decoration:const InputDecoration(labelText:'معرّف العضو UID')),
+        TextField(controller:amountController,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'عدد العملات للشحن')),
+        const SizedBox(height:12),
+        DropdownButtonFormField<_StyleItem>(value:selected,decoration:const InputDecoration(labelText:'عنصر الهدية'),
+          items:_items.map((e)=>DropdownMenuItem(value:e,child:Text(e.name))).toList(),
+          onChanged:(v){if(v!=null)setDialogState(()=>selected=v);}),
+      ])),
+      actions:[
+        TextButton(onPressed:()=>Navigator.pop(dialogContext),child:const Text('إلغاء')),
+        FilledButton(onPressed:(){
+          final uid=uidController.text.trim(), amount=int.tryParse(amountController.text.trim())??0;
+          Navigator.pop(dialogContext);
+          if(uid.isNotEmpty&&amount>0)_giftCoins(uid,amount);
+        },child:const Text('شحن العملات')),
+        FilledButton.tonal(onPressed:(){
+          final uid=uidController.text.trim();
+          Navigator.pop(dialogContext);
+          if(uid.isNotEmpty)_giftItem(uid,selected);
+        },child:const Text('إهداء العنصر')),
+      ],
+    )));
+    uidController.dispose(); amountController.dispose();
   }
   Future<void> _equip(_StyleItem item) async {
     final data=<String,dynamic>{'customTitleUpdatedAt':FieldValue.serverTimestamp()};
@@ -88,9 +135,13 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
       final inventoryRef=_inventory.doc(item.id);
       var owned=false;
       await _db.runTransaction((tx) async {
-        final walletSnap=await tx.get(_wallet);
         final itemSnap=await tx.get(inventoryRef);
         if(itemSnap.exists){owned=true;return;}
+        if(_isFounder){
+          tx.set(inventoryRef,{'itemId':item.id,'name':item.name,'category':item.category,'price':item.price,'purchasedAt':FieldValue.serverTimestamp(),'grantedBy':_uid});
+          return;
+        }
+        final walletSnap=await tx.get(_wallet);
         if(!walletSnap.exists)throw StateError('رصيدك صفر حالياً. تحتاج عملات قبل الشراء.');
         final coins=(walletSnap.data()?['coins'] as num?)?.toInt()??0;
         if(coins<item.price)throw StateError('رصيدك غير كافٍ. تحتاج ${item.price} عملة.');
@@ -131,8 +182,8 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
             decoration:BoxDecoration(borderRadius:BorderRadius.circular(18),gradient:const LinearGradient(colors:[Color(0xFF28204F),Color(0xFF7053C8)])),
             child:Row(children:[const Icon(Icons.monetization_on_rounded,color:Color(0xFFFFD66B),size:32),const SizedBox(width:10),
               const Expanded(child:Text('رصيد العملات',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold))),
-              Text('$coins',style:const TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900)),
-              if(_isFounder)IconButton(tooltip:'إضافة 500 عملة للمؤسس',onPressed:_busy?null:_grantFounderCoins,icon:const Icon(Icons.add_circle,color:Color(0xFFFFD66B))),
+              Text(_isFounder?'غير محدود':'$coins',style:const TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900)),
+              if(_isFounder)IconButton(tooltip:'إدارة رصيد وهدايا الأعضاء',onPressed:_busy?null:_showFounderTools,icon:const Icon(Icons.card_giftcard,color:Color(0xFFFFD66B))),
             ]));
         }),
         SizedBox(height:48,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10),
