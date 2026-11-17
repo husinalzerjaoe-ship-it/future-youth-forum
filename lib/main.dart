@@ -1733,7 +1733,7 @@ class InlineAudioPost extends StatefulWidget {
 }
 class _InlineAudioPostState extends State<InlineAudioPost>{
   late final AudioPlayer _player=AudioPlayer();
-  @override void initState(){super.initState();_player.setUrl(widget.url).catchError((_){ });}
+  @override void initState(){super.initState();_player.setUrl(widget.url).catchError((_) => null);}
   @override void dispose(){_player.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>Card(child:Padding(padding:const EdgeInsets.symmetric(horizontal:8,vertical:4),child:Row(children:[
     StreamBuilder<PlayerState>(stream:_player.playerStateStream,builder:(context,s){
