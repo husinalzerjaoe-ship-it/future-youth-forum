@@ -99,7 +99,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       // This avoids using a stale email claim after account/provider changes.
       await user.getIdToken(true);
       final token = await user.getIdTokenResult();
-      final tokenEmail = (token.claims?['email'] ?? user.email ?? '').toString().trim().toLowerCase();
+      final tokenEmail = (token.claims?['email'] ?? '').toString().trim().toLowerCase();
       if (tokenEmail != 'husinalzerjaoe@gmail.com') {
         _lastPublishError = 'حساب Firebase الحالي ليس حساب المؤسس المعتمد. سجّل الدخول بحساب المؤسس ثم أعد المحاولة.';
         return false;
@@ -166,7 +166,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       if(bytes.length>8*1024*1024){_toast('الملف أكبر من 8 ميغابايت.');return;}
       final items=IptvPlaylistParser.parse(utf8.decode(bytes,allowMalformed:true),source:file.name);
       if(items.isEmpty){_toast('الملف لا يحتوي قنوات M3U صالحة.');return;}
-      _replace(file.name,items);await _save();final shared=await _publishSharedPlaylist(file.name,items);_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ تعذر النشر المشترك (تحقق من حساب المؤسس وقواعد Firestore).');
+      _replace(file.name,items);await _save();final shared=await _publishSharedPlaylist(file.name,items);_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ فشل النشر المشترك: '+(_lastPublishError.isEmpty?'تحقق من حساب المؤسس وقواعد Firestore.':_lastPublishError));
     }catch(e){_toast('تعذر استيراد الملف: '+e.toString());}
   }
   Future<void> _importEpg() async {
