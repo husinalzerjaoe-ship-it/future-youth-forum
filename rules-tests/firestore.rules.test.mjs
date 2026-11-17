@@ -898,3 +898,62 @@ test('each member can record one immutable view per community clip', async () =>
   await assertFails(updateDoc(view, { viewerId: 'bob' }));
   await assertSucceeds(deleteDoc(view));
 });
+
+
+test('V53/V54 creator follow records are owner-bound and accept only server timestamps', async () => {
+  const following = doc(user('alice'), 'publicProfiles/alice/following/bob');
+  const follower = doc(user('alice'), 'publicProfiles/bob/followers/alice');
+
+  await assertSucceeds(setDoc(following, {
+    userId: 'bob',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(follower, {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+
+  await assertFails(setDoc(doc(user('mallory'), 'publicProfiles/bob/followers/alice'), {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'publicProfiles/alice/following/alice'), {
+    userId: 'alice',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'publicProfiles/alice/following/carol'), {
+    userId: 'carol',
+    createdAt: serverTimestamp(),
+    forged: true,
+  }));
+
+  await assertSucceeds(deleteDoc(following));
+  await assertSucceeds(deleteDoc(follower));
+});
+
+test('V54 notification center keeps notifications private and recipient-only for read status', async () => {
+  await seed('publicProfiles/alice', { name: 'Alice', bio: '', photoUrl: '' });
+  await seed('publicProfiles/bob', { name: 'Bob', bio: '', photoUrl: '' });
+  const notice = doc(user('alice'), 'notifications/v54-notice');
+  await assertSucceeds(setDoc(notice, {
+    recipientId: 'bob',
+    actorId: 'alice',
+    actorName: 'Alice',
+    type: 'follow',
+    text: 'بدأ بمتابعتك',
+    read: false,
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'notifications/v54-notice')));
+  await assertFails(getDoc(doc(user('mallory'), 'notifications/v54-notice')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'notifications/v54-notice'), {
+    read: true,
+  }));
+  await assertFails(updateDoc(doc(user('alice'), 'notifications/v54-notice'), {
+    read: true,
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'notifications/v54-notice'), {
+    read: true,
+    recipientId: 'mallory',
+  }));
+});
