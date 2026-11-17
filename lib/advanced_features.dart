@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'watch_party.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -365,6 +366,34 @@ class _DirectChatPageState extends State<DirectChatPage> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر إرسال الرسالة. افحص اتصال الإنترنت وصلاحيات المحادثة.')));
     } finally { if (mounted) setState(() => busy = false); }
   }
+  Future<void> handleKeyboardMedia(KeyboardInsertedContent content) async {
+    final bytes = content.data;
+    if (bytes == null || bytes.isEmpty) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لوحة المفاتيح لم توفر بيانات الملصق؛ استخدم زر GIF داخل التطبيق')));
+      return;
+    }
+    final ext = content.mimeType == 'image/gif' ? 'gif'
+        : content.mimeType == 'image/webp' ? 'webp'
+        : content.mimeType == 'image/png' ? 'png' : 'jpg';
+    try {
+      if (mounted) setState(() => busy = true);
+      final dir = await Directory.systemTemp.createTemp('forum_keyboard_media_');
+      final file = File('${dir.path}/keyboard_sticker.$ext');
+      await file.writeAsBytes(bytes, flush: true);
+      final url = await uploadForumMedia(XFile(file.path, name: 'keyboard_sticker.$ext'), folder: 'private-chat');
+      if (ext == 'gif') {
+        if (mounted) setState(() => busy = false);
+        await send(gifUrl: url);
+      } else {
+        if (mounted) setState(() => busy = false);
+        await send(imageUrl: url);
+      }
+      try { await file.delete(); await dir.delete(); } catch (_) {}
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إرسال ملصق لوحة المفاتيح: $e')));
+    } finally { if (mounted) setState(() => busy = false); }
+  }
+
   Future<void> sendGif() async {
     if (busy) return;
     try {
