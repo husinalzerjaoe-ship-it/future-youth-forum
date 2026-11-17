@@ -162,13 +162,13 @@ class _IptvPlayerPageState extends State<IptvPlayerPage> {
   @override void initState(){super.initState();_initialize();}
   Future<void> _initialize() async {
     final old=_player;_player=null;await old?.dispose();if(!mounted)return;
-    setState(()=>{_loading=true,_error=null});
+    setState(() { _loading = true; _error = null; });
     try{
       final uri=Uri.parse(widget.channel.url);
       if(!{'http','https'}.contains(uri.scheme)||uri.host.isEmpty)throw const FormatException();
       final p=VideoPlayerController.networkUrl(uri,httpHeaders:const {'User-Agent':'FutureYouthForum/1.0'});
       _player=p;await p.initialize().timeout(const Duration(seconds:30));if(!mounted)return;await p.play();setState(()=>_loading=false);
-    }catch(_){if(mounted)setState(()=>{_loading=false,_error='تعذر تشغيل القناة. قد يكون الرابط متوقفاً أو يحتاج صلاحية أو صيغة غير مدعومة.'});}
+    }catch(_){if(mounted)setState(() { _loading = false; _error = 'تعذر تشغيل القناة. قد يكون الرابط متوقفاً أو يحتاج صلاحية أو صيغة غير مدعومة.'; });}
   }
   @override void dispose(){_player?.dispose();super.dispose();}
   String _time(Duration d)=>d.inMinutes.toString().padLeft(2,'0')+':'+(d.inSeconds%60).toString().padLeft(2,'0');
@@ -184,7 +184,7 @@ class _IptvPlayerPageState extends State<IptvPlayerPage> {
         ])))),
       if(p!=null&&p.value.isInitialized)Padding(padding:const EdgeInsets.fromLTRB(12,5,12,14),child:Row(children:[
         const Icon(Icons.live_tv,color:Colors.white70),const SizedBox(width:7),Expanded(child:Text(widget.channel.group,style:const TextStyle(color:Colors.white70))),
-        ValueListenableBuilder<VideoPlayerValue>(valueListenable:p,builder:(_,v,__)=>Text(v.isLive?'بث مباشر':_time(v.position)+' / '+_time(v.duration),style:const TextStyle(color:Colors.white70,fontSize:12))),
+        ValueListenableBuilder<VideoPlayerValue>(valueListenable:p,builder:(_,v,__)=>Text(v.duration==Duration.zero?'بث مباشر':_time(v.position)+' / '+_time(v.duration),style:const TextStyle(color:Colors.white70,fontSize:12))),
         IconButton(tooltip:'إعادة الاتصال',onPressed:_initialize,icon:const Icon(Icons.refresh,color:Colors.white)),
       ])),
     ])));
