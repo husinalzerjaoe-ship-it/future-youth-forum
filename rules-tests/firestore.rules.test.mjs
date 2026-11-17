@@ -857,3 +857,44 @@ test('V52 permanent community clips support member feed, likes, comments, and ow
   await assertSucceeds(deleteDoc(doc(user('alice'), 'communityClips/clip-1')));
   await assertFails(deleteDoc(doc(user('bob'), 'communityClips/clip-1')));
 });
+
+
+test('members can save community clips only in their own private saved list', async () => {
+  const saved = doc(user('alice'), 'users/alice/savedClips/clip-1');
+  await assertSucceeds(setDoc(saved, {
+    clipId: 'clip-1', authorId: 'bob', authorName: 'Bob',
+    caption: 'A community moment',
+    videoUrl: 'https://media.example.test/clips/one.mp4',
+    savedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(saved));
+  await assertFails(getDoc(doc(user('bob'), 'users/alice/savedClips/clip-1')));
+  await assertFails(setDoc(doc(user('bob'), 'users/alice/savedClips/clip-2'), {
+    clipId: 'clip-2', authorId: 'bob', authorName: 'Bob',
+    caption: 'forged', videoUrl: 'https://media.example.test/clips/two.mp4',
+    savedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'users/alice/savedClips/bad-url'), {
+    clipId: 'bad-url', authorId: 'bob', authorName: 'Bob',
+    caption: 'bad URL', videoUrl: 'javascript:alert(1)', savedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(deleteDoc(saved));
+});
+
+test('each member can record one immutable view per community clip', async () => {
+  await seed('communityClips/clip-views', {
+    authorId: 'bob', authorName: 'Bob', caption: 'clip',
+    videoUrl: 'https://media.example.test/clips/views.mp4',
+    createdAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
+  });
+  const view = doc(user('alice'), 'communityClips/clip-views/views/alice');
+  await assertSucceeds(setDoc(view, {
+    viewerId: 'alice', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(view));
+  await assertFails(setDoc(doc(user('bob'), 'communityClips/clip-views/views/mallory'), {
+    viewerId: 'mallory', createdAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(view, { viewerId: 'bob' }));
+  await assertSucceeds(deleteDoc(view));
+});
