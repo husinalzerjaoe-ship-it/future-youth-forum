@@ -53,6 +53,13 @@ test('a conversation member can send a message, a non-member and blocked pair ca
     senderId: 'alice', senderRole: 'member', type: 'text', text: 'hello'
   };
   await assertSucceeds(setDoc(doc(user('alice'), 'conversations/dm-2/messages/m-1'), message));
+  await assertSucceeds(setDoc(doc(user('alice'), 'conversations/dm-2/messages/sticker-1'), {
+    senderId: 'alice', senderRole: 'member', type: 'sticker', text: '😂'
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'conversations/dm-2/messages/gif-1'), {
+    senderId: 'bob', senderRole: 'member', type: 'gif', text: 'GIF متحرك',
+    gifUrl: 'https://media.example.test/funny.gif'
+  }));
   await assertFails(setDoc(doc(user('mallory'), 'conversations/dm-2/messages/m-2'), {
     ...message, senderId: 'mallory'
   }));
@@ -98,6 +105,19 @@ test('a banned account cannot create a public chat message', async () => {
   await seed('userSanctions/alice', { permanentBan: true });
   await assertFails(setDoc(doc(user('alice'), 'messages/banned-message'), {
     senderId: 'alice', senderRole: 'member', type: 'text', text: 'not allowed'
+  }));
+});
+
+test('public chat accepts validated sticker and animated GIF messages', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'messages/sticker-1'), {
+    senderId: 'alice', senderRole: 'member', type: 'sticker', text: '🫶', createdAt: serverTimestamp()
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'messages/gif-1'), {
+    senderId: 'alice', senderRole: 'member', type: 'gif', text: 'GIF متحرك',
+    imageUrl: 'https://media.example.test/reaction.gif', createdAt: serverTimestamp()
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'messages/bad-gif'), {
+    senderId: 'alice', senderRole: 'member', type: 'gif', text: 'GIF', imageUrl: 'javascript:alert(1)'
   }));
 });
 
