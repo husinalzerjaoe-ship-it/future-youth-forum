@@ -9,6 +9,7 @@ on:
       - feature/v27-firestore-rules-audit
       - feature/v38-ultimate-all-in-one
       - feature/v40-full-community-release
+      - feature/v47-shared-iptv-library
     paths:
       - 'firestore.rules'
       - 'rules-tests/**'
