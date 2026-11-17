@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
@@ -248,6 +250,371 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     } finally {
       if (mounted) setState(() { _busy = false; _progress = null; _busyLabel = null; });
     }
+  }
+
+  Future<void> _uploadCommunityMusic() async {
+    if (_busy) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'],
+      allowMultiple: false,
+      withData: false,
+    );
+    final file = picked?.files.single;
+    final path = file?.path;
+    if (file == null || path == null) return;
+    if (file.size <= 0 || file.size > 50 * 1024 * 1024) {
+      _toast('حجم الأغنية يجب أن يكون بين 1 بايت و50 ميغابايت.');
+      return;
+    }
+    final titleController = TextEditingController(text: file.name.replaceAll(RegExp(r'\\.[^.]+
+    final tracks = _items.where((e) => e.kind == 'audio' && File(e.path).existsSync()).toList();
+    final index = tracks.indexWhere((e) => e.path == entry.path);
+    if (index < 0) return;
+    try {
+      await initializeLocalAudioService();
+      if (mounted && !_audioReady) setState(() => _audioReady = true);
+      await appAudioHandler.loadLocalQueue([
+        for (final e in tracks) MediaItem(id: e.path, title: e.title, album: 'مكتبة ملتقى شباب المستقبل')
+      ], initialIndex: index);
+      await appAudioHandler.play();
+    } catch (e) { _toast('تعذر تشغيل الصوت: $e'); }
+  }
+
+  Future<void> _favorite(_MediaEntry entry) async {
+    setState(() => entry.favorite = !entry.favorite);
+    await _save();
+  }
+
+  Future<void> _remove(_MediaEntry entry) async {
+    final ok = await showDialog<bool>(context: context, builder: (c) => AlertDialog(
+      title: const Text('حذف من المكتبة؟'),
+      content: Text(entry.downloaded ? 'سيُحذف الملف المنزّل من الجهاز.' : 'سيُحذف من القائمة فقط ولن يُحذف الملف الأصلي.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('إلغاء')),
+        FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('حذف')),
+      ],
+    ));
+    if (ok != true) return;
+    if (entry.downloaded) { final f = File(entry.path); if (await f.exists()) await f.delete(); }
+    _items.remove(entry);
+    await _save();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final audio = _items.where((e) => e.kind == 'audio').toList();
+    final videos = _items.where((e) => e.kind == 'video').toList();
+    final favorites = _items.where((e) => e.favorite).toList();
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('مكتبة ومشغّل المستقبل'),
+          actions: [IconButton(tooltip: 'استيراد ملفات', onPressed: _busy ? null : _pick, icon: const Icon(Icons.add_to_photos_outlined))]),
+        body: _loading ? const Center(child: CircularProgressIndicator()) : CustomScrollView(slivers: [
+          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(14), child: _hero(audio.length, videos.length, favorites.length))),
+          if (_busy) SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_busyLabel ?? 'جاري العمل'), const SizedBox(height: 8), LinearProgressIndicator(value: _progress)
+          ]))),
+          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: Row(children: [
+            Expanded(child: _action(Icons.folder_open, 'استيراد ملفات', 'من جهازك', _busy ? null : _pick)),
+            const SizedBox(width: 10),
+            Expanded(child: _action(Icons.download_for_offline, 'تنزيل مباشر', 'صوت وفيديو', _busy ? null : _download)),
+          ]))),
+          SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            child: _action(Icons.video_call_rounded, 'ارفع فيديو من الاستديو', 'غرفة مشاهدة متزامنة مع دردشة وفويس', _busy ? null : _pickGalleryVideo))),
+          _communityMusicSection(),
+          SliverToBoxAdapter(child: _heading('الصوتيات', audio.length)),
+          _list(audio, Icons.headphones_rounded),
+          SliverToBoxAdapter(child: _heading('الفيديوهات', videos.length)),
+          _list(videos, Icons.video_library_rounded),
+          SliverToBoxAdapter(child: _heading('المفضلة', favorites.length)),
+          _list(favorites, Icons.favorite_rounded),
+          if (_items.isEmpty) const SliverFillRemaining(hasScrollBody: false, child: Center(child: Padding(
+            padding: EdgeInsets.all(28), child: Text('مكتبتك جاهزة!\\nاستورد ملفاتك أو أضف رابطاً مباشراً لملف تملك حق تنزيله.', textAlign: TextAlign.center)
+          ))),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ]),
+        bottomNavigationBar: _nowPlaying(),
+      ),
+    );
+  }
+
+  Widget _hero(int audio, int video, int favorites) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF28205C), Color(0xFF171936), Color(0xFF123B4B)]),
+      border: Border.all(color: Colors.white.withOpacity(.12)),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Icon(Icons.auto_awesome_rounded, color: Color(0xFFBDAEFF), size: 30),
+      const SizedBox(height: 8),
+      const Text('كل وسائطك بمكان واحد', style: TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Colors.white)),
+      const SizedBox(height: 6),
+      const Text('مكتبة محلية، تنزيلاتك، ومشغّل صوت يعمل بالخلفية.', style: TextStyle(color: Colors.white70)),
+      const SizedBox(height: 14),
+      Wrap(spacing: 8, children: [_pill('$audio صوت'), _pill('$video فيديو'), _pill('$favorites مفضلة')]),
+    ]),
+  );
+
+  Widget _pill(String text) => Container(padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+    decoration: BoxDecoration(color: Colors.white.withOpacity(.10), borderRadius: BorderRadius.circular(30)),
+    child: Text(text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)));
+
+  Widget _action(IconData icon, String title, String subtitle, VoidCallback? onTap) => Card(
+    child: InkWell(borderRadius: BorderRadius.circular(16), onTap: onTap, child: Padding(padding: const EdgeInsets.all(13), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: const Color(0xFF9F8BFF), size: 27), const SizedBox(height: 8),
+      Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+    ]))),
+  );
+
+  Widget _heading(String title, int count) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+    child: Row(children: [Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)), const SizedBox(width: 8), Text(count.toString(), style: const TextStyle(color: Colors.grey))]),
+  );
+
+  Widget _list(List<_MediaEntry> entries, IconData icon) {
+    if (entries.isEmpty) return const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(horizontal: 18, vertical: 6), child: Text('لا توجد ملفات هنا بعد.', style: TextStyle(color: Colors.grey, fontSize: 12))));
+    return SliverList(delegate: SliverChildBuilderDelegate((context, index) {
+      final entry = entries[index];
+      return Card(margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4), child: ListTile(
+        leading: CircleAvatar(backgroundColor: const Color(0xFF30265D), child: Icon(icon, color: const Color(0xFFCCBEFF))),
+        title: Text(entry.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text((entry.downloaded ? 'محفوظ داخل التطبيق' : 'ملف محلي') + ' • ' + (entry.kind == 'audio' ? 'صوت' : 'فيديو'), style: const TextStyle(fontSize: 11)),
+        onTap: () => entry.kind == 'audio' ? _play(entry) : Navigator.push(context, MaterialPageRoute(builder: (_) => _LocalVideoPage(entry: entry))),
+        trailing: PopupMenuButton<String>(
+          onSelected: (v) {
+            if (v == 'favorite') _favorite(entry);
+            if (v == 'remove') _remove(entry);
+            if (v == 'watch') _uploadVideoAndOpenRoom(entry);
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(value: 'favorite', child: Text(entry.favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة')),
+            if (entry.kind == 'video') const PopupMenuItem(value: 'watch', child: Text('رفع وفتح غرفة مشاهدة')),
+            const PopupMenuItem(value: 'remove', child: Text('حذف')),
+          ],
+        ),
+      ));
+    }, childCount: entries.length));
+  }
+
+  Widget _nowPlaying() {
+    // AudioService is initialized asynchronously after the home screen appears.
+    // Never dereference the late handler until initialization has completed.
+    if (!_audioReady || !isAudioServiceInitialized) return const SizedBox.shrink();
+    return StreamBuilder<MediaItem?>(
+    stream: appAudioHandler.mediaItem,
+    builder: (context, media) {
+      final item = media.data;
+      if (item == null) return const SizedBox.shrink();
+      return StreamBuilder<PlaybackState>(
+        stream: appAudioHandler.playbackState,
+        builder: (context, state) {
+          final playing = state.data?.playing ?? false;
+          return SafeArea(top: false, child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(color: const Color(0xFF211B48), border: Border(top: BorderSide(color: Colors.white.withOpacity(.12)))),
+            child: Row(children: [
+              const Icon(Icons.graphic_eq, color: Color(0xFFBDAEFF)),
+              const SizedBox(width: 8),
+              Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+              IconButton(tooltip: 'السابق', onPressed: appAudioHandler.skipToPrevious, icon: const Icon(Icons.skip_previous_rounded)),
+              IconButton(onPressed: () => playing ? appAudioHandler.pause() : appAudioHandler.play(), icon: Icon(playing ? Icons.pause : Icons.play_arrow)),
+              IconButton(tooltip: 'التالي', onPressed: appAudioHandler.skipToNext, icon: const Icon(Icons.skip_next_rounded)),
+              IconButton(onPressed: appAudioHandler.stop, icon: const Icon(Icons.stop)),
+            ]),
+          ));
+        },
+      );
+    },
+  );
+  }
+}
+
+class _MediaEntry {
+  _MediaEntry({required this.path, required this.title, required this.kind, required this.downloaded, this.favorite = false});
+  final String path;
+  final String title;
+  final String kind;
+  final bool downloaded;
+  bool favorite;
+  Map<String, dynamic> toJson() => {'path': path, 'title': title, 'kind': kind, 'downloaded': downloaded, 'favorite': favorite};
+  factory _MediaEntry.fromJson(Map<String, dynamic> json) => _MediaEntry(
+    path: json['path'] as String? ?? '',
+    title: json['title'] as String? ?? 'وسائط',
+    kind: json['kind'] as String? ?? 'audio',
+    downloaded: json['downloaded'] as bool? ?? false,
+    favorite: json['favorite'] as bool? ?? false,
+  );
+}
+
+class _LocalVideoPage extends StatefulWidget {
+  const _LocalVideoPage({required this.entry});
+  final _MediaEntry entry;
+  @override
+  State<_LocalVideoPage> createState() => _LocalVideoPageState();
+}
+
+class _LocalVideoPageState extends State<_LocalVideoPage> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+  @override
+  void initState() { super.initState(); _init(); }
+  Future<void> _init() async {
+    try {
+      final c = VideoPlayerController.file(File(widget.entry.path));
+      _controller = c;
+      await c.initialize();
+      if (!mounted) return;
+      setState(() {});
+      await c.play();
+    } catch (_) { if (mounted) setState(() => _failed = true); }
+  }
+  @override
+  void dispose() { _controller?.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: Text(widget.entry.title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+    backgroundColor: Colors.black,
+    body: Center(
+      child: _failed
+        ? const Text('تعذر تشغيل هذا التنسيق على جهازك.', style: TextStyle(color: Colors.white))
+        : _controller?.value.isInitialized == true
+          ? AspectRatio(aspectRatio: _controller!.value.aspectRatio, child: Stack(alignment: Alignment.center, children: [
+              VideoPlayer(_controller!),
+              IconButton.filled(
+                onPressed: () { final c = _controller!; setState(() { c.value.isPlaying ? c.pause() : c.play(); }); },
+                icon: Icon(_controller!.value.isPlaying ? Icons.pause : Icons.play_arrow), iconSize: 38,
+              ),
+              Align(alignment: Alignment.bottomCenter, child: VideoProgressIndicator(_controller!, allowScrubbing: true)),
+            ]))
+          : const CircularProgressIndicator(color: Colors.white),
+    ),
+  );
+}
+), ''));
+    final artistController = TextEditingController(text: FirebaseAuth.instance.currentUser?.displayName ?? 'عضو الملتقى');
+    final rights = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('رفع أغنية للمجتمع'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: titleController, decoration: const InputDecoration(labelText: 'اسم الأغنية')),
+            const SizedBox(height: 8),
+            TextField(controller: artistController, decoration: const InputDecoration(labelText: 'الفنان / صاحب الملف')),
+            const SizedBox(height: 10),
+            const Text('ارفع فقط ملفاً تملك حقوق نشره أو لديك إذن بمشاركته.', style: TextStyle(fontSize: 12)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, 'أنا صاحب العمل وأسمح بنشره'), child: const Text('أؤكد وأرفع')),
+          ],
+        ),
+      ),
+    );
+    final title = titleController.text.trim();
+    final artist = artistController.text.trim();
+    titleController.dispose();
+    artistController.dispose();
+    if (rights == null) return;
+    if (title.isEmpty || title.length > 100 || artist.isEmpty || artist.length > 100) {
+      _toast('اكتب اسم أغنية وفناناً صالحين (حتى 100 حرف).');
+      return;
+    }
+    setState(() { _busy = true; _progress = null; _busyLabel = 'جاري رفع الأغنية للمجتمع...'; });
+    try {
+      final url = await uploadForumMedia(
+        XFile(path, name: file.name),
+        folder: 'music',
+        onProgress: (value) { if (mounted) setState(() => _progress = value); },
+      );
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final extension = file.name.split('.').last.toLowerCase();
+      await FirebaseFirestore.instance.collection('animeWallpapers').add({
+        'category': 'music',
+        'title': title,
+        'anime': 'موسيقى مجتمع ملتقى شباب المستقبل',
+        'artist': artist,
+        'uploaderId': uid,
+        'status': 'approved',
+        'extension': extension,
+        'sourceUrl': url,
+        'imageUrl': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=640',
+        'rights': rights,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _toast('تم رفع الأغنية وإضافتها إلى مكتبة المجتمع.');
+    } catch (error) {
+      _toast('تعذر رفع الأغنية: $error');
+    } finally {
+      if (mounted) setState(() { _busy = false; _progress = null; _busyLabel = null; });
+    }
+  }
+
+  Future<void> _playCommunityMusic(String url, String title) async {
+    try {
+      await initializeLocalAudioService();
+      if (mounted && !_audioReady) setState(() => _audioReady = true);
+      await appAudioHandler.loadRemoteTrack(url, title);
+    } catch (error) {
+      _toast('تعذر تشغيل الأغنية المشتركة: $error');
+    }
+  }
+
+  Widget _communityMusicSection() {
+    final query = FirebaseFirestore.instance.collection('animeWallpapers')
+        .where('category', isEqualTo: 'music')
+        .where('status', isEqualTo: 'approved')
+        .limit(60);
+    return SliverToBoxAdapter(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+          child: Row(children: [
+            const Expanded(child: Text('موسيقى المجتمع', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+            TextButton.icon(onPressed: _busy ? null : _uploadCommunityMusic, icon: const Icon(Icons.upload_rounded), label: const Text('رفع أغنية')),
+          ]),
+        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: query.snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(14), child: Text('تعذر تحميل مكتبة المجتمع. تحقق من صلاحيات Firestore والتخزين.'));
+            if (!snapshot.hasData) return const LinearProgressIndicator();
+            final docs = snapshot.data!.docs.toList()
+              ..sort((a, b) {
+                final at = a.data()['createdAt'];
+                final bt = b.data()['createdAt'];
+                return (bt is Timestamp ? bt.millisecondsSinceEpoch : 0)
+                    .compareTo(at is Timestamp ? at.millisecondsSinceEpoch : 0);
+              });
+            if (docs.isEmpty) return const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('ماكو أغاني مشتركة بعد. ارفع أول أغنية تملك حق مشاركتها.', style: TextStyle(color: Colors.grey)));
+            return Column(children: docs.map((doc) {
+              final data = doc.data();
+              final url = (data['sourceUrl'] ?? '').toString();
+              final title = (data['title'] ?? 'أغنية').toString();
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.music_note_rounded)),
+                  title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text((data['artist'] ?? 'فنان غير معروف').toString()),
+                  trailing: IconButton(
+                    tooltip: 'تشغيل',
+                    onPressed: url.startsWith('https://') ? () => _playCommunityMusic(url, title) : null,
+                    icon: const Icon(Icons.play_circle_fill_rounded, size: 32),
+                  ),
+                ),
+              );
+            }).toList());
+          },
+        ),
+      ]),
+    );
   }
 
   Future<void> _play(_MediaEntry entry) async {
