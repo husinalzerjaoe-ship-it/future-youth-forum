@@ -58,7 +58,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
   final List<IptvChannel> _channels=[]; final List<IptvChannel> _sharedChannels=[]; final Set<String> _favorites={};
   StreamSubscription<QuerySnapshot<Map<String,dynamic>>>? _sharedSub;
   final List<IptvProgram> _programs=[];
-  bool _loading=true,_busy=false; String _category='الكل',_query='';
+  bool _loading=true,_busy=false; String _category='الكل',_query='',_lastPublishError='';
   @override void initState(){super.initState();_load();_listenShared();}
   @override void dispose(){_sharedSub?.cancel();_url.dispose();_name.dispose();_search.dispose();_epgUrl.dispose();super.dispose();}
   void _listenShared() {
@@ -85,8 +85,25 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
 
   Future<bool> _publishSharedPlaylist(String source, List<IptvChannel> items, {String sourceUrl = ''}) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || items.isEmpty || items.length > 10000 || sourceUrl.length > 2048) return false;
+    _lastPublishError = '';
+    if (user == null) {
+      _lastPublishError = 'لا يوجد حساب Firebase مسجل الدخول.';
+      return false;
+    }
+    if (items.isEmpty || items.length > 10000 || sourceUrl.length > 2048) {
+      _lastPublishError = 'بيانات القائمة خارج الحدود المسموحة.';
+      return false;
+    }
     try {
+      // Refresh the Firebase ID token before Firestore evaluates the founder claim.
+      // This avoids using a stale email claim after account/provider changes.
+      await user.getIdToken(true);
+      final token = await user.getIdTokenResult();
+      final tokenEmail = (token.claims?['email'] ?? user.email ?? '').toString().trim().toLowerCase();
+      if (tokenEmail != 'husinalzerjaoe@gmail.com') {
+        _lastPublishError = 'حساب Firebase الحالي ليس حساب المؤسس المعتمد. سجّل الدخول بحساب المؤسس ثم أعد المحاولة.';
+        return false;
+      }
       final sharedName = source.trim().isEmpty ? 'قائمة IPTV' : (source.length > 100 ? source.substring(0,100) : source);
       final parent = FirebaseFirestore.instance.collection('iptvSharedPlaylists').doc(_sharedId(sharedName, sourceUrl, items));
       await parent.set({'name':sharedName,'sourceUrl':sourceUrl,'ownerUid':user.uid,'channelCount':items.length,'updatedBy':user.uid,'updatedAt':FieldValue.serverTimestamp()}, SetOptions(merge:true));
@@ -107,7 +124,11 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       }
       await parent.update({'channelCount':items.length,'updatedAt':FieldValue.serverTimestamp(),'updatedBy':user.uid});
       return true;
-    } catch (_) { return false; }
+    } catch (e, stack) {
+      _lastPublishError = e.toString();
+      debugPrint('IPTV shared publish failed: $e\\n$stack');
+      return false;
+    }
   }
   Future<void> _load() async {
     try { final p=await SharedPreferences.getInstance(),raw=p.getString(_key);
@@ -132,7 +153,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       final source=_name.text.trim().isEmpty?uri.host:_name.text.trim();
       final items=IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
       if(items.isEmpty)throw Exception('لم نعثر على قنوات صالحة.');
-      _replace(source,items);await _save();_url.clear();_name.clear();final shared=await _publishSharedPlaylist(source,items,sourceUrl:uri.toString());_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ تعذر النشر المشترك (تحقق من حساب المؤسس وقواعد Firestore).');
+      _replace(source,items);await _save();_url.clear();_name.clear();final shared=await _publishSharedPlaylist(source,items,sourceUrl:uri.toString());_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ فشل النشر المشترك: '+(_lastPublishError.isEmpty?'تحقق من حساب المؤسس وقواعد Firestore.':_lastPublishError));
     }catch(e){_toast('تعذر استيراد القائمة: '+e.toString());}
     finally{if(mounted)setState(()=>_busy=false);}
   }
