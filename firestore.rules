@@ -76,7 +76,7 @@ service cloud.firestore {
             'royalbadge': 200, 'creativebadge': 140, 'friendlybadge': 100
           }[id];
         }
-        allow read: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && (request.auth.uid == userId || isFounder());
         allow create: if request.auth != null
           && request.resource.data.keys().hasOnly(['itemId','name','category','price','purchasedAt','grantedBy'])
           && request.resource.data.itemId == itemId
