@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'youtube_video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -462,7 +463,7 @@ class _RegionChatPageState extends State<RegionChatPage> {
  int backgroundIndex=0;
  bool get founder=>isForumFounder;
  static const backgrounds=[Color(0xFFF5F3FF),Color(0xFFEAF6FF),Color(0xFFFFF3E8),Color(0xFFF0F7F1),Color(0xFF171936)];
- static const stickers=['😂','❤️','🔥','😍','😭','👏','✨','🌹','🫶','🤣','🥹','💜','⚽','🐱','🎉','👍'];
+ static const stickers=['😂','🤣','😹','🥹','😭','😍','🥰','😎','🤩','😱','🤯','😴','🤔','🙄','😅','🥳','🤗','🫠','😤','🤭','😋','😜','🤪','😇','❤️','🩷','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','💘','💝','💟','❣️','🌹','🌷','🌸','💐','🫶','👍','👎','👏','🙌','🤝','🙏','💪','👌','✌️','🤟','🫡','🫰','👋','💯','🔥','⭐','🌟','🎉','🏆','🥇','✅','❌','👀','🫂','🐱','🐶','🐼','🐻','🐨','🦊','🐸','🐵','🐰','🐹','🐣','🦄','🐧','🦋','🐢','🐬','🦁','🐯','🐮','🐷','🐙','🌈','🍓','🍉','⚽','🏀','🏐','🎮','🕹️','🎯','🎲','♟️','🏓','🎧','🎤','🎬','🎨','🚀','🌙','☀️','⚡','💎','👑','🛸','🏁','🎸','🥁','🎹'];
 
  Future<bool> blocked(String uid) async {
   final snap=await db2.collection('regionalChats').doc(widget.id).collection('bans').doc(uid).get();
@@ -521,6 +522,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   }on StorageException catch(e){if(mounted)setState(()=>error='فشل رفع الصورة (${e.statusCode ?? 'Storage'}): ${e.message}');}catch(e){if(mounted)setState(()=>error='تعذر رفع الصورة: $e');}
  }
 
+ Future<void> sendGif() async { if(busy)return; try { final result=await FilePicker.platform.pickFiles(type:FileType.custom,allowedExtensions:const ['gif'],allowMultiple:false,withData:false); final file=result?.files.single; final path=file?.path; if(file==null||path==null)return; if(file.size>15*1024*1024){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('حجم GIF يجب ألا يتجاوز 15 ميغابايت')));return;} setState(()=>busy=true); final url=await uploadForumMedia(XFile(path,name:file.name),folder:'regional-chat',roomId:widget.id); await send(text:'GIF متحرك',imageUrl:url,type:'image'); } catch(e){if(mounted)setState(()=>error='تعذر إرسال GIF: $e');} finally{if(mounted)setState(()=>busy=false);} }
+
  Future<void> toggleVoiceRecording() async {
   if(busy)return;
   if(!recordingVoice){
@@ -549,11 +552,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
   }finally{if(mounted)setState(()=>busy=false);}
  }
 
- void showStickers()=>showModalBottomSheet<void>(context:context,showDragHandle:true,
-  builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:Padding(padding:const EdgeInsets.all(16),
-   child:GridView.count(shrinkWrap:true,crossAxisCount:4,childAspectRatio:1.3,children:stickers.map((s)=>InkWell(
-    onTap:(){Navigator.pop(sheet);send(text:s,type:'sticker');},
-    child:Center(child:Text(s,style:const TextStyle(fontSize:34))))).toList()))));
+ Future<void> showStickers() async { final selected=await showModalBottomSheet<String>(context:context,isScrollControlled:true,showDragHandle:true,builder:(sheet)=>Directionality(textDirection:TextDirection.rtl,child:SizedBox(height:MediaQuery.of(sheet).size.height*.62,child:Column(children:[const Padding(padding:EdgeInsets.all(12),child:Text('حزم الملصقات',style:TextStyle(fontSize:19,fontWeight:FontWeight.bold))),Expanded(child:GridView.builder(padding:const EdgeInsets.all(12),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:5,mainAxisSpacing:8,crossAxisSpacing:8),itemCount:stickers.length,itemBuilder:(c,i)=>InkWell(onTap:()=>Navigator.pop(sheet,stickers[i]),child:Container(decoration:BoxDecoration(color:const Color(0xFFF1EDFF),borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:Text(stickers[i],style:const TextStyle(fontSize:30))))))])))); if(selected!=null)await send(text:selected,type:'sticker'); }
+
 
  Future<void> chooseBackground() async {
   final selected=await showModalBottomSheet<int>(context:context,showDragHandle:true,
@@ -627,7 +627,8 @@ class _RegionChatPageState extends State<RegionChatPage> {
     }))),
    if(error!=null)Padding(padding:const EdgeInsets.symmetric(horizontal:10,vertical:3),child:Text(error!,style:const TextStyle(color:Colors.red,fontSize:11))),
    Container(color:Colors.white,padding:const EdgeInsets.symmetric(horizontal:6,vertical:6),child:SafeArea(top:false,child:Row(children:[
-    IconButton(onPressed:busy?null:sendImage,tooltip:'صورة أو GIF',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:sendImage,tooltip:'إرسال صورة',icon:const Icon(Icons.image,color:p)),
+    IconButton(onPressed:busy?null:sendGif,tooltip:'إرسال GIF متحرك',icon:const Icon(Icons.gif_box_outlined,color:p)),
     IconButton(onPressed:busy?null:toggleVoiceRecording,tooltip:recordingVoice?'إيقاف وإرسال الفويس':'تسجيل فويس',icon:Icon(recordingVoice?Icons.stop_circle:Icons.mic,color:recordingVoice?Colors.red:p)),
     IconButton(onPressed:busy?null:showStickers,tooltip:'ملصقات',icon:const Icon(Icons.emoji_emotions,color:Color(0xFFE6A52C))),
     Expanded(child:TextField(controller:t,minLines:1,maxLines:4,maxLength:1000,textInputAction:TextInputAction.send,onSubmitted:(_)=>send(text:t.text),
