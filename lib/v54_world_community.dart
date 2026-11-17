@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'achievement_hub.dart';
+import 'advanced_features.dart';
 import 'community_events.dart';
 import 'community_pages.dart';
 import 'community_polls.dart';
