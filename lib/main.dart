@@ -354,7 +354,7 @@ class _AnimatedIntroGateState extends State<AnimatedIntroGate> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(milliseconds: 1700), () {
+    Future<void>.delayed(const Duration(milliseconds: 650), () {
       if (mounted) setState(() => _showIntro = false);
     });
   }
@@ -427,7 +427,19 @@ class AuthGate extends StatelessWidget {
     stream: FirebaseAuth.instance.authStateChanges(),
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.waiting) {
-        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        return const Scaffold(
+          body: Center(child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('لحظات ونجهّز حسابك...', textAlign: TextAlign.center),
+              SizedBox(height: 10),
+              Text('إذا كان الاتصال بطيئاً سيكتمل التحميل عند استقرار الشبكة.', textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white60, fontSize: 12)),
+            ]),
+          )),
+        );
       }
       return snapshot.hasData ? const HomePage() : const AuthPage();
     },
@@ -1256,7 +1268,22 @@ class PostsPage extends StatelessWidget {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: db.collection('posts').orderBy('createdAt', descending: true).limit(70).snapshots(),
       builder: (context, s) {
-        if (s.hasError) return const Center(child: Text('تعذر تحميل المنشورات.'));
+        if (s.hasError) return Center(child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.cloud_off_rounded, size: 42, color: Colors.orangeAccent),
+            const SizedBox(height: 12),
+            const Text('تعذر تحميل المنشورات حالياً', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            const SizedBox(height: 8),
+            const Text('قد يكون الاتصال ضعيفاً أو توجد مشكلة بصلاحيات قاعدة البيانات. جرّب مرة ثانية.', textAlign: TextAlign.center),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة تحميل الصفحة'),
+            ),
+          ]),
+        ));
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final posts = s.data!.docs;
         return Scaffold(
@@ -1616,7 +1643,22 @@ class _PublicChatPageState extends State<PublicChatPage> {
     Expanded(child: Container(color: chatBackgrounds[backgroundIndex], child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).limit(100).snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return const Center(child: Padding(padding: EdgeInsets.all(22), child: Text('تعذر تحميل المحادثة. تأكد من قواعد Firebase.')));
+        if (snapshot.hasError) return Center(child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.cloud_off_rounded, size: 40, color: Colors.orangeAccent),
+            const SizedBox(height: 10),
+            const Text('تعذر تحميل المحادثة حالياً', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('تحقق من الإنترنت أو صلاحيات المحادثة، ثم أعد تحميل الصفحة.', textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ]),
+        ));
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final messages = snapshot.data!.docs;
         if (messages.isEmpty) return const Center(child: Text('الساحة هادئة حالياً… كن أول من يبدأ الحديث ✨'));
@@ -1656,7 +1698,17 @@ class MyProfilePage extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: db.collection('publicProfiles').doc(uid).snapshots(),
       builder: (context, s) {
-        if (!s.hasData) return const Center(child: CircularProgressIndicator());
+        if (s.hasError) return Center(child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.person_off_rounded, size: 40),
+          const SizedBox(height: 10),
+          const Text('تعذر تحميل الملف الشخصي'),
+          const SizedBox(height: 10),
+          FilledButton(onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomePage())), child: const Text('إعادة المحاولة')),
+        ]),
+      ));
+      if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final d = s.data!.data() ?? {};
         return ListView(padding: const EdgeInsets.all(18), children: [
           const Text('ملفي الشخصي', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
