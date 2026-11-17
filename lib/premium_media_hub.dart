@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
@@ -248,6 +250,146 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
     } finally {
       if (mounted) setState(() { _busy = false; _progress = null; _busyLabel = null; });
     }
+  }
+
+  Future<void> _uploadCommunityMusic() async {
+    if (_busy) return;
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'],
+      allowMultiple: false,
+      withData: false,
+    );
+    final file = picked?.files.single;
+    final path = file?.path;
+    if (file == null || path == null) return;
+    if (file.size <= 0 || file.size > 50 * 1024 * 1024) {
+      _toast('حجم الأغنية يجب ألا يتجاوز 50 ميغابايت.');
+      return;
+    }
+    final dot = file.name.lastIndexOf('.');
+    final defaultTitle = dot > 0 ? file.name.substring(0, dot) : file.name;
+    final titleController = TextEditingController(text: defaultTitle);
+    final artistController = TextEditingController(text: FirebaseAuth.instance.currentUser?.displayName ?? 'عضو الملتقى');
+    final rights = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('رفع أغنية للمجتمع'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextField(controller: titleController, decoration: const InputDecoration(labelText: 'اسم الأغنية')),
+            const SizedBox(height: 8),
+            TextField(controller: artistController, decoration: const InputDecoration(labelText: 'الفنان / صاحب الملف')),
+            const SizedBox(height: 10),
+            const Text('ارفع فقط ملفاً تملك حقوق نشره أو لديك إذن بمشاركته.', style: TextStyle(fontSize: 12)),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, 'أنا صاحب العمل وأسمح بنشره'), child: const Text('أؤكد وأرفع')),
+          ],
+        ),
+      ),
+    );
+    final title = titleController.text.trim();
+    final artist = artistController.text.trim();
+    titleController.dispose();
+    artistController.dispose();
+    if (rights == null) return;
+    if (title.isEmpty || title.length > 100 || artist.isEmpty || artist.length > 100) {
+      _toast('اكتب اسم أغنية وفناناً صالحين (حتى 100 حرف).');
+      return;
+    }
+    setState(() { _busy = true; _progress = null; _busyLabel = 'جاري رفع الأغنية للمجتمع...'; });
+    try {
+      final url = await uploadForumMedia(
+        XFile(path, name: file.name),
+        folder: 'music',
+        onProgress: (value) { if (mounted) setState(() => _progress = value); },
+      );
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      final extension = dot >= 0 ? file.name.substring(dot + 1).toLowerCase() : '';
+      await FirebaseFirestore.instance.collection('animeWallpapers').add({
+        'category': 'music',
+        'title': title,
+        'anime': 'موسيقى مجتمع ملتقى شباب المستقبل',
+        'artist': artist,
+        'uploaderId': uid,
+        'status': 'approved',
+        'extension': extension,
+        'sourceUrl': url,
+        'imageUrl': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=640',
+        'rights': rights,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _toast('تم رفع الأغنية وإضافتها إلى مكتبة المجتمع.');
+    } catch (error) {
+      _toast('تعذر رفع الأغنية: ' + error.toString());
+    } finally {
+      if (mounted) setState(() { _busy = false; _progress = null; _busyLabel = null; });
+    }
+  }
+
+  Future<void> _playCommunityMusic(String url, String title) async {
+    try {
+      await initializeLocalAudioService();
+      if (mounted && !_audioReady) setState(() => _audioReady = true);
+      await appAudioHandler.loadRemoteTrack(url, title);
+    } catch (error) {
+      _toast('تعذر تشغيل الأغنية المشتركة: ' + error.toString());
+    }
+  }
+
+  Widget _communityMusicSection() {
+    final query = FirebaseFirestore.instance.collection('animeWallpapers')
+        .where('category', isEqualTo: 'music')
+        .where('status', isEqualTo: 'approved')
+        .limit(60);
+    return SliverToBoxAdapter(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+          child: Row(children: [
+            const Expanded(child: Text('موسيقى المجتمع', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
+            TextButton.icon(onPressed: _busy ? null : _uploadCommunityMusic, icon: const Icon(Icons.upload_rounded), label: const Text('رفع أغنية')),
+          ]),
+        ),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: query.snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return const Padding(padding: EdgeInsets.all(14), child: Text('تعذر تحميل مكتبة المجتمع. تحقق من صلاحيات Firestore والتخزين.'));
+            if (!snapshot.hasData) return const LinearProgressIndicator();
+            final docs = snapshot.data!.docs.toList()
+              ..sort((a, b) {
+                final at = a.data()['createdAt'];
+                final bt = b.data()['createdAt'];
+                final av = at is Timestamp ? at.millisecondsSinceEpoch : 0;
+                final bv = bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+                return bv.compareTo(av);
+              });
+            if (docs.isEmpty) return const Padding(padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Text('ماكو أغاني مشتركة بعد. ارفع أول أغنية تملك حق مشاركتها.', style: TextStyle(color: Colors.grey)));
+            return Column(children: docs.map((doc) {
+              final data = doc.data();
+              final url = (data['sourceUrl'] ?? '').toString();
+              final title = (data['title'] ?? 'أغنية').toString();
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                child: ListTile(
+                  leading: const CircleAvatar(child: Icon(Icons.music_note_rounded)),
+                  title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text((data['artist'] ?? 'فنان غير معروف').toString()),
+                  trailing: IconButton(
+                    tooltip: 'تشغيل',
+                    onPressed: url.startsWith('https://') ? () => _playCommunityMusic(url, title) : null,
+                    icon: const Icon(Icons.play_circle_fill_rounded, size: 32),
+                  ),
+                ),
+              );
+            }).toList());
+          },
+        ),
+      ]),
+    );
   }
 
   Future<void> _play(_MediaEntry entry) async {

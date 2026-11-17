@@ -31,6 +31,7 @@ Future<String> uploadForumMedia(
     case 'profiles':
     case 'watch-rooms':
     case 'shared-files':
+    case 'music':
       prefix = '$folder/${user.uid}/';
       break;
     case 'regional-chat':
