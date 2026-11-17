@@ -211,6 +211,34 @@ test('private message owners can edit text and pinning is limited to the partici
   }));
 });
 
+test('private conversation typing and read receipts are visible only to participants and self-writable', async () => {
+  await seed('conversations/dm-presence', { members: ['alice', 'bob'] });
+
+  const aliceTyping = doc(user('alice'), 'conversations/dm-presence/typing/alice');
+  await assertSucceeds(setDoc(aliceTyping, {
+    uid: 'alice', typing: true, updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'conversations/dm-presence/typing/alice')));
+  await assertFails(getDoc(doc(user('mallory'), 'conversations/dm-presence/typing/alice')));
+  await assertFails(setDoc(doc(user('mallory'), 'conversations/dm-presence/typing/mallory'), {
+    uid: 'mallory', typing: true, updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(aliceTyping.delete());
+
+  const aliceReceipt = doc(user('alice'), 'conversations/dm-presence/readReceipts/alice');
+  await assertSucceeds(setDoc(aliceReceipt, {
+    uid: 'alice', lastReadMessageId: 'message-123', lastReadAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'conversations/dm-presence/readReceipts/alice')));
+  await assertFails(getDoc(doc(user('mallory'), 'conversations/dm-presence/readReceipts/alice')));
+  await assertFails(setDoc(doc(user('mallory'), 'conversations/dm-presence/readReceipts/mallory'), {
+    uid: 'mallory', lastReadMessageId: 'forged', lastReadAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(aliceReceipt, {
+    uid: 'bob', lastReadMessageId: 'forged', lastReadAt: serverTimestamp(),
+  }));
+});
+
 test('private room messages remain limited to room members', async () => {
   await seed('privateRooms/room-1', {
     ownerId: 'alice', name: 'Private', members: ['alice', 'bob'], invitedUids: ['alice', 'bob']
