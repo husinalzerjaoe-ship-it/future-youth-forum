@@ -81,11 +81,33 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       );
       if (result == null) return;
       var count = 0;
+      final documents = await getApplicationDocumentsDirectory();
       for (final f in result.files) {
-        final path = f.path;
-        if (path == null || (!_audio(path) && !_video(path)) || _items.any((e) => e.path == path)) continue;
-        _items.insert(0, _MediaEntry(path: path, title: f.name, kind: _audio(path) ? 'audio' : 'video', downloaded: false));
-        count++;
+        final sourcePath = f.path;
+        if (sourcePath == null || (!_audio(sourcePath) && !_video(sourcePath))) continue;
+        if (_items.any((e) => e.title == f.name && File(e.path).existsSync())) continue;
+
+        // File-picker paths may point to temporary cache/URI-backed files.
+        // Copy selected media into app-owned storage so it remains available
+        // after Android cleans the picker cache or the app is restarted.
+        final source = File(sourcePath);
+        if (!await source.exists()) continue;
+        final safeName = f.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+        final destination = File(
+          '${documents.path}/import_${DateTime.now().microsecondsSinceEpoch}_${safeName.isEmpty ? 'media' : safeName}',
+        );
+        try {
+          final saved = await source.copy(destination.path);
+          _items.insert(0, _MediaEntry(
+            path: saved.path,
+            title: f.name,
+            kind: _audio(sourcePath) ? 'audio' : 'video',
+            downloaded: true,
+          ));
+          count++;
+        } catch (error) {
+          debugPrint('Could not persist imported media ${f.name}: $error');
+        }
       }
       await _save();
       if (mounted) setState(() {});
@@ -343,7 +365,7 @@ class _PremiumMediaHubPageState extends State<PremiumMediaHubPage> {
       return Card(margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4), child: ListTile(
         leading: CircleAvatar(backgroundColor: const Color(0xFF30265D), child: Icon(icon, color: const Color(0xFFCCBEFF))),
         title: Text(entry.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text((entry.downloaded ? 'منزّل على الجهاز' : 'ملف محلي') + ' • ' + (entry.kind == 'audio' ? 'صوت' : 'فيديو'), style: const TextStyle(fontSize: 11)),
+        subtitle: Text((entry.downloaded ? 'محفوظ داخل التطبيق' : 'ملف محلي') + ' • ' + (entry.kind == 'audio' ? 'صوت' : 'فيديو'), style: const TextStyle(fontSize: 11)),
         onTap: () => entry.kind == 'audio' ? _play(entry) : Navigator.push(context, MaterialPageRoute(builder: (_) => _LocalVideoPage(entry: entry))),
         trailing: PopupMenuButton<String>(
           onSelected: (v) {
