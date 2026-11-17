@@ -589,3 +589,114 @@ test('shared IPTV playlists are readable by signed-in members and founder-manage
   }));
   await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), 'iptvSharedPlaylists/demo-playlist')));
 });
+
+test('banned accounts cannot publish poems, quotes, or shared media links', async () => {
+  await seed('userSanctions/alice', {
+    uid: 'alice', permanentBan: true, permanentMute: false,
+    updatedBy: 'founder-uid',
+  });
+  await assertFails(setDoc(doc(user('alice'), 'poems/blocked'), {
+    authorId: 'alice', text: 'نص تجريبي',
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'quotes/blocked'), {
+    authorId: 'alice', text: 'اقتباس تجريبي',
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'mediaLinks/blocked'), {
+    authorId: 'alice', title: 'رابط رسمي',
+    url: 'https://youtu.be/example', category: 'تعليم',
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'poems/allowed'), {
+    authorId: 'bob', text: 'قصيدة تجريبية',
+  }));
+});
+
+test('stories, views, and replies are owned by their authenticated members', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'stories/story-1'), {
+    authorId: 'alice', authorName: 'Alice',
+    mediaUrl: 'https://media.example.test/story.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 60 * 60 * 1000)),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'stories/story-1')));
+  await assertFails(deleteDoc(doc(user('bob'), 'stories/story-1')));
+  await assertSucceeds(setDoc(doc(user('bob'), 'stories/story-1/views/bob'), {
+    viewerId: 'bob', viewedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'stories/story-1/views/bob'), {
+    viewerId: 'bob', viewedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'stories/story-1/replies/reply-1'), {
+    authorId: 'bob', authorName: 'Bob', text: 'قصة جميلة',
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'stories/story-1/replies/reply-2'), {
+    authorId: 'bob', authorName: 'Bob', text: 'انتحال ملكية',
+  }));
+});
+
+test('notifications can be created by the actor and marked read only by the recipient', async () => {
+  await seed('publicProfiles/alice', { name: 'Alice', bio: '', photoUrl: '' });
+  await seed('publicProfiles/bob', { name: 'Bob', bio: '', photoUrl: '' });
+  const notice = doc(user('alice'), 'notifications/notice-1');
+  await assertSucceeds(setDoc(notice, {
+    recipientId: 'bob', actorId: 'alice', actorName: 'Alice',
+    type: 'mention', text: 'أشار إليك في منشور',
+    read: false, createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'notifications/notice-1')));
+  await assertFails(getDoc(doc(user('mallory'), 'notifications/notice-1')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'notifications/notice-1'), { read: true }));
+  await assertFails(updateDoc(doc(user('alice'), 'notifications/notice-1'), { read: true }));
+  await assertFails(updateDoc(doc(user('bob'), 'notifications/notice-1'), {
+    read: false, recipientId: 'mallory',
+  }));
+});
+
+test('game invitations are visible to sender and recipient and accepted only by recipient', async () => {
+  const invite = doc(user('alice'), 'gameInvites/invite-1');
+  await assertSucceeds(setDoc(invite, {
+    from: 'alice', to: 'bob', fromName: 'Alice',
+    game: 'general', status: 'pending', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('alice'), 'gameInvites/invite-1')));
+  await assertSucceeds(getDoc(doc(user('bob'), 'gameInvites/invite-1')));
+  await assertFails(getDoc(doc(user('mallory'), 'gameInvites/invite-1')));
+  await assertFails(updateDoc(doc(user('alice'), 'gameInvites/invite-1'), { status: 'accepted' }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'gameInvites/invite-1'), { status: 'accepted' }));
+  await assertFails(updateDoc(doc(user('bob'), 'gameInvites/invite-1'), { from: 'bob' }));
+});
+
+test('watch-party chat is restricted to joined members', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'watchParties/party-1'), {
+    hostId: 'alice', title: 'جلسة مشاهدة', match: 'مقطع عام',
+    streamUrl: 'https://www.youtube.com/watch?v=example',
+    members: ['alice'], status: 'open',
+  }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'watchParties/party-1'), {
+    members: ['alice', 'bob'],
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'watchParties/party-1/messages/msg-1'), {
+    senderId: 'bob', senderName: 'Bob', text: 'أهلاً بالمجموعة',
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'watchParties/party-1/messages/msg-2'), {
+    senderId: 'mallory', senderName: 'Mallory', text: 'رسالة خارج الغرفة',
+  }));
+});
+
+test('interest clubs require membership for posts and preserve owner controls', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'forumClubs/club-1'), {
+    ownerId: 'alice', ownerName: 'Alice', name: 'نادي الأنمي',
+    description: 'نقاشات الأنمي', category: 'الأنمي والمانغا',
+    members: ['alice'], active: true,
+  }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'forumClubs/club-1'), {
+    members: ['alice', 'bob'],
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'forumClubs/club-1/posts/post-1'), {
+    authorId: 'bob', authorName: 'Bob', text: 'موضوع داخل النادي',
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'forumClubs/club-1/posts/post-2'), {
+    authorId: 'mallory', authorName: 'Mallory', text: 'عضو غير منضم',
+  }));
+});
+
