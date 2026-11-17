@@ -1171,6 +1171,39 @@ class PostsPage extends StatelessWidget {
     }
   }
 
+  Future<void> addVideoPost(BuildContext context) async {
+    final file=await ImagePicker().pickVideo(source:ImageSource.gallery,maxDuration:const Duration(minutes:5));
+    if(file==null)return;
+    try {
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final url=await uploadForumMedia(file,folder:'posts');
+      await db.collection('posts').add({
+        'text':'','videoMediaUrl':url,'mediaType':'video','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الفيديو')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الفيديو: $e')));}
+  }
+  Future<void> addAudioPost(BuildContext context) async {
+    final picked=await FilePicker.platform.pickFiles(type:FileType.audio,withData:false);
+    final path=picked?.files.single.path;
+    if(path==null||path.isEmpty)return;
+    try {
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final file=XFile(path,name:picked!.files.single.name);
+      final url=await uploadForumMedia(file,folder:'posts');
+      await db.collection('posts').add({
+        'text':'','audioUrl':url,'mediaType':'audio','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر المقطع الصوتي')));
+    }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الصوت: $e')));}
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser!;
@@ -1303,7 +1336,9 @@ class PostsPage extends StatelessWidget {
                 const Text('آخر المنشورات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 Wrap(spacing: 4, children: [
                   TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.edit_outlined), label: const Text('اكتب منشوراً')),
-                  TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('نشر صورة')),
+                  TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('صورة')),
+                  TextButton.icon(onPressed: () => addVideoPost(context), icon: const Icon(Icons.video_library_outlined), label: const Text('فيديو')),
+                  TextButton.icon(onPressed: () => addAudioPost(context), icon: const Icon(Icons.mic_none_rounded), label: const Text('صوت')),
                 ]),
               ],
             ),
@@ -1325,6 +1360,10 @@ class PostsPage extends StatelessWidget {
                   Padding(padding: const EdgeInsets.only(top: 10), child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(d['imageUrl'] as String, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Padding(padding: EdgeInsets.all(12), child: Text('تعذر تحميل الصورة'))))),
                 if ((d['videoUrl'] as String? ?? '').trim().isNotEmpty)
                   Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: d['videoUrl'] as String)),
+                if ((d['videoMediaUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 10), child: InlineVideoPost(url: d['videoMediaUrl'] as String)),
+                if ((d['audioUrl'] as String? ?? '').trim().isNotEmpty)
+                  Padding(padding: const EdgeInsets.only(top: 8), child: InlineAudioPost(url: d['audioUrl'] as String)),
                 PostSocialActions(postId: doc.id, authorId: d['authorId'] as String? ?? ''),
               ])));
             }),
@@ -1805,8 +1844,14 @@ class MemberPosts extends StatelessWidget {
         return Card(clipBehavior: Clip.antiAlias, margin: const EdgeInsets.symmetric(vertical: 7),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if ((data['text'] as String? ?? '').isNotEmpty) Text(data['text'] as String, style: const TextStyle(fontSize: 16)),
+            if ((data['imageUrl'] as String? ?? '').isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: ClipRRect(borderRadius: BorderRadius.circular(14), child: Image.network(data['imageUrl'] as String, width: double.infinity, fit: BoxFit.cover))),
             if (videoUrl.trim().isNotEmpty)
               Padding(padding: const EdgeInsets.only(top: 10), child: YouTubeVideoPlayer(url: videoUrl)),
+            if ((data['videoMediaUrl'] as String? ?? '').trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 10), child: InlineVideoPost(url: data['videoMediaUrl'] as String)),
+            if ((data['audioUrl'] as String? ?? '').trim().isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 8), child: InlineAudioPost(url: data['audioUrl'] as String)),
             PostSocialActions(postId: post.id, authorId: data['authorId'] as String? ?? ''),
           ])));
       }).toList());
