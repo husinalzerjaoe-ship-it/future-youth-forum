@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:audio_service/audio_service.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1186,6 +1188,50 @@ class PostsPage extends StatelessWidget {
       if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر الفيديو')));
     }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر نشر الفيديو: $e')));}
   }
+  Future<void> recordVoicePost(BuildContext context) async {
+    final recorder=AudioRecorder();
+    String? path;
+    try {
+      if(!await recorder.hasPermission()) {
+        if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('اسمح للتطبيق باستخدام المايك لتسجيل المنشور الصوتي.')));
+        return;
+      }
+      final dir=await Directory.systemTemp.createTemp('future_post_voice_');
+      path='${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await recorder.start(const RecordConfig(encoder:AudioEncoder.aacLc,bitRate:96000,sampleRate:44100),path:path);
+      final publish=await showDialog<bool>(context:context,barrierDismissible:false,builder:(dialogContext)=>Directionality(
+        textDirection:TextDirection.rtl,
+        child:AlertDialog(
+          title:const Text('تسجيل منشور صوتي 🎙️'),
+          content:const Text('التسجيل جارٍ. اضغط إيقاف ونشر عند الانتهاء. الحد الأقصى 3 دقائق.'),
+          actions:[
+            TextButton(onPressed:()=>Navigator.pop(dialogContext,false),child:const Text('إلغاء')),
+            FilledButton.icon(onPressed:()=>Navigator.pop(dialogContext,true),icon:const Icon(Icons.stop_circle),label:const Text('إيقاف ونشر')),
+          ],
+        )));
+      final stopped=await recorder.stop();
+      if(publish!=true)return;
+      final finalPath=stopped??path;
+      if(finalPath==null)return;
+      final file=File(finalPath);
+      if(!await file.exists()||await file.length()==0)throw StateError('التسجيل فارغ.');
+      final user=FirebaseAuth.instance.currentUser!;
+      final profile=await db.collection('publicProfiles').doc(user.uid).get();
+      final url=await uploadForumMedia(XFile(finalPath,name:'voice_post_${DateTime.now().millisecondsSinceEpoch}.m4a'),folder:'posts');
+      await db.collection('posts').add({
+        'text':'','audioUrl':url,'mediaType':'audio','authorId':user.uid,
+        'authorName':profile.data()?['name']??user.displayName??'عضو',
+        'authorPhoto':profile.data()?['photoUrl']??'','createdAt':FieldValue.serverTimestamp(),
+      });
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم نشر تسجيلك الصوتي')));
+    }catch(e){
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تسجيل المنشور: $e')));
+    }finally{
+      try{await recorder.dispose();}catch(_){}
+      if(path!=null){try{final file=File(path);if(await file.exists())await file.delete();}catch(_){}}
+    }
+  }
+
   Future<void> addAudioPost(BuildContext context) async {
     final picked=await FilePicker.platform.pickFiles(type:FileType.audio,withData:false);
     final path=picked?.files.single.path;
@@ -1338,7 +1384,8 @@ class PostsPage extends StatelessWidget {
                   TextButton.icon(onPressed: () => addPost(context), icon: const Icon(Icons.edit_outlined), label: const Text('اكتب منشوراً')),
                   TextButton.icon(onPressed: () => addPhotoPost(context), icon: const Icon(Icons.add_photo_alternate_outlined), label: const Text('صورة')),
                   TextButton.icon(onPressed: () => addVideoPost(context), icon: const Icon(Icons.video_library_outlined), label: const Text('فيديو')),
-                  TextButton.icon(onPressed: () => addAudioPost(context), icon: const Icon(Icons.mic_none_rounded), label: const Text('صوت')),
+                  TextButton.icon(onPressed: () => recordVoicePost(context), icon: const Icon(Icons.mic_rounded), label: const Text('سجّل فويس')),
+                  TextButton.icon(onPressed: () => addAudioPost(context), icon: const Icon(Icons.audio_file_rounded), label: const Text('ملف صوت')),
                 ]),
               ],
             ),
