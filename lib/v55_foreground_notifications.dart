@@ -47,7 +47,7 @@ class V55ForegroundNotificationService {
       if (firstPublic) { firstPublic = false; return; }
       for (final change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added &&
-            change.doc.data()['senderId'] != uid) {
+            change.doc.data()?['senderId'] != uid) {
           _playAlert();
           break;
         }
