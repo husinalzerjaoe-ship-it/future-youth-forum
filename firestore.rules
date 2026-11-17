@@ -869,7 +869,33 @@ service cloud.firestore {
               && request.resource.data.videoUrl.matches('https://.*'))
           )
           && usersNotBlocked(members()[0], members()[1]);
-        allow update: if false;
+        // A sender may edit only their own plain-text message; all media payloads stay immutable.
+        // Either participant may pin a message, but only the member who pinned it may unpin it.
+        allow update: if request.auth != null && isMember() && (
+          (
+            resource.data.senderId == request.auth.uid
+            && resource.data.type == 'text'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'edited', 'editedAt'])
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 1000
+            && request.resource.data.edited == true
+            && request.resource.data.editedAt is timestamp
+          )
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isPinned', 'pinnedBy', 'pinnedAt'])
+            && request.resource.data.isPinned is bool
+            && (
+              (request.resource.data.isPinned == true
+                && request.resource.data.pinnedBy == request.auth.uid
+                && request.resource.data.pinnedAt is timestamp)
+              || (request.resource.data.isPinned == false
+                && resource.data.pinnedBy == request.auth.uid
+                && !('pinnedBy' in request.resource.data)
+                && !('pinnedAt' in request.resource.data))
+            )
+          )
+        );
         allow delete: if request.auth != null && isMember()
           && resource.data.senderId == request.auth.uid;
 
