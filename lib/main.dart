@@ -1570,8 +1570,7 @@ class MyProfilePage extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com'
-                      ? const Color(0xFFFFB52E) : accent,
+                  color: d['profileFrameColor'] is int ? Color(d['profileFrameColor'] as int) : (FirebaseAuth.instance.currentUser?.email?.toLowerCase() == 'husinalzerjaoe@gmail.com' ? const Color(0xFFFFB52E) : accent),
                   width: 4,
                 ),
               ),
@@ -1873,7 +1872,7 @@ class MemberProfilePage extends StatelessWidget {
           if (!s.hasData) return const Center(child: CircularProgressIndicator());
           final d = s.data!.data() ?? {};
           return ListView(padding: const EdgeInsets.all(18), children: [
-            Center(child: UserAvatar(url: d['photoUrl'] as String?)),
+            Center(child: ProfileIdentityAvatar(profile:d)),
             const SizedBox(height: 8),
             Center(child: Text(d['name'] as String? ?? fallbackName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
             if ((d['customTitle'] as String? ?? '').trim().isNotEmpty)
