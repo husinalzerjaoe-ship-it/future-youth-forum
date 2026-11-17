@@ -11,6 +11,7 @@ on:
       - feature/v40-full-community-release
       - feature/v47-shared-iptv-library
       - feature/v48-community-evolution
+      - feature/v52-community-reels-stories
     paths:
       - 'firestore.rules'
       - 'rules-tests/**'
