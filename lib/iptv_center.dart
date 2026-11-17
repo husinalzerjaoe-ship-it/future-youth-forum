@@ -6,15 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 
 class IptvChannel {
-  const IptvChannel({required this.name, required this.url, this.group='عام', this.logo='', this.tvgId='', this.source=''});
-  final String name, url, group, logo, tvgId, source;
+  const IptvChannel({required this.name, required this.url, this.group='عام', this.logo='', this.tvgId='', this.source='', this.sourceUrl=''});
+  final String name, url, group, logo, tvgId, source, sourceUrl;
   String get id => url;
-  Map<String,dynamic> toJson() => {'name':name,'url':url,'group':group,'logo':logo,'tvgId':tvgId,'source':source};
-  factory IptvChannel.fromJson(Map<String,dynamic> j) => IptvChannel(name:j['name']?.toString()??'قناة',url:j['url']?.toString()??'',group:j['group']?.toString()??'عام',logo:j['logo']?.toString()??'',tvgId:j['tvgId']?.toString()??'',source:j['source']?.toString()??'');
+  Map<String,dynamic> toJson() => {'name':name,'url':url,'group':group,'logo':logo,'tvgId':tvgId,'source':source,'sourceUrl':sourceUrl};
+  factory IptvChannel.fromJson(Map<String,dynamic> j) => IptvChannel(name:j['name']?.toString()??'قناة',url:j['url']?.toString()??'',group:j['group']?.toString()??'عام',logo:j['logo']?.toString()??'',tvgId:j['tvgId']?.toString()??'',source:j['source']?.toString()??'',sourceUrl:j['sourceUrl']?.toString()??'');
 }
 
 class IptvPlaylistParser {
-  static List<IptvChannel> parse(String text,{String source='',Uri? baseUri}) {
+  static List<IptvChannel> parse(String text,{String source='',String sourceUrl='',Uri? baseUri}) {
     final result=<IptvChannel>[];
     String? name; var group='عام',logo='',tvgId='';
     final attr=RegExp(r'''([A-Za-z0-9_-]+)\s*=\s*["']([^"']*)["']''');
@@ -34,7 +34,7 @@ class IptvPlaylistParser {
       final parsed=Uri.tryParse(line); if(parsed==null) {name=null;continue;}
       final uri=parsed.hasScheme?parsed:(baseUri?.resolveUri(parsed)??parsed);
       if(!{'http','https'}.contains(uri.scheme)||uri.host.isEmpty) {name=null;continue;}
-      result.add(IptvChannel(name:name==null||name!.isEmpty?uri.host:name!,url:uri.toString(),group:group,logo:logo,tvgId:tvgId,source:source));
+      result.add(IptvChannel(name:name==null||name!.isEmpty?uri.host:name!,url:uri.toString(),group:group,logo:logo,tvgId:tvgId,source:source,sourceUrl:sourceUrl));
       name=null; group='عام'; logo=''; tvgId='';
     }
     return result;
@@ -71,7 +71,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       if(response.statusCode!=200)throw Exception('استجابة المصدر '+response.statusCode.toString());
       if(response.bodyBytes.length>8*1024*1024)throw Exception('القائمة أكبر من 8 ميغابايت.');
       final source=_name.text.trim().isEmpty?uri.host:_name.text.trim();
-      final items=IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,baseUri:uri);
+      final items=IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
       if(items.isEmpty)throw Exception('لم نعثر على قنوات صالحة.');
       _replace(source,items);await _save();_url.clear();_name.clear();_toast('تم استيراد '+items.length.toString()+' قناة.');
     }catch(e){_toast('تعذر استيراد القائمة: '+e.toString());}
@@ -104,6 +104,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     final visible=_visible;
     return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
       appBar:AppBar(title:const Text('مركز التلفزيون وIPTV'),actions:[
+        IconButton(tooltip:'تحديث المصادر',onPressed:_busy?null:_refreshAllSources,icon:const Icon(Icons.refresh_rounded)),
         IconButton(tooltip:'إدارة المصادر',onPressed:_manageSources,icon:const Icon(Icons.playlist_add_check)),
         IconButton(tooltip:'استيراد ملف',onPressed:_busy?null:_importFile,icon:const Icon(Icons.file_open)),
       ]),
@@ -142,12 +143,33 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     trailing:IconButton(onPressed:()=>_favorite(c),icon:Icon(_favorites.contains(c.id)?Icons.favorite:Icons.favorite_border,color:_favorites.contains(c.id)?Colors.redAccent:null)),
     onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>IptvPlayerPage(channel:c))),
   ));
+  Future<void> _refreshSource(String source) async {
+    final old = _channels.where((e) => e.source == source).toList();
+    if (old.isEmpty || old.first.sourceUrl.isEmpty) { _toast('هذا المصدر ملف محلي ولا يملك رابط تحديث.'); return; }
+    final uri = Uri.tryParse(old.first.sourceUrl);
+    if (uri == null || !{'http','https'}.contains(uri.scheme)) { _toast('رابط تحديث المصدر غير صالح.'); return; }
+    setState(() => _busy = true);
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 25));
+      if (response.statusCode != 200) throw Exception('HTTP '+response.statusCode.toString());
+      if (response.bodyBytes.length > 8*1024*1024) throw Exception('القائمة أكبر من 8 ميغابايت.');
+      final items = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
+      if (items.isEmpty) throw Exception('القائمة لا تحتوي قنوات صالحة.');
+      _replace(source,items); await _save(); _toast('تم تحديث '+items.length.toString()+' قناة.');
+    } catch(e) { _toast('فشل تحديث المصدر: '+e.toString()); }
+    finally { if(mounted) setState(() => _busy = false); }
+  }
+  Future<void> _refreshAllSources() async {
+    final sources = _channels.where((e)=>e.sourceUrl.isNotEmpty).map((e)=>e.source).toSet().toList();
+    if(sources.isEmpty){_toast('لا توجد قوائم روابط لتحديثها.');return;}
+    for(final source in sources){if(!mounted)return;await _refreshSource(source);}
+  }
   Future<void> _manageSources() async {
     final sources=_channels.map((e)=>e.source).toSet().toList()..sort();
     if(sources.isEmpty){_toast('ماكو مصادر محفوظة بعد.');return;}
     await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(ctx)=>Directionality(textDirection:TextDirection.rtl,child:SafeArea(child:ListView(shrinkWrap:true,padding:const EdgeInsets.all(14),children:[
       const Text('مصادرك المحفوظة',style:TextStyle(fontSize:19,fontWeight:FontWeight.w900)),
-      ...sources.map((s)=>ListTile(leading:const Icon(Icons.playlist_play),title:Text(s),subtitle:Text(_channels.where((e)=>e.source==s).length.toString()+' قناة'),trailing:IconButton(icon:const Icon(Icons.delete_outline),onPressed:(){Navigator.pop(ctx);_removeSource(s);}))),
+      ...sources.map((s)=>ListTile(leading:const Icon(Icons.playlist_play),title:Text(s),subtitle:Text(_channels.where((e)=>e.source==s).length.toString()+' قناة'),trailing:Wrap(spacing:0,children:[if(_channels.any((e)=>e.source==s&&e.sourceUrl.isNotEmpty))IconButton(tooltip:'تحديث القائمة',icon:const Icon(Icons.refresh),onPressed:(){Navigator.pop(ctx);_refreshSource(s);}),IconButton(icon:const Icon(Icons.delete_outline),onPressed:(){Navigator.pop(ctx);_removeSource(s);})]))),
     ]))));
   }
 }
