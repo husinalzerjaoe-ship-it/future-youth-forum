@@ -36,6 +36,7 @@ import 'friends_fun_world.dart';
 import 'future_arcade.dart';
 import 'v39_daily_challenges.dart';
 import 'v39_creator_links.dart';
+import 'v40_party_deck.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -61,6 +62,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'اتصال احتياطي Jitsi',subtitle:'بديل للصوت والفيديو مع دردشة الاجتماع ورمز غرفة',category:'التواصل',icon:Icons.video_camera_front_rounded,page:const JitsiBackupCallsPage()),
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
   (title:'عالم الوناسة',subtitle:'تحديات جماعية وألغاز وتمثيل وألعاب خفيفة بدون إنترنت',category:'الألعاب',icon:Icons.celebration_rounded,page:const FriendsFunWorldPage()),
+  (title:'مكتبة 100 تحدي V40',subtitle:'مئة بطاقة متنوعة مع نقاط وجولات ومسابقة أونلاين منفصلة',category:'الألعاب',icon:Icons.style_rounded,page:const V40PartyDeckPage()),
   (title:'مدينة الألعاب 2D',subtitle:'ألعاب أركيد وطاولات وألغاز ومغامرات',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const FutureArcadePage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
