@@ -1,4 +1,8 @@
 import 'dart:convert';
+import 'dart:async';
+import 'package:crypto/crypto.dart' as crypto;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -51,11 +55,59 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
   static const _key='future_youth_iptv_channels_v1';
   static const _epgKey='future_youth_iptv_epg_v1';
   final _url=TextEditingController(),_name=TextEditingController(),_search=TextEditingController();
-  final List<IptvChannel> _channels=[]; final Set<String> _favorites={};
+  final List<IptvChannel> _channels=[]; final List<IptvChannel> _sharedChannels=[]; final Set<String> _favorites={};
+  StreamSubscription<QuerySnapshot<Map<String,dynamic>>>? _sharedSub;
   final List<IptvProgram> _programs=[];
   bool _loading=true,_busy=false; String _category='الكل',_query='';
-  @override void initState(){super.initState();_load();}
-  @override void dispose(){_url.dispose();_name.dispose();_search.dispose();super.dispose();}
+  @override void initState(){super.initState();_load();_listenShared();}
+  @override void dispose(){_sharedSub?.cancel();_url.dispose();_name.dispose();_search.dispose();super.dispose();}
+  void _listenShared() {
+    _sharedSub = FirebaseFirestore.instance.collection('iptvSharedPlaylists')
+      .orderBy('updatedAt', descending:true).snapshots().listen((snapshot) async {
+        try {
+          final groups = await Future.wait(snapshot.docs.map((doc) async {
+            final channels = await doc.reference.collection('channels').orderBy('index').get();
+            return channels.docs.map((item) {
+              final data = item.data();
+              return IptvChannel(name:data['name']?.toString() ?? 'قناة',url:data['url']?.toString() ?? '',group:data['group']?.toString() ?? 'عام',logo:data['logo']?.toString() ?? '',tvgId:data['tvgId']?.toString() ?? '',source:data['source']?.toString() ?? doc.data()['name']?.toString() ?? 'مكتبة مشتركة',sourceUrl:data['sourceUrl']?.toString() ?? '');
+            }).where((channel) => channel.url.isNotEmpty).toList();
+          }));
+          if (!mounted) return;
+          setState(() { _sharedChannels..clear()..addAll(groups.expand((items) => items)); });
+        } catch (_) { /* Local IPTV remains available if cloud sync is offline. */ }
+      }, onError: (_) { /* Cloud sync must not block local playback. */ });
+  }
+
+  String _sharedId(String source, String sourceUrl, List<IptvChannel> items) {
+    final identity = sourceUrl.isNotEmpty ? sourceUrl : '$source|${items.isEmpty ? '' : items.first.url}';
+    return crypto.sha256.convert(utf8.encode(identity)).toString();
+  }
+
+  Future<bool> _publishSharedPlaylist(String source, List<IptvChannel> items, {String sourceUrl = ''}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || items.isEmpty) return false;
+    try {
+      final parent = FirebaseFirestore.instance.collection('iptvSharedPlaylists').doc(_sharedId(source, sourceUrl, items));
+      await parent.set({'name':source,'sourceUrl':sourceUrl,'ownerUid':user.uid,'channelCount':items.length,'updatedBy':user.uid,'updatedAt':FieldValue.serverTimestamp()}, SetOptions(merge:true));
+      final old = await parent.collection('channels').get();
+      for (var start=0; start<old.docs.length; start+=400) {
+        final batch=FirebaseFirestore.instance.batch();
+        for (final doc in old.docs.skip(start).take(400)) { batch.delete(doc.reference); }
+        await batch.commit();
+      }
+      for (var start=0; start<items.length; start+=400) {
+        final batch=FirebaseFirestore.instance.batch();
+        final chunk=items.skip(start).take(400).toList();
+        for (var i=0; i<chunk.length; i++) {
+          final c=chunk[i];
+          batch.set(parent.collection('channels').doc((start+i).toString().padLeft(6,'0')), {'index':start+i,'name':c.name,'url':c.url,'group':c.group,'logo':c.logo,'tvgId':c.tvgId,'source':source,'sourceUrl':sourceUrl});
+        }
+        await batch.commit();
+      }
+      await parent.update({'channelCount':items.length,'updatedAt':FieldValue.serverTimestamp(),'updatedBy':user.uid});
+      return true;
+    } catch (_) { return false; }
+  }
   Future<void> _load() async {
     try { final p=await SharedPreferences.getInstance(),raw=p.getString(_key);
       if(raw!=null){final data=jsonDecode(raw);if(data is List)_channels.addAll(data.whereType<Map>().map((e)=>IptvChannel.fromJson(Map<String,dynamic>.from(e))));}
@@ -79,7 +131,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       final source=_name.text.trim().isEmpty?uri.host:_name.text.trim();
       final items=IptvPlaylistParser.parse(utf8.decode(response.bodyBytes,allowMalformed:true),source:source,sourceUrl:uri.toString(),baseUri:uri);
       if(items.isEmpty)throw Exception('لم نعثر على قنوات صالحة.');
-      _replace(source,items);await _save();_url.clear();_name.clear();_toast('تم استيراد '+items.length.toString()+' قناة.');
+      _replace(source,items);await _save();_url.clear();_name.clear();final shared=await _publishSharedPlaylist(source,items,sourceUrl:uri.toString());_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ تعذر النشر المشترك (تحقق من حساب المؤسس وقواعد Firestore).');
     }catch(e){_toast('تعذر استيراد القائمة: '+e.toString());}
     finally{if(mounted)setState(()=>_busy=false);}
   }
@@ -92,7 +144,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
       if(bytes.length>8*1024*1024){_toast('الملف أكبر من 8 ميغابايت.');return;}
       final items=IptvPlaylistParser.parse(utf8.decode(bytes,allowMalformed:true),source:file.name);
       if(items.isEmpty){_toast('الملف لا يحتوي قنوات M3U صالحة.');return;}
-      _replace(file.name,items);await _save();_toast('تم استيراد '+items.length.toString()+' قناة من الملف.');
+      _replace(file.name,items);await _save();final shared=await _publishSharedPlaylist(file.name,items);_toast(shared?'تم استيراد ونشر '+items.length.toString()+' قناة لكل الأعضاء.':'تم الاستيراد محلياً؛ تعذر النشر المشترك (تحقق من حساب المؤسس وقواعد Firestore).');
     }catch(e){_toast('تعذر استيراد الملف: '+e.toString());}
   }
   Future<void> _importEpg() async {
@@ -121,8 +173,9 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     final ids=_channels.where((e)=>e.source==source).map((e)=>e.id).toSet();
     setState((){_channels.removeWhere((e)=>e.source==source);_favorites.removeAll(ids);});await _save();_toast('تم حذف المصدر.');
   }
-  List<String> get _categories=>['الكل','المفضلة',...(_channels.map((e)=>e.group).toSet().toList()..sort())];
-  List<IptvChannel> get _visible=>_channels.where((c){
+  List<IptvChannel> get _allChannels { final localUrls=_channels.map((c)=>c.url).toSet(); return [..._channels,..._sharedChannels.where((c)=>!localUrls.contains(c.url)).map((c)=>IptvChannel(name:c.name,url:c.url,group:c.group,logo:c.logo,tvgId:c.tvgId,source:'مشتركة • '+c.source,sourceUrl:c.sourceUrl))]; }
+  List<String> get _categories=>['الكل','المفضلة',...(_allChannels.map((e)=>e.group).toSet().toList()..sort())];
+  List<IptvChannel> get _visible=>_allChannels.where((c){
     final cat=_category=='الكل'||(_category=='المفضلة'?_favorites.contains(c.id):c.group==_category),q=_query.trim().toLowerCase();
     return cat&&(q.isEmpty||c.name.toLowerCase().contains(q)||c.group.toLowerCase().contains(q)||c.source.toLowerCase().contains(q));
   }).toList();
@@ -153,7 +206,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
         const SizedBox(height:9),
         SizedBox(height:42,child:ListView.separated(scrollDirection:Axis.horizontal,itemCount:_categories.length,separatorBuilder:(_,__)=>const SizedBox(width:7),itemBuilder:(_,i)=>ChoiceChip(label:Text(_categories[i]),selected:_category==_categories[i],onSelected:(_)=>setState(()=>_category=_categories[i])))),
         const SizedBox(height:12),
-        Row(children:[Expanded(child:Text('القنوات ('+visible.length.toString()+')',style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900))),TextButton(onPressed:_manageSources,child:const Text('المصادر'))]),
+        Row(children:[Expanded(child:Text('القنوات والمكتبة المشتركة ('+visible.length.toString()+')',style:const TextStyle(fontSize:18,fontWeight:FontWeight.w900))),TextButton(onPressed:_manageSources,child:const Text('المصادر'))]),
         if(visible.isEmpty)const Card(child:Padding(padding:EdgeInsets.all(24),child:Column(children:[Icon(Icons.live_tv_outlined,size:44,color:Colors.grey),SizedBox(height:8),Text('ماكو قنوات مضافة حالياً',style:TextStyle(fontWeight:FontWeight.bold)),Text('أضف قائمة تملك حق استخدامها أو استورد ملف M3U.',textAlign:TextAlign.center,style:TextStyle(color:Colors.grey))]))) else ...visible.take(250).map(_channelTile),
         if(visible.length>250)const Text('نعرض أول 250 قناة للمحافظة على سرعة الصفحة. استخدم البحث للتصفية.'),
       ]),
@@ -170,8 +223,8 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
   Widget _hero()=>Container(padding:const EdgeInsets.all(17),decoration:BoxDecoration(borderRadius:BorderRadius.circular(21),gradient:const LinearGradient(begin:Alignment.topRight,end:Alignment.bottomLeft,colors:[Color(0xFF4B3D9B),Color(0xFF1B2945),Color(0xFF123A46)])),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
     const Icon(Icons.live_tv,color:Color(0xFFE4DEFF),size:32),const SizedBox(height:8),
     const Text('شاهد قنواتك بمكان واحد',style:TextStyle(color:Colors.white,fontSize:20,fontWeight:FontWeight.w900)),
-    const SizedBox(height:5),const Text('استيراد M3U وM3U8، تصنيفات، بحث ومفضلة.',style:TextStyle(color:Colors.white70)),
-    const SizedBox(height:10),Text(_channels.length.toString()+' قناة • '+_channels.map((e)=>e.source).toSet().length.toString()+' مصدر • '+_favorites.length.toString()+' مفضلة',style:const TextStyle(color:Colors.white)),
+    const SizedBox(height:5),const Text('استيراد M3U وM3U8، ومشاركة مكتبتك مع أعضاء الملتقى.',style:TextStyle(color:Colors.white70)),
+    const SizedBox(height:10),Text(_allChannels.length.toString()+' قناة • '+_channels.map((e)=>e.source).toSet().length.toString()+' مصدر محلي • '+_sharedChannels.length.toString()+' قناة مشتركة',style:const TextStyle(color:Colors.white)),
     const SizedBox(height:12),Wrap(spacing:8,runSpacing:8,children:[FilledButton.icon(onPressed:()=>_openWatchParty(),icon:const Icon(Icons.groups_rounded),label:const Text('غرف مشاهدة IPTV مع الأصدقاء')),OutlinedButton.icon(onPressed:_showEpgGuide,icon:const Icon(Icons.calendar_month),label:Text('دليل البرامج ('+_programs.length.toString()+')'))]), 
   ]));
   Widget _channelTile(IptvChannel c)=>Card(margin:const EdgeInsets.only(bottom:7),child:ListTile(
