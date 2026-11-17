@@ -131,7 +131,7 @@ class _DirectMessagesPageState extends State<DirectMessagesPage> {
           ),
         ),
         Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: _db.collection('conversations').where('members', arrayContains: _uid).snapshots(),
+          stream: _db.collection('conversations').where(Filter.or(Filter('memberA', isEqualTo: _uid), Filter('memberB', isEqualTo: _uid))).snapshots(),
           builder: (context, s) {
             if (s.hasError) {
               final error = s.error;
@@ -292,6 +292,8 @@ class _StartDirectMessagePageState extends State<StartDirectMessagePage> {
                     final members = <String>[_uid, d.id]..sort();
                     await conversation.set({
                       'members': members,
+                      'memberA': members[0],
+                      'memberB': members[1],
                       'memberNames': {
                         _uid: myProfile.data()?['name'] ?? me.displayName ?? 'عضو',
                         d.id: name,
