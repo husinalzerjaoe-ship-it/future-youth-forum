@@ -85,7 +85,7 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
       case 'حاسبة الخصم': _form('حاسبة الخصم', ['السعر الأصلي','نسبة الخصم'], (v) {
         if (v[0] < 0 || v[1] < 0 || v[1] > 100) return 'تحقق من السعر ونسبة الخصم (0–100)';
         final saving = v[0]*v[1]/100;
-        return 'قيمة التوفير: ${_fmt(saving)}\\nالسعر بعد الخصم: ${_fmt(v[0]-saving)}';
+        return 'قيمة التوفير: ${_fmt(saving)}\nالسعر بعد الخصم: ${_fmt(v[0]-saving)}';
       }); break;
       case 'تقسيم مبلغ': _form('تقسيم مبلغ', ['المبلغ الكلي','عدد الأشخاص'], (v) {
         if (v[0] < 0 || v[1] < 1 || v[1] > 10000 || v[1] != v[1].roundToDouble()) return 'أدخل مبلغاً صحيحاً وعدداً صحيحاً للأشخاص';
@@ -189,9 +189,9 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
         TextField(controller:input,minLines:4,maxLines:8,onChanged:(_)=>refresh((){}),
           decoration:const InputDecoration(hintText:'اكتب كل عنصر بسطر',border:OutlineInputBorder())),
         const SizedBox(height:8),
-        Text('عدد العناصر: ${input.text.split('\\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).length}'),
+        Text('عدد العناصر: ${input.text.split('\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).length}'),
         if(input.text.trim().isNotEmpty) SizedBox(height:130,child:SingleChildScrollView(child:SelectableText(
-          input.text.split('\\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).toList().asMap().entries.map((e)=>'${e.key+1}. ${e.value}').join('\\n')))),
+          input.text.split('\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).toList().asMap().entries.map((e)=>'${e.key+1}. ${e.value}').join('\n')))),
       ]),
       actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))],
     ))).then((_)=>input.dispose());
