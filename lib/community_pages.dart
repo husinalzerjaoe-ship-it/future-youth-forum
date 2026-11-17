@@ -32,6 +32,8 @@ import 'daily_world.dart';
 import 'v6_community_suite.dart';
 import 'knowledge_corner.dart';
 import 'v31_member_titles.dart';
+import 'friends_fun_world.dart';
+import 'future_arcade.dart';
 
 const p=Color(0xFF6554D9);
 final db2=FirebaseFirestore.instance;
@@ -55,6 +57,8 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'مكالمات الصوت والفيديو',subtitle:'اتصلوا بالصوت وانتقلوا بين الأقسام والمكالمة مستمرة',category:'التواصل',icon:Icons.video_call_rounded,page:LiveKitCallsPage(onContinue:()=>Navigator.of(context).push(MaterialPageRoute(builder:(_)=>const CommunityHubPage())))),
   (title:'اتصال احتياطي Jitsi',subtitle:'بديل للصوت والفيديو مع دردشة الاجتماع ورمز غرفة',category:'التواصل',icon:Icons.video_camera_front_rounded,page:const JitsiBackupCallsPage()),
   (title:'مركز الألعاب',subtitle:'ألعاب أصدقاء وأسئلة وتحديات ومنافسات',category:'الألعاب',icon:Icons.sports_esports,page:const GameCenterPage()),
+  (title:'عالم الوناسة',subtitle:'تحديات جماعية وألغاز وتمثيل وألعاب خفيفة بدون إنترنت',category:'الألعاب',icon:Icons.celebration_rounded,page:const FriendsFunWorldPage()),
+  (title:'مدينة الألعاب 2D',subtitle:'ألعاب أركيد وطاولات وألغاز ومغامرات',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const FutureArcadePage()),
   (title:'مدينة الألعاب',subtitle:'ألعاب مصغرة وتحديات جماعية وألعاب لوحية',category:'الألعاب',icon:Icons.videogame_asset_rounded,page:const ArcadeHubPage()),
   (title:'النقاط والتحديات',subtitle:'مكافآت يومية وأخبار وإنجازات',category:'الألعاب',icon:Icons.emoji_events,page:const EngagementHubPage()),
   (title:'مركز المباريات',subtitle:'مواعيد ونتائج ومتابعة أخبار الكرة',category:'الألعاب',icon:Icons.sports_soccer,page:const MatchCenterPage()),
@@ -220,7 +224,32 @@ class _TextShelfState extends State<TextShelf> {
   appBar:AppBar(title:Text(widget.title)),body:Column(children:[
    if(widget.collection=='poems') Padding(padding:const EdgeInsets.fromLTRB(12,8,12,2),child:Wrap(spacing:8,children:['الكل','شعبي','فصحى'].map((v)=>ChoiceChip(label:Text(v),selected:category==v,onSelected:(_)=>setState(()=>category=v))).toList())),
    Expanded(child:StreamBuilder<QuerySnapshot<Map<String,dynamic>>>(stream:db2.collection(widget.collection).orderBy('createdAt',descending:true).limit(150).snapshots(),builder:(c,s){
-    if(s.hasError)return const Center(child:Text('تعذر تحميل المشاركات. تأكد من قواعد Firestore.'));
+    if(s.hasError) return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: .35),
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('الاتصال بالمكتبة غير متاح حالياً. تقدر تتصفح المحتوى المحفوظ داخل التطبيق، والمنشورات الجديدة تظهر عند رجوع الاتصال.'),
+          ),
+        ),
+        ..._builtIns.take(80).where((d)=>category=='الكل'||d['category']==category).map((d) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [const Icon(Icons.auto_awesome, color: p), const SizedBox(width: 8), Expanded(child: Text(d['authorName']!, style: const TextStyle(fontWeight: FontWeight.bold))), Chip(label: Text(d['category']!))]),
+              const SizedBox(height: 8),
+              SelectableText(d['text']!, style: const TextStyle(fontSize: 16, height: 1.6)),
+              Align(alignment: Alignment.centerLeft, child: IconButton(
+                tooltip: 'نسخ النص', icon: const Icon(Icons.copy_rounded),
+                onPressed: () { Clipboard.setData(ClipboardData(text: d['text']!)); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم النسخ'))); },
+              )),
+            ]),
+          ),
+        )),
+      ],
+    );
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final userItems=s.data!.docs.map((doc)=>{'text':doc.data()['text'] as String? ??'','category':doc.data()['category'] as String? ??(widget.collection=='poems'?'فصحى':'اقتباسات'),'authorName':doc.data()['authorName'] as String? ??'عضو','id':doc.id}).where((d)=>category=='الكل'||d['category']==category).toList();
     final built=_builtIns.where((d)=>category=='الكل'||d['category']==category).toList(); final items=[...userItems,...built];
