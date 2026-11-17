@@ -774,3 +774,17 @@ test('shared IPTV publishing remains founder-only even when regular members are 
     group: 'عام', logo: '', tvgId: '', source: 'محاولة عضو', sourceUrl: '',
   }));
 });
+
+
+test('banned accounts cannot read the shared IPTV library', async () => {
+  await seed('iptvSharedPlaylists/readable', {
+    name: 'قائمة', sourceUrl: '', ownerUid: 'founder-uid',
+    channelCount: 1, updatedBy: 'founder-uid',
+    updatedAt: Timestamp.fromDate(new Date('2026-01-01T00:00:00Z')),
+  });
+  await seed('userSanctions/banned-reader', {
+    uid: 'banned-reader', permanentBan: true, updatedBy: 'founder-uid',
+  });
+  await assertSucceeds(getDoc(doc(user('active-member'), 'iptvSharedPlaylists/readable')));
+  await assertFails(getDoc(doc(user('banned-reader'), 'iptvSharedPlaylists/readable')));
+});
