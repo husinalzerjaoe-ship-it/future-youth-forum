@@ -55,7 +55,7 @@ class V55ForegroundNotificationService {
     }, onError: (Object error) {});
 
     _conversations = FirebaseFirestore.instance.collection('conversations')
-        .where('members', arrayContains: uid).limit(50)
+        .where(Filter.or(Filter('memberA', isEqualTo: uid), Filter('memberB', isEqualTo: uid))).limit(50)
         .snapshots()
         .listen((snapshot) {
       for (final conversation in snapshot.docs) {
