@@ -1361,7 +1361,8 @@ service cloud.firestore {
         && (
           (request.resource.data.get('category', '') == 'music'
             && request.resource.data.status == 'approved'
-            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac'])
+            && request.resource.data.extension in ['mp3','m4a','aac','wav','ogg','flac']
+            && request.resource.data.createdAt == request.time)
           || (request.resource.data.get('category', '') != 'music'
             && request.resource.data.status == 'pending')
         )
