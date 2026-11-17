@@ -2350,21 +2350,29 @@ class _VoiceCommentPlayerState extends State<_VoiceCommentPlayer> {
   @override
   void initState() {
     super.initState();
-    _player.setUrl(widget.url).catchError((_) {
-      if (mounted) setState(() => _failed = true);
-    });
+    _prepare();
+  }
+  Future<void> _prepare() async {
+    try { await _player.setUrl(widget.url); }
+    catch (_) { if (mounted) setState(() => _failed = true); }
   }
   @override
   void dispose() { _player.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
-    IconButton(
-      visualDensity: VisualDensity.compact,
-      tooltip: 'تشغيل التعليق الصوتي',
-      onPressed: _failed ? null : () async {
-        if (_player.playing) { await _player.pause(); } else { await _player.play(); }
+    StreamBuilder<PlayerState>(
+      stream: _player.playerStateStream,
+      builder: (context, snapshot) {
+        final playing = snapshot.data?.playing ?? false;
+        return IconButton(
+          visualDensity: VisualDensity.compact,
+          tooltip: 'تشغيل التعليق الصوتي',
+          onPressed: _failed ? null : () async {
+            if (_player.playing) { await _player.pause(); } else { await _player.play(); }
+          },
+          icon: Icon(_failed ? Icons.error_outline : (playing ? Icons.pause_circle : Icons.play_circle)),
+        );
       },
-      icon: Icon(_failed ? Icons.error_outline : (_player.playing ? Icons.pause_circle : Icons.play_circle)),
     ),
     const Text('تعليق صوتي'),
     StreamBuilder<Duration?>(
