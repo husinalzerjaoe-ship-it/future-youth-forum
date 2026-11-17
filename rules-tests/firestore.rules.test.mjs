@@ -267,6 +267,6 @@ test('friends 2D room can be found by its single roomCode field and joined by a 
   await assertSucceeds(updateDoc(doc(user('bob'), 'arcadeRooms/room-2d-1'), {
     members: ['alice', 'bob'], updatedAt: serverTimestamp()
   }));
-  await assertSucceeds(getDoc(doc(user('bob'), 'arcadeRooms/room-2d-1/chat/hello-1')).catch(()=>null));
+  await assertSucceeds(setDoc(doc(user('bob'), 'arcadeRooms/room-2d-1/chat/hello-1'), { uid: 'bob', name: 'Bob', text: 'هلا', createdAt: serverTimestamp() }));
   await assertFails(getDoc(doc(user('mallory'), 'arcadeRooms/room-2d-1')));
 });
