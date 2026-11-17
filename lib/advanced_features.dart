@@ -603,8 +603,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
     final choice = await showModalBottomSheet<String>(context: context, showDragHandle: true,
       builder: (c) => Directionality(textDirection: TextDirection.rtl, child: Wrap(children: [
         ListTile(leading: const Icon(Icons.reply, color: _brand), title: const Text('الرد على هذه الرسالة'), onTap: () => Navigator.pop(c, 'reply')),
+        if (doc.data()?['senderId'] == _uid && (doc.data()?['type'] ?? 'text') == 'text')
+          ListTile(leading: const Icon(Icons.edit_outlined, color: _brand), title: const Text('تعديل الرسالة'), onTap: () => Navigator.pop(c, 'edit')),
+        ListTile(
+          leading: Icon(doc.data()?['isPinned'] == true ? Icons.push_pin_outlined : Icons.push_pin, color: _brand),
+          title: Text(doc.data()?['isPinned'] == true ? 'إلغاء تثبيت الرسالة' : 'تثبيت الرسالة'),
+          onTap: () => Navigator.pop(c, 'pin'),
+        ),
         if (doc.data()?['senderId'] == _uid)
-          ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('حذف الرسالة'), onTap: () => Navigator.pop(c, 'delete')),
+          ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('حذف الرسالة من الطرفين'), onTap: () => Navigator.pop(c, 'delete')),
         const ListTile(title: Text('تفاعل مع الرسالة')),
         ...['❤️','😂','🔥','👏','😍','😢'].map((e) => ListTile(leading: Text(e, style: const TextStyle(fontSize: 25)), title: Text(e), onTap: () => Navigator.pop(c, e))),
       ])));
@@ -614,9 +621,34 @@ class _DirectChatPageState extends State<DirectChatPage> {
       final type = d['type'];
       final preview = (d['text'] as String?)?.trim().isNotEmpty == true ? (d['text'] as String).trim() : type == 'image' ? '📷 صورة' : type == 'voice' ? '🎙️ رسالة صوتية' : 'رسالة';
       if (mounted) setState(() => replyTo = {'id': doc.id, 'senderName': d['senderName'] ?? 'عضو', 'preview': preview});
+    } else if (choice == 'edit') {
+      final original = (doc.data()?['text'] ?? '').toString();
+      final editController = TextEditingController(text: original);
+      final edited = await showDialog<String>(context: context, builder: (c) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('تعديل الرسالة'),
+          content: TextField(controller: editController, autofocus: true, minLines: 1, maxLines: 5, maxLength: 1000),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(c, editController.text.trim()), child: const Text('حفظ')),
+          ],
+        ),
+      ));
+      editController.dispose();
+      if (edited != null && edited.isNotEmpty && edited != original.trim()) {
+        await doc.reference.update({'text': edited, 'edited': true, 'editedAt': FieldValue.serverTimestamp()});
+      }
+    } else if (choice == 'pin') {
+      final currentlyPinned = doc.data()?['isPinned'] == true;
+      await doc.reference.update({
+        'isPinned': !currentlyPinned,
+        if (currentlyPinned) 'pinnedBy': FieldValue.delete() else 'pinnedBy': _uid,
+        if (currentlyPinned) 'pinnedAt': FieldValue.delete() else 'pinnedAt': FieldValue.serverTimestamp(),
+      });
     } else if (choice == 'delete') {
       final d = doc.data() ?? {};
-      final mediaUrl = (d['audioUrl'] ?? d['imageUrl'] ?? d['videoUrl']) as String?;
+      final mediaUrl = (d['audioUrl'] ?? d['imageUrl'] ?? d['videoUrl'] ?? d['gifUrl']) as String?;
       if (mediaUrl != null) { try { await deleteForumMedia(mediaUrl); } catch (_) {} }
       await doc.reference.delete();
     } else if (choice != null) {
@@ -747,6 +779,15 @@ class _DirectChatPageState extends State<DirectChatPage> {
                           ])),
                         );
                       },
+                    ),
+                  if (d['isPinned'] == true)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 6),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.push_pin_rounded, size: 13, color: _brand),
+                        SizedBox(width: 4),
+                        Text('رسالة مثبتة', style: TextStyle(fontSize: 10, color: _brand, fontWeight: FontWeight.bold)),
+                      ]),
                     ),
                   if (d['replyToMessageId'] is String)
                     Container(width: double.infinity, margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: _brand.withValues(alpha: .09), borderRadius: BorderRadius.circular(8), border: const Border(right: BorderSide(color: _brand, width: 3))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('رد على ${d['replyToSenderName'] ?? 'عضو'}', style: const TextStyle(fontSize: 11, color: _brand, fontWeight: FontWeight.bold)), Text(d['replyToText'] as String? ?? 'رسالة', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12))])),
