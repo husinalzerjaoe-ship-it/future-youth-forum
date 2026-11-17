@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, query, where, Filter, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
+  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, runTransaction, serverTimestamp, Timestamp
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -43,7 +43,7 @@ test('the inbox OR query lists only conversations indexed to the signed-in membe
 
   const inboxQuery = (uid) => query(
     collection(user(uid), 'conversations'),
-    Filter.or(where('memberA', '==', uid), where('memberB', '==', uid)),
+    or(where('memberA', '==', uid), where('memberB', '==', uid)),
   );
   const aliceInbox = await getDocs(inboxQuery('alice'));
   assert.equal(aliceInbox.size, 2);
