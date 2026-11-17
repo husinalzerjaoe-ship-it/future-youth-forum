@@ -1212,7 +1212,6 @@ class PostsPage extends StatelessWidget {
       final stopped=await recorder.stop();
       if(publish!=true)return;
       final finalPath=stopped??path;
-      if(finalPath==null)return;
       final file=File(finalPath);
       if(!await file.exists()||await file.length()==0)throw StateError('التسجيل فارغ.');
       final user=FirebaseAuth.instance.currentUser!;
