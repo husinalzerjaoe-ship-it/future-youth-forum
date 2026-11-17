@@ -148,6 +148,30 @@ test('links and media are accepted when founder controls allow them', async () =
   }));
 });
 
+test('private conversations allow members to share video messages but not non-members', async () => {
+  await seed('conversations/dm-video', { members: ['alice', 'bob'] });
+  const videoMessage = {
+    senderId: 'alice',
+    senderRole: 'member',
+    type: 'video',
+    text: '🎬 تمت مشاركة مقطع',
+    videoUrl: 'https://media.example.test/community/clip.mp4',
+    sharedClipId: 'clip-1',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(
+    doc(user('alice'), 'conversations/dm-video/messages/video-1'),
+    videoMessage,
+  ));
+  await assertSucceeds(getDoc(
+    doc(user('bob'), 'conversations/dm-video/messages/video-1'),
+  ));
+  await assertFails(setDoc(
+    doc(user('mallory'), 'conversations/dm-video/messages/video-2'),
+    { ...videoMessage, senderId: 'mallory' },
+  ));
+});
+
 test('private conversation messages are readable only by the two members', async () => {
   await seed('conversations/dm-1', { members: ['alice', 'bob'] });
   await seed('conversations/dm-1/messages/msg-1', {
@@ -848,8 +872,38 @@ test('V52 permanent community clips support member feed, likes, comments, and ow
   await assertFails(setDoc(doc(user('alice'), 'communityClips/clip-1/likes/bob'), {
     uid: 'bob', createdAt: serverTimestamp(),
   }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'communityClips/clip-image'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'صورة من الملتقى',
+    mediaType: 'image', mediaUrl: 'https://media.example.test/community/photo.jpg',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('alice'), 'communityClips/clip-gif'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'GIF متحرك',
+    mediaType: 'gif', mediaUrl: 'https://media.example.test/community/loop.gif',
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'communityClips/clip-bad-gif'), {
+    authorId: 'alice', authorName: 'Alice', caption: 'GIF بلا رابط',
+    mediaType: 'gif', createdAt: serverTimestamp(),
+  }));
+
   await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/comment-1'), {
     authorId: 'bob', authorName: 'Bob', text: 'مقطع جميل', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/voice-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'audio',
+    audioUrl: 'https://media.example.test/community/comment.m4a',
+    durationSeconds: 12, createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/gif-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'gif',
+    mediaUrl: 'https://media.example.test/community/reaction.gif',
+    mediaFormat: 'gif', createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'communityClips/clip-1/comments/image-1'), {
+    authorId: 'bob', authorName: 'Bob', text: '', mediaType: 'image',
+    mediaUrl: 'https://media.example.test/community/reaction.jpg',
+    mediaFormat: 'image', createdAt: serverTimestamp(),
   }));
   await assertFails(setDoc(doc(user('mallory'), 'communityClips/clip-1/comments/comment-2'), {
     authorId: 'bob', authorName: 'Bob', text: 'انتحال تعليق', createdAt: serverTimestamp(),
