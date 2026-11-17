@@ -51,6 +51,21 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
   CollectionReference<Map<String,dynamic>> get _inventory=>_db.collection('users').doc(_uid).collection('styleInventory');
   DocumentReference<Map<String,dynamic>> get _profile=>_db.collection('publicProfiles').doc(_uid);
   List<String> get _categories=>['الكل',..._items.map((e)=>e.category).toSet()];
+  bool get _isFounder => FirebaseAuth.instance.currentUser?.email?.toLowerCase()=='husinalzerjaoe@gmail.com';
+  Future<void> _grantFounderCoins() async {
+    if(!_isFounder||_busy)return;
+    setState(()=>_busy=true);
+    try{
+      await _db.runTransaction((tx)async{
+        final snap=await tx.get(_wallet);
+        final old=(snap.data()?['coins'] as num?)?.toInt()??0;
+        final values={'coins':old+500,'updatedAt':FieldValue.serverTimestamp(),'grantedBy':_uid};
+        if(snap.exists)tx.update(_wallet,values);else tx.set(_wallet,values);
+      });
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إضافة 500 عملة إلى رصيد المؤسس')));
+    }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر إضافة العملات: $e')));}
+    finally{if(mounted)setState(()=>_busy=false);}
+  }
   Future<void> _equip(_StyleItem item) async {
     final data=<String,dynamic>{'customTitleUpdatedAt':FieldValue.serverTimestamp()};
     if(item.category=='ألقاب') {
@@ -99,7 +114,9 @@ class _FutureStyleStorePageState extends State<FutureStyleStorePage> {
             decoration:BoxDecoration(borderRadius:BorderRadius.circular(18),gradient:const LinearGradient(colors:[Color(0xFF28204F),Color(0xFF7053C8)])),
             child:Row(children:[const Icon(Icons.monetization_on_rounded,color:Color(0xFFFFD66B),size:32),const SizedBox(width:10),
               const Expanded(child:Text('رصيد العملات',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold))),
-              Text('$coins',style:const TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900))]));
+              Text('$coins',style:const TextStyle(color:Colors.white,fontSize:23,fontWeight:FontWeight.w900)),
+              if(_isFounder)IconButton(tooltip:'إضافة 500 عملة للمؤسس',onPressed:_busy?null:_grantFounderCoins,icon:const Icon(Icons.add_circle,color:Color(0xFFFFD66B))),
+            ]));
         }),
         SizedBox(height:48,child:ListView(scrollDirection:Axis.horizontal,padding:const EdgeInsets.symmetric(horizontal:10),
           children:_categories.map((c)=>Padding(padding:const EdgeInsets.symmetric(horizontal:4),
