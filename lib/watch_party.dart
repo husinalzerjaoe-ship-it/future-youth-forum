@@ -24,7 +24,8 @@ class WatchPartyLobbyPage extends StatefulWidget {
   final String? initialUrl;
   final String? initialName;
   final bool cinemaMode;
-  const WatchPartyLobbyPage({super.key, this.initialUrl, this.initialName, this.cinemaMode = false});
+  final bool forceDirect;
+  const WatchPartyLobbyPage({super.key, this.initialUrl, this.initialName, this.cinemaMode = false, this.forceDirect = false});
   @override State<WatchPartyLobbyPage> createState() => _WatchPartyLobbyPageState();
 }
 
@@ -98,7 +99,7 @@ class _WatchPartyLobbyPageState extends State<WatchPartyLobbyPage> {
     final path = uri.path.toLowerCase();
     final isDirect = path.endsWith('.mp4') || path.endsWith('.m3u8') ||
         path.endsWith('.m4v') || path.endsWith('.mov') || path.endsWith('.webm');
-    final sourceType = videoId != null ? 'youtube' : isDirect ? 'direct' : 'web';
+    final sourceType = videoId != null ? 'youtube' : (widget.forceDirect || isDirect) ? 'direct' : 'web';
     if (_passwordProtected && _roomPassword.text.trim().length < 4) {
       setState(() => _error = 'كلمة المرور لازم تكون 4 أحرف على الأقل.');
       return;
