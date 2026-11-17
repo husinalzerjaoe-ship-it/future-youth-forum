@@ -1,0 +1,31 @@
+name: V43 Firestore Rules Validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'rules-tests/**'
+      - 'firebase.json'
+      - '.github/workflows/v43-rules-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firestore-emulator-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Firebase CLI and rules test dependencies
+        run: |
+          npm install --global firebase-tools
+          npm --prefix rules-tests install --no-audit --no-fund
+      - name: Run Firestore rules emulator tests
+        run: firebase emulators:exec --only firestore --project demo-futureyouth-rules "npm --prefix rules-tests test"
