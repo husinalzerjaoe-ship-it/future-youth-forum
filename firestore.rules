@@ -1883,7 +1883,9 @@ service cloud.firestore {
         && request.resource.data.channelCount is int && request.resource.data.channelCount > 0 && request.resource.data.channelCount <= 10000
         && request.resource.data.updatedAt == request.time;
       allow update: if isFounder()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['channelCount','updatedBy','updatedAt'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','sourceUrl','channelCount','updatedBy','updatedAt'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+        && request.resource.data.sourceUrl is string && request.resource.data.sourceUrl.size() <= 2048
         && request.resource.data.channelCount is int && request.resource.data.channelCount > 0 && request.resource.data.channelCount <= 10000
         && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
       allow delete: if isFounder();
