@@ -85,10 +85,11 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
 
   Future<bool> _publishSharedPlaylist(String source, List<IptvChannel> items, {String sourceUrl = ''}) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || items.isEmpty) return false;
+    if (user == null || items.isEmpty || items.length > 10000 || sourceUrl.length > 2048) return false;
     try {
-      final parent = FirebaseFirestore.instance.collection('iptvSharedPlaylists').doc(_sharedId(source, sourceUrl, items));
-      await parent.set({'name':source,'sourceUrl':sourceUrl,'ownerUid':user.uid,'channelCount':items.length,'updatedBy':user.uid,'updatedAt':FieldValue.serverTimestamp()}, SetOptions(merge:true));
+      final sharedName = source.trim().isEmpty ? 'قائمة IPTV' : (source.length > 100 ? source.substring(0,100) : source);
+      final parent = FirebaseFirestore.instance.collection('iptvSharedPlaylists').doc(_sharedId(sharedName, sourceUrl, items));
+      await parent.set({'name':sharedName,'sourceUrl':sourceUrl,'ownerUid':user.uid,'channelCount':items.length,'updatedBy':user.uid,'updatedAt':FieldValue.serverTimestamp()}, SetOptions(merge:true));
       final old = await parent.collection('channels').get();
       for (var start=0; start<old.docs.length; start+=400) {
         final batch=FirebaseFirestore.instance.batch();
@@ -100,7 +101,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
         final chunk=items.skip(start).take(400).toList();
         for (var i=0; i<chunk.length; i++) {
           final c=chunk[i];
-          batch.set(parent.collection('channels').doc((start+i).toString().padLeft(6,'0')), {'index':start+i,'name':c.name,'url':c.url,'group':c.group,'logo':c.logo,'tvgId':c.tvgId,'source':source,'sourceUrl':sourceUrl});
+          batch.set(parent.collection('channels').doc((start+i).toString().padLeft(6,'0')), {'index':start+i,'name':c.name.length > 160 ? c.name.substring(0,160) : c.name,'url':c.url,'group':c.group.length > 100 ? c.group.substring(0,100) : c.group,'logo':c.logo.length > 2048 ? c.logo.substring(0,2048) : c.logo,'tvgId':c.tvgId.length > 160 ? c.tvgId.substring(0,160) : c.tvgId,'source':sharedName,'sourceUrl':sourceUrl});
         }
         await batch.commit();
       }
