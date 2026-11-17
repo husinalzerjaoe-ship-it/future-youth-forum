@@ -785,21 +785,20 @@ service cloud.firestore {
           && newValues.size() <= 2
           && ((otherUid in oldValues) == (otherUid in newValues));
       }
-      // The array-contains query in the app already targets conversations
-      // containing the signed-in user. Do not require members.size() here:
-      // Firestore rules are not filters and cannot prove an array's size from
-      // that query, which otherwise makes the entire inbox query fail.
-      // The app first checks whether a deterministic conversation document
-      // exists before creating it. Permit authenticated get() of a missing
-      // document (there is no data to disclose), but keep existing documents
-      // and all inbox list queries restricted to their two members.
+      // The current inbox query is an OR over memberA/memberB. Keep list
+      // authorization aligned with those exact query predicates so Firestore
+      // can prove every returned conversation belongs to the signed-in user.
+      // get() still supports legacy documents whose membership is stored only
+      // in the members array; a missing deterministic DM may be checked safely.
       allow get: if request.auth != null && (
         resource == null
         || (resource.data.members is list && request.auth.uid in resource.data.members)
+        || resource.data.memberA == request.auth.uid
+        || resource.data.memberB == request.auth.uid
       );
       allow list: if request.auth != null
-        && resource.data.members is list
-        && request.auth.uid in resource.data.members;
+        && (resource.data.memberA == request.auth.uid
+          || resource.data.memberB == request.auth.uid);
       allow create: if request.auth != null && accountNotBanned()
         && chatControlEnabled('directMessagesEnabled')
         && request.resource.data.members is list
@@ -818,8 +817,11 @@ service cloud.firestore {
         && request.resource.data.members.size() == 2
         // Allow only reordering of the same two members for legacy DMs.
         && request.resource.data.members.hasAll(resource.data.members)
+        // Explicit inbox indexes must always mirror the canonical two-member array.
+        && (!('memberA' in request.resource.data) || request.resource.data.memberA == request.resource.data.members[0])
+        && (!('memberB' in request.resource.data) || request.resource.data.memberB == request.resource.data.members[1])
         && resource.data.members.hasAll(request.resource.data.members)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'lastMessage', 'updatedAt', 'memberNames', 'backgrounds', 'pinnedBy', 'mutedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberA', 'memberB', 'lastMessage', 'updatedAt', 'memberNames', 'backgrounds', 'pinnedBy', 'mutedBy'])
         && (!('backgrounds' in request.resource.data) || request.resource.data.backgrounds is map)
         && selfOnlyMemberFlag('pinnedBy')
         && selfOnlyMemberFlag('mutedBy')
