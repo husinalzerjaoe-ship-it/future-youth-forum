@@ -27,6 +27,11 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
     (title:'قلب العملة',subtitle:'وجه أو كتابة',icon:Icons.monetization_on_rounded,group:'العشوائيات'),
     (title:'عداد النصوص',subtitle:'الكلمات والحروف والأسطر',icon:Icons.text_fields_rounded,group:'الكتابة'),
     (title:'مفكرة سريعة',subtitle:'حفظ ملاحظة على جهازك',icon:Icons.sticky_note_2_rounded,group:'التنظيم'),
+    (title:'حاسبة المعدل',subtitle:'متوسط ثلاث درجات',icon:Icons.school_rounded,group:'الدراسة'),
+    (title:'حاسبة الخصم',subtitle:'السعر بعد الخصم وقيمة التوفير',icon:Icons.discount_rounded,group:'الحساب'),
+    (title:'تقسيم مبلغ',subtitle:'قسمة مبلغ بالتساوي على أشخاص',icon:Icons.groups_rounded,group:'الحساب'),
+    (title:'تحويل وقت الدراسة',subtitle:'حوّل الساعات والدقائق إلى دقائق',icon:Icons.timer_outlined,group:'الدراسة'),
+    (title:'ترتيب قائمة',subtitle:'تنظيف وترقيم الأسماء أو المهام',icon:Icons.format_list_numbered,group:'الكتابة'),
   ];
 
   @override
@@ -73,6 +78,24 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
       case 'قرعة الأسماء': _picker(); break;
       case 'عداد النصوص': _counter(); break;
       case 'مفكرة سريعة': _openNote(); break;
+      case 'حاسبة المعدل': _form('حاسبة المعدل', ['الدرجة الأولى','الدرجة الثانية','الدرجة الثالثة'], (v) {
+        if (v.any((n) => n < 0 || n > 100)) return 'أدخل درجات بين 0 و100';
+        return 'المعدل: ${_fmt((v[0]+v[1]+v[2])/3)} من 100';
+      }); break;
+      case 'حاسبة الخصم': _form('حاسبة الخصم', ['السعر الأصلي','نسبة الخصم'], (v) {
+        if (v[0] < 0 || v[1] < 0 || v[1] > 100) return 'تحقق من السعر ونسبة الخصم (0–100)';
+        final saving = v[0]*v[1]/100;
+        return 'قيمة التوفير: ${_fmt(saving)}\\nالسعر بعد الخصم: ${_fmt(v[0]-saving)}';
+      }); break;
+      case 'تقسيم مبلغ': _form('تقسيم مبلغ', ['المبلغ الكلي','عدد الأشخاص'], (v) {
+        if (v[0] < 0 || v[1] < 1 || v[1] > 10000 || v[1] != v[1].roundToDouble()) return 'أدخل مبلغاً صحيحاً وعدداً صحيحاً للأشخاص';
+        return 'حصة كل شخص: ${_fmt(v[0]/v[1])}';
+      }); break;
+      case 'تحويل وقت الدراسة': _form('تحويل وقت الدراسة', ['عدد الساعات','عدد الدقائق'], (v) {
+        if (v[0] < 0 || v[1] < 0 || v[1] >= 60) return 'الدقائق تكون من 0 إلى 59';
+        return 'المجموع: ${_fmt(v[0]*60+v[1])} دقيقة';
+      }); break;
+      case 'ترتيب قائمة': _formatList(); break;
     }
   }
 
@@ -156,6 +179,22 @@ class _FutureUtilityStudioPageState extends State<FutureUtilityStudioPage> {
         if(!mounted)return; setState(()=>_savedNote=_note.text); if(c.mounted)Navigator.pop(c);
       },child:const Text('حفظ'))],
     ));
+  }
+
+  void _formatList() {
+    final input=TextEditingController();
+    showDialog<void>(context:context,builder:(c)=>StatefulBuilder(builder:(c,refresh)=>AlertDialog(
+      title:const Text('ترتيب وتنظيف قائمة'),
+      content:Column(mainAxisSize:MainAxisSize.min,children:[
+        TextField(controller:input,minLines:4,maxLines:8,onChanged:(_)=>refresh((){}),
+          decoration:const InputDecoration(hintText:'اكتب كل عنصر بسطر',border:OutlineInputBorder())),
+        const SizedBox(height:8),
+        Text('عدد العناصر: ${input.text.split('\\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).length}'),
+        if(input.text.trim().isNotEmpty) SizedBox(height:130,child:SingleChildScrollView(child:SelectableText(
+          input.text.split('\\n').map((x)=>x.trim()).where((x)=>x.isNotEmpty).toList().asMap().entries.map((e)=>'${e.key+1}. ${e.value}').join('\\n')))),
+      ]),
+      actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('إغلاق'))],
+    ))).then((_)=>input.dispose());
   }
 
   void _result(String title,String value,IconData icon) {
