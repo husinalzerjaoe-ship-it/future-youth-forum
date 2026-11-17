@@ -38,6 +38,7 @@ import 'v39_daily_challenges.dart';
 import 'v39_creator_links.dart';
 import 'v40_party_deck.dart';
 import 'advanced_features.dart';
+import 'community_expansion.dart';
 import 'cinema_hub.dart';
 import 'football_live_center.dart';
 import 'premium_media_hub.dart';
@@ -109,6 +110,7 @@ class _CommunityHubPageState extends State<CommunityHubPage> {
   (title:'تصويتات الملتقى',subtitle:'استفتاءات وآراء الأعضاء',category:'المجتمع',icon:Icons.poll,page:const CommunityPollsPage()),
   (title:'فعاليات الملتقى',subtitle:'مسابقات ولقاءات وتسجيل مشاركة',category:'المجتمع',icon:Icons.event_available,page:const CommunityEventsPage()),
   (title:'أندية الاهتمامات',subtitle:'أنشئ نادياً أو انضم لأصحاب اهتماماتك',category:'المجتمع',icon:Icons.diversity_3_rounded,page:const V6CommunitySuitePage()),
+  (title:'مجتمعنا وفعالياتنا',subtitle:'استاد الأصدقاء وصندوق المجتمع والفعاليات والنقاشات',category:'المجتمع',icon:Icons.diversity_2_rounded,page:const CommunityExpansionPage()),
   (title:'مساحة التركيز',subtitle:'مؤقت بومودورو وجلسات إنجاز واستراحات',category:'المعرفة',icon:Icons.timer_rounded,page:const FocusRoomPage()),
   (title:'مساحتي الشخصية',subtitle:'مزاجك وأهدافك وعاداتك ودفتر يومياتك',category:'المعرفة',icon:Icons.auto_graph_rounded,page:const PersonalGrowthPage()),
   (title:'الغرف والملفات والموسيقى',subtitle:'غرف بدعوات ورمز ومشاركة ملفات ومشغل محلي',category:'الترفيه',icon:Icons.hub,page:const ExtraCommunityFeaturesPage()),
