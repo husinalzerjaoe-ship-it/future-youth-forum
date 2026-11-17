@@ -263,6 +263,82 @@ test('private conversation typing and read receipts are visible only to particip
   }));
 });
 
+test('private rooms can be created, listed, managed and messaged by invited members only', async () => {
+  const room = {
+    ownerId: 'alice',
+    name: 'غرفة الأصدقاء',
+    roomAdmins: [],
+    members: ['alice', 'bob'],
+    invitedUids: ['alice', 'bob'],
+    roomType: 'text',
+    meetUrl: '',
+    createdAt: serverTimestamp(),
+    lastMessage: 'الغرفة جاهزة',
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'privateRooms/room-create'), room));
+  await assertSucceeds(getDoc(doc(user('bob'), 'privateRooms/room-create')));
+  await assertFails(getDoc(doc(user('mallory'), 'privateRooms/room-create')));
+
+  const memberRooms = await getDocs(query(
+    collection(user('bob'), 'privateRooms'),
+    where('members', 'array-contains', 'bob'),
+  ));
+  assert.equal(memberRooms.size, 1);
+
+  await assertSucceeds(updateDoc(doc(user('alice'), 'privateRooms/room-create'), {
+    members: ['alice', 'bob'],
+    invitedUids: ['alice', 'bob'],
+    roomAdmins: ['bob'],
+  }));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'privateRooms/room-create'), {
+    lastMessage: 'وصلت الرسالة',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(user('bob'), 'privateRooms/room-create'), {
+    members: ['alice', 'bob', 'mallory'],
+    invitedUids: ['alice', 'bob', 'mallory'],
+    roomAdmins: [],
+  }));
+
+  await assertSucceeds(setDoc(doc(user('bob'), 'privateRooms/room-create/messages/image-1'), {
+    senderId: 'bob', type: 'image', text: '',
+    imageUrl: 'https://media.example.test/private/photo.jpg',
+  }));
+  await assertSucceeds(setDoc(doc(user('bob'), 'privateRooms/room-create/messages/voice-1'), {
+    senderId: 'bob', type: 'voice', text: '',
+    audioUrl: 'https://media.example.test/private/voice.m4a',
+    durationSeconds: 15,
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'privateRooms/room-create/messages/outside-1'), {
+    senderId: 'mallory', type: 'text', text: 'intrusion',
+  }));
+});
+
+test('members can publish and play approved shared music files', async () => {
+  await assertSucceeds(setDoc(doc(user('alice'), 'sharedFiles/music-1'), {
+    uploaderId: 'alice',
+    title: 'موسيقى الملتقى.mp3',
+    fileName: 'forum-music.mp3',
+    extension: 'mp3',
+    size: 1024,
+    fileUrl: 'https://media.example.test/shared-files/forum-music.mp3',
+    status: 'approved',
+    category: 'music',
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(doc(user('bob'), 'sharedFiles/music-1')));
+  await assertFails(setDoc(doc(user('alice'), 'sharedFiles/music-bad-time'), {
+    uploaderId: 'alice',
+    title: 'ملف بلا توقيت.mp3',
+    extension: 'mp3',
+    size: 1024,
+    fileUrl: 'https://media.example.test/shared-files/bad.mp3',
+    status: 'approved',
+    category: 'music',
+    createdAt: Timestamp.fromDate(new Date('2020-01-01T00:00:00Z')),
+  }));
+});
+
 test('private room messages remain limited to room members', async () => {
   await seed('privateRooms/room-1', {
     ownerId: 'alice', name: 'Private', members: ['alice', 'bob'], invitedUids: ['alice', 'bob']
