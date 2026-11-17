@@ -11,7 +11,7 @@ class IptvProgram {
 
 class IptvEpgParser {
   static DateTime? _date(String raw) {
-    final m=RegExp(r'^(\\d{4})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(\\d{2})(?:\\s*([+-])(\\d{2})(\\d{2}))?$').firstMatch(raw.trim());
+    final m=RegExp(r'^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+-])(\d{2})(\d{2}))?$').firstMatch(raw.trim());
     if(m==null)return null;
     try {
       final local=DateTime.utc(int.parse(m[1]!),int.parse(m[2]!),int.parse(m[3]!),int.parse(m[4]!),int.parse(m[5]!),int.parse(m[6]!));
