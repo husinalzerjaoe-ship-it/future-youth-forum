@@ -1,7 +1,5 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -723,4 +721,53 @@ class _CommunityReelTileState extends State<_CommunityReelTile> {
       ],
     );
   }
+}
+
+
+class _ReelCommentAudio extends StatefulWidget {
+  final String url;
+  const _ReelCommentAudio({required this.url});
+
+  @override
+  State<_ReelCommentAudio> createState() => _ReelCommentAudioState();
+}
+
+class _ReelCommentAudioState extends State<_ReelCommentAudio> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _loading = false;
+
+  Future<void> _toggle() async {
+    try {
+      if (_player.playing) {
+        await _player.pause();
+        return;
+      }
+      setState(() => _loading = true);
+      if (_player.audioSource == null) await _player.setUrl(widget.url);
+      await _player.play();
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تعذر تشغيل التعليق الصوتي')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<PlayerState>(
+    stream: _player.playerStateStream,
+    builder: (context, snapshot) => TextButton.icon(
+      onPressed: _loading ? null : _toggle,
+      icon: _loading
+        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+        : Icon(snapshot.data?.playing == true ? Icons.pause_circle : Icons.play_circle),
+      label: const Text('تعليق صوتي'),
+    ),
+  );
 }
