@@ -71,6 +71,7 @@ import 'v54_world_community.dart';
 import 'dns_helper.dart';
 import 'v55_foreground_notifications.dart';
 import 'v56_future_world.dart';
+import 'v58_experience_hub.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -773,6 +774,9 @@ class _HomePageState extends State<HomePage> {
                 case 'v56Hub':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V56FutureWorldPage()));
                   break;
+                case 'v58Hub':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V58ExperienceHubPage()));
+                  break;
                 case 'v54Hub':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V54WorldCommunityPage()));
                   break;
@@ -956,6 +960,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v58Hub', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('مركز تجربة الملتقى V58'), subtitle: Text('كل الأقسام ببحث وتصنيفات موحدة'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v56Hub', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('عالم المستقبل V56'), subtitle: Text('دفتر الأحلام والذكريات والقصص والترفيه'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v54Hub', child: ListTile(leading: Icon(Icons.public_rounded), title: Text('عالم شباب المستقبل V54'), subtitle: Text('مركز المجتمع والإشعارات والإنجازات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v53Hub', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('عالم الملتقى V53'), subtitle: Text('بوابة المجتمع والفعاليات والإنجازات'), contentPadding: EdgeInsets.zero)),
