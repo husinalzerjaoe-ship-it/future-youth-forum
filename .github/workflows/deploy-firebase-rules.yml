@@ -18,6 +18,7 @@ on:
       - feature/v55-music-notifications-repair
       - feature/v58-experience-hub-full-upgrade
       - feature/v59-independent-vod-cinema-library
+      - feature/v60-complete-forum-upgrade
     paths:
       - 'firestore.rules'
       - 'storage.rules'
