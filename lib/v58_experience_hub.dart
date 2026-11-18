@@ -23,6 +23,7 @@ import 'v52_community_reels.dart';
 import 'v53_community_hub.dart';
 import 'v54_world_community.dart';
 import 'v56_future_world.dart';
+import 'v59_vod_cinema_library.dart';
 
 class V58ExperienceHubPage extends StatefulWidget {
   const V58ExperienceHubPage({super.key});
@@ -47,7 +48,8 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
     _V58Feature('عالم وناسة الأصدقاء', 'نشاطات وألعاب اجتماعية', Icons.celebration_rounded, 'الألعاب', () => const FriendsFunWorldPage()),
     _V58Feature('مدينة ألعاب 2D', 'افتح تجارب الألعاب الموجودة', Icons.videogame_asset_rounded, 'الألعاب', () => const FutureArcadePage()),
     _V58Feature('منافسات الأصدقاء', 'تحديات ولوحة منافسة', Icons.emoji_events_rounded, 'الألعاب', () => const FriendsBattleArenaPage()),
-    _V58Feature('مركز IPTV', 'قوائم القنوات والمكتبة والمشغل', Icons.live_tv_rounded, 'الترفيه', () => const IptvCenterPage()),
+    _V58Feature('مركز IPTV', 'القنوات المباشرة ودليل البرامج', Icons.live_tv_rounded, 'الترفيه', () => const IptvCenterPage()),
+    _V58Feature('مكتبة الأفلام والمسلسلات المتزامنة', 'أفلام وأنمي وحلقات ومشاهدة جماعية', Icons.movie_filter_rounded, 'الترفيه', () => const VodCinemaLibraryPage()),
     _V58Feature('مكتبة الوسائط', 'مركز الصوت والفيديو', Icons.video_library_rounded, 'الترفيه', () => const PremiumMediaHubPage()),
     _V58Feature('عالم المستقبل V56', 'دفتر الأحلام والذكريات والقصص', Icons.auto_awesome_rounded, 'الإبداع والمعرفة', () => const V56FutureWorldPage()),
     _V58Feature('استوديو الإبداع', 'مساحة الكتابة وصناعة المحتوى', Icons.brush_rounded, 'الإبداع والمعرفة', () => const FutureStudioPage()),
