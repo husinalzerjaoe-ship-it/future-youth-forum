@@ -360,6 +360,31 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
   }catch(e){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الملف: '+e.toString())));}
   finally{if(mounted)setState(()=>loading=false);}
  }
+ Future<void> playSharedQueue(List<QueryDocumentSnapshot<Map<String,dynamic>>> docs) async {
+  final items=docs.map((d){
+   final x=d.data();
+   return MediaItem(
+    id:(x['fileUrl']??'').toString(),
+    title:(x['title']??'مقطع صوتي').toString(),
+    album:'قائمة موسيقى المجتمع',
+   );
+  }).where((item){
+   final uri=Uri.tryParse(item.id);
+   return uri!=null && const ['https','http'].contains(uri.scheme) && uri.host.isNotEmpty;
+  }).toList(growable:false);
+  if(items.isEmpty){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('ماكو روابط صوتية صالحة بقائمة المجتمع')));
+   return;
+  }
+  setState(()=>loading=true);
+  try{
+   await appAudioHandler.loadRemoteQueue(items);
+   await appAudioHandler.play();
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('بدأ تشغيل قائمة من ${items.length} أغنية')));
+  }catch(e){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل القائمة: $e')));
+  }finally{if(mounted)setState(()=>loading=false);}
+ }
  Future<void> playShared(String url,String title) async {
   setState(()=>loading=true);
   try{await appAudioHandler.loadRemoteTrack(url,title);}
@@ -381,7 +406,11 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
   body:Column(children:[
    Padding(padding:const EdgeInsets.all(12),child:StreamBuilder<PlaybackState>(stream:appAudioHandler.playbackState,builder:(context,s){
     final playing=s.data?.playing??false;
-    return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:StreamBuilder<MediaItem?>(stream:appAudioHandler.mediaItem,builder:(context,m)=>Text(m.data?.title??(current>=0?tracks[current].name:'مشغل الموسيقى'),maxLines:1,overflow:TextOverflow.ellipsis)),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:IconButton(onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle))));
+    return Card(child:ListTile(leading:const Icon(Icons.music_note,size:34),title:StreamBuilder<MediaItem?>(stream:appAudioHandler.mediaItem,builder:(context,m)=>Text(m.data?.title??(current>=0?tracks[current].name:'مشغل الموسيقى'),maxLines:1,overflow:TextOverflow.ellipsis)),subtitle:Text(loading?'جاري التحميل':playing?'يعمل الآن':'اختر أغنية للتشغيل'),trailing:Row(mainAxisSize:MainAxisSize.min,children:[
+     IconButton(tooltip:'السابق',onPressed:appAudioHandler.skipToPrevious,icon:const Icon(Icons.skip_previous_rounded)),
+     IconButton(tooltip:playing?'إيقاف مؤقت':'تشغيل',onPressed:playing?appAudioHandler.pause:appAudioHandler.play,icon:Icon(playing?Icons.pause_circle:Icons.play_circle)),
+     IconButton(tooltip:'التالي',onPressed:appAudioHandler.skipToNext,icon:const Icon(Icons.skip_next_rounded)),
+    ])));
    })),
    const Padding(padding:EdgeInsets.fromLTRB(12,4,12,4),child:Align(alignment:Alignment.centerRight,child:Text('موسيقى المجتمع • نشر مباشر دون موافقة الإدارة'))),
    // Pending tracks remain visible to their uploader; the founder can review them here.
@@ -430,6 +459,13 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final docs=s.data!.docs.where((d)=>['mp3','m4a','aac','wav','ogg','flac'].contains((d.data()['extension']??'').toString().toLowerCase())).toList();
     return ListView(children:[
+     if(docs.isNotEmpty) Card(child:ListTile(
+      leading:const Icon(Icons.queue_music_rounded,size:30),
+      title:const Text('تشغيل قائمة المجتمع كاملة',style:TextStyle(fontWeight:FontWeight.bold)),
+      subtitle:Text('${docs.length} أغنية متاحة بالتتابع'),
+      trailing:const Icon(Icons.play_circle_fill),
+      onTap:loading?null:()=>playSharedQueue(docs),
+     )),
      if(docs.isEmpty)const ListTile(title:Text('ماكو أغاني منشورة بعد'),subtitle:Text('ارفع أول أغنية وشاركها مع أعضاء الملتقى')),
      ...docs.map((d){final x=d.data();return Card(child:ListTile(
       leading:const CircleAvatar(child:Icon(Icons.audiotrack)),
