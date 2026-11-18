@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'media_upload_service.dart';
 import 'download_service.dart';
 
@@ -276,6 +277,9 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
  int current=-1;
  bool loading=false,uploading=false,audioReady=false;
  String? audioInitError;
+ final _sharedMusicSearch=TextEditingController();
+ final Set<String> _favoriteSharedIds=<String>{};
+ bool _onlyFavorites=false;
  final db=FirebaseFirestore.instance;
  String get uid=>FirebaseAuth.instance.currentUser!.uid;
 
@@ -283,6 +287,35 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
  void initState() {
   super.initState();
   _initializeAudio();
+  _loadSharedFavorites();
+ }
+
+ @override
+ void dispose() {
+  _sharedMusicSearch.dispose();
+  super.dispose();
+ }
+
+ String get _favoritesKey=>'shared_music_favorites_$uid';
+
+ Future<void> _loadSharedFavorites() async {
+  try{
+   final prefs=await SharedPreferences.getInstance();
+   final saved=prefs.getStringList(_favoritesKey)??const <String>[];
+   if(mounted)setState(()=>_favoriteSharedIds.addAll(saved));
+  }catch(_){}
+ }
+
+ Future<void> _toggleSharedFavorite(String id) async {
+  setState((){
+   if(!_favoriteSharedIds.add(id))_favoriteSharedIds.remove(id);
+  });
+  try{
+   final prefs=await SharedPreferences.getInstance();
+   await prefs.setStringList(_favoritesKey,_favoriteSharedIds.toList());
+  }catch(_){
+   if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تعذر حفظ المفضلة على هذا الجهاز')));
+  }
  }
 
  Future<void> _initializeAudio() async {
@@ -458,20 +491,46 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
     if(s.hasError)return const Center(child:Text('تعذر تحميل الأغاني المنشورة'));
     if(!s.hasData)return const Center(child:CircularProgressIndicator());
     final docs=s.data!.docs.where((d)=>['mp3','m4a','aac','wav','ogg','flac'].contains((d.data()['extension']??'').toString().toLowerCase())).toList();
+    final query=_sharedMusicSearch.text.trim().toLowerCase();
+    final visibleDocs=docs.where((d){
+     final x=d.data();
+     final title=(x['title']??x['fileName']??'').toString().toLowerCase();
+     return (query.isEmpty||title.contains(query))&&(!_onlyFavorites||_favoriteSharedIds.contains(d.id));
+    }).toList();
     return ListView(children:[
-     if(docs.isNotEmpty) Card(child:ListTile(
+     Padding(padding:const EdgeInsets.fromLTRB(12,10,12,4),child:TextField(
+      controller:_sharedMusicSearch,
+      onChanged:(_)=>setState((){}),
+      decoration:InputDecoration(
+       prefixIcon:const Icon(Icons.search_rounded),
+       hintText:'ابحث باسم الأغنية...',
+       suffixIcon:_sharedMusicSearch.text.isEmpty?null:IconButton(
+        tooltip:'مسح البحث',onPressed:()=>setState(()=>_sharedMusicSearch.clear()),icon:const Icon(Icons.close)),
+       border:OutlineInputBorder(borderRadius:BorderRadius.circular(14)),
+      ),
+     )),
+     Padding(padding:const EdgeInsets.symmetric(horizontal:12),child:Wrap(spacing:8,children:[
+      FilterChip(label:const Text('كل الأغاني'),selected:!_onlyFavorites,onSelected:(_)=>setState(()=>_onlyFavorites=false)),
+      FilterChip(label:const Text('مفضلاتي'),avatar:const Icon(Icons.favorite,size:16),selected:_onlyFavorites,onSelected:(_)=>setState(()=>_onlyFavorites=true)),
+      Chip(label:Text('${visibleDocs.length} نتيجة')),
+     ])),
+     if(visibleDocs.isNotEmpty) Card(child:ListTile(
       leading:const Icon(Icons.queue_music_rounded,size:30),
-      title:const Text('تشغيل قائمة المجتمع كاملة',style:TextStyle(fontWeight:FontWeight.bold)),
-      subtitle:Text('${docs.length} أغنية متاحة بالتتابع'),
+      title:const Text('تشغيل القائمة المعروضة',style:TextStyle(fontWeight:FontWeight.bold)),
+      subtitle:Text('${visibleDocs.length} أغنية متاحة بالتتابع'),
       trailing:const Icon(Icons.play_circle_fill),
-      onTap:loading?null:()=>playSharedQueue(docs),
+      onTap:loading?null:()=>playSharedQueue(visibleDocs),
      )),
      if(docs.isEmpty)const ListTile(title:Text('ماكو أغاني منشورة بعد'),subtitle:Text('ارفع أول أغنية وشاركها مع أعضاء الملتقى')),
-     ...docs.map((d){final x=d.data();return Card(child:ListTile(
+     if(docs.isNotEmpty&&visibleDocs.isEmpty)const ListTile(title:Text('ما لقينا أغاني مطابقة'),subtitle:Text('غيّر البحث أو اعرض كل الأغاني')),
+     ...visibleDocs.map((d){final x=d.data();final favorite=_favoriteSharedIds.contains(d.id);return Card(child:ListTile(
       leading:const CircleAvatar(child:Icon(Icons.audiotrack)),
       title:Text(x['title'] as String? ?? 'مقطع صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
       subtitle:Text('من مكتبة المجتمع • '+(x['size']??0).toString()+' بايت'),
-      trailing:IconButton(tooltip:'تشغيل',icon:const Icon(Icons.play_circle_fill),onPressed:()=>playShared(x['fileUrl'] as String,x['title'] as String? ?? 'مقطع صوتي'))
+      trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+       IconButton(tooltip:favorite?'إزالة من المفضلة':'إضافة للمفضلة',icon:Icon(favorite?Icons.favorite:Icons.favorite_border,color:favorite?Colors.pink:null),onPressed:()=>_toggleSharedFavorite(d.id)),
+       IconButton(tooltip:'تشغيل',icon:const Icon(Icons.play_circle_fill),onPressed:()=>playShared(x['fileUrl'] as String,x['title'] as String? ?? 'مقطع صوتي')),
+      ]),
      ));})
     ]);
    })),
