@@ -21,6 +21,7 @@ on:
       - feature/v60-complete-forum-upgrade
     paths:
       - 'firestore.rules'
+      - 'firestore.indexes.json'
       - 'storage.rules'
       - 'rules-tests/**'
       - 'firebase.json'
@@ -61,8 +62,8 @@ jobs:
           test -f firestore.rules
 
       # V27 is manual-dispatch only: pushing this branch never changes live rules.
-      # The selected branch is checked out, emulator tests run, then only Firestore rules deploy.
+      # The selected branch is checked out, emulator tests run, then Firestore rules and indexes deploy.
       # Firebase Storage has not been initialized for this project. Deploy Firestore
       # rules now; deploy storage.rules only after a bucket is provisioned.
       - name: Deploy Firestore security rules
-        run: firebase deploy --only firestore:rules --project futureyouth-69f8a --non-interactive
+        run: firebase deploy --only firestore:rules,firestore:indexes --project futureyouth-69f8a --non-interactive
