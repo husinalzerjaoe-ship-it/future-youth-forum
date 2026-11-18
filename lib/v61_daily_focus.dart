@@ -16,7 +16,7 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
   static const _storageKey = 'v61_daily_focus_items';
   final List<_FocusItem> _items = [];
   bool _loading = true;
-  bool _saving = false;
+  Future<void> _pendingSave = Future<void>.value();
 
   int get _done => _items.where((item) => item.done).length;
   double get _progress => _items.isEmpty ? 0 : _done / _items.length;
@@ -47,18 +47,16 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _persist() async {
-    if (_saving) return;
-    _saving = true;
-    try {
+  Future<void> _persist() {
+    // Serialize writes so quick consecutive taps cannot silently drop a save.
+    _pendingSave = _pendingSave.then((_) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         _storageKey,
         jsonEncode(_items.map((item) => item.toJson()).toList()),
       );
-    } finally {
-      _saving = false;
-    }
+    });
+    return _pendingSave;
   }
 
   Future<void> _addItem() async {
