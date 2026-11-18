@@ -27,10 +27,8 @@ for item in audio_permissions + livekit_permissions:
     if f'android:name="{permission_name}"' not in text:
         text = text.replace("<application", f"    {item}\n    <application", 1)
 
-text = text.replace(
-    'android:name=".MainActivity"',
-    'android:name="com.ryanheise.audioservice.AudioServiceActivity"',
-)
+# Keep the app's own MainActivity so its FlutterEngine and MethodChannels remain available.
+# MainActivity must extend AudioServiceActivity; see configure_android_branding.py.
 service = """
         <service
             android:name="com.ryanheise.audioservice.AudioService"
