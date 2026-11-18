@@ -15,6 +15,7 @@ on:
       - feature/v53-community-universe
       - feature/v54-world-community
       - feature/v58-experience-hub-full-upgrade
+      - feature/v59-independent-vod-cinema-library
     paths:
       - 'firestore.rules'
       - 'rules-tests/**'
