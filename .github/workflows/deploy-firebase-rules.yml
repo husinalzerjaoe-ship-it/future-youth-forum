@@ -18,6 +18,7 @@ on:
       - feature/v55-music-notifications-repair
       - feature/v58-experience-hub-full-upgrade
       - feature/v59-independent-vod-cinema-library
+      - feature/v60-complete-forum-upgrade
     paths:
       - 'firestore.rules'
       - 'storage.rules'
@@ -60,7 +61,7 @@ jobs:
           test -f firestore.rules
 
       # V27 is manual-dispatch only: pushing this branch never changes live rules.
-      # The selected branch is checked out, emulator tests run, then only Firestore rules deploy.
+      # The selected branch is checked out, emulator tests run, then Firestore rules and indexes deploy.
       # Firebase Storage has not been initialized for this project. Deploy Firestore
       # rules now; deploy storage.rules only after a bucket is provisioned.
       - name: Deploy Firestore security rules
