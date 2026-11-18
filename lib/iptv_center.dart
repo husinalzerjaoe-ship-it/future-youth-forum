@@ -636,7 +636,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       final parsed = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes, allowMalformed: true), source: source, sourceUrl: uri.toString(), baseUri: uri);
       if (parsed.isEmpty) throw Exception('القائمة المحدثة فارغة.');
       _items.removeWhere((e) => e.source == source); _items.addAll(parsed); await _save(); await _syncToCloud(parsed);
-      _toast('تم تحديث المصدر: + parsed.length.toString() + ' عنصر.');
+      _toast('تم تحديث المصدر: ' + parsed.length.toString() + ' عنصر.');
     } catch (e) { _toast('فشل تحديث المصدر: ' + e.toString()); }
     finally { if (mounted) setState(() => _busy = false); }
   }
@@ -659,7 +659,23 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
   void _room(IptvChannel item) { Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(initialUrl: item.url, initialName: 'مشاهدة جماعية • ' + item.name, forceDirect: true))); }
   Widget _sources() {
     final sources = _items.map((e) => e.source).where((e) => e.isNotEmpty).toSet().toList()..sort();
-    return Card(child: ExpansionTile(leading: const Icon(Icons.source_outlined), title: Text('مصادري (' + sources.length.toString() + ')'), children: sources.map((source) => ListTile(title: Text(source), subtitle: Text(_items.where((e) => e.source == source).length.toString() + ' عنصر'), trailing: IconButton(onPressed: _busy ? null : () => _refresh(source), icon: const Icon(Icons.refresh_rounded))).toList()));
+    return Card(
+      child: ExpansionTile(
+        leading: const Icon(Icons.source_outlined),
+        title: Text('مصادري (' + sources.length.toString() + ')'),
+        children: sources.map<Widget>((source) {
+          final count = _items.where((e) => e.source == source).length;
+          return ListTile(
+            title: Text(source),
+            subtitle: Text(count.toString() + ' عنصر'),
+            trailing: IconButton(
+              onPressed: _busy ? null : () => _refresh(source),
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          );
+        }).toList(),
+      ),
+    );
   }
   @override Widget build(BuildContext context) {
     final visible = _visible;
