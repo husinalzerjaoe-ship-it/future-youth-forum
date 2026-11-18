@@ -92,7 +92,18 @@ jobs:
                          if item.get(android + "name") == "flutterEmbedding"), None)
           if marker is None or marker.get(android + "value") != "2":
               raise SystemExit("Flutter embedding v2 marker is missing or unreadable")
-          print("Verified Flutter Android embedding v2 in the generated manifest.")
+          activity = next((item for item in app.findall("activity")
+                           if item.get(android + "name") == ".MainActivity"), None)
+          if activity is None:
+              raise SystemExit("MainActivity must remain the declared app activity")
+          service = next((item for item in app.findall("service")
+                          if item.get(android + "name") == "com.ryanheise.audioservice.AudioService"), None)
+          if service is None:
+              raise SystemExit("AudioService is missing from AndroidManifest.xml")
+          source = Path("android/app/src/main/kotlin/com/futureyouth/forum/MainActivity.kt")
+          if not source.exists() or "class MainActivity : AudioServiceActivity()" not in source.read_text():
+              raise SystemExit("MainActivity must extend AudioServiceActivity to provide the correct FlutterEngine")
+          print("Verified Flutter embedding v2, app MainActivity, and audio_service activity integration.")
           PY
       - name: Verify Activepieces webhook secret
         env:
