@@ -172,18 +172,17 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
 
   Future<void> _startDirectCall() async {
     final user = FirebaseAuth.instance.currentUser;
-    var friendUid = _friendUidController.text.trim();
+    final friendUid = _friendUidController.text.trim();
     if (user == null) {
       setState(() => _error = 'سجّل الدخول أولاً.');
       return;
     }
-    if (friendUid.isEmpty || friendUid == user.uid || friendUid.length > 128) {
-      setState(() => _error = 'أدخل معرّف حساب صديقك الصحيح، ولا تستخدم معرّف حسابك.');
+    if (!RegExp(r'^[A-Za-z0-9:_-]{10,128}$').hasMatch(friendUid) || friendUid == user.uid) {
+      setState(() => _error = 'أدخل معرّف Firebase الصحيح لصديقك.');
       return;
     }
     try {
-      // Accept either a Firebase UID or an exact public profile name.
-      if (!RegExp(r'^[A-Za-z0-9:_-]{10,128}
+      final callRef = FirebaseFirestore.instance.collection('callSessions').doc();
       final roomName = 'fyf-call-${callRef.id}';
       await callRef.set({
         'callerId': user.uid,
@@ -198,7 +197,11 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
       _roomController.text = roomName;
       await _joinRoom();
       if (_room == null) {
-        await callRef.update({'status': 'failed', 'endedAt': FieldValue.serverTimestamp()});
+        await callRef.update({
+          'status': 'failed',
+          'endedAt': FieldValue.serverTimestamp(),
+        });
+        _activeCallId = null;
       }
     } catch (error) {
       if (mounted) setState(() => _error = 'تعذر بدء الاتصال: $error');
