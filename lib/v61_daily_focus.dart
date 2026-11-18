@@ -13,7 +13,11 @@ class V61DailyFocusPage extends StatefulWidget {
 }
 
 class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
-  static const _storageKey = 'v61_daily_focus_items';
+  String get _storageKey {
+    final now = DateTime.now();
+    final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return 'v61_daily_focus_items_$day';
+  }
   final List<_FocusItem> _items = [];
   final TextEditingController _newItemController = TextEditingController();
   bool _loading = true;
@@ -56,7 +60,7 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
 
   Future<void> _persist() {
     // Serialize writes so quick consecutive taps cannot silently drop a save.
-    _pendingSave = _pendingSave.then((_) async {
+    _pendingSave = _pendingSave.catchError((_) {}).then((_) async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
         _storageKey,
