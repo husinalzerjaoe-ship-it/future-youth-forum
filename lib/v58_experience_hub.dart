@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'media_upload_service.dart';
 import 'advanced_features.dart';
 import 'community_events.dart';
 import 'community_pages.dart';
@@ -31,6 +35,7 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
   String _category = 'الكل';
 
   late final List<_V58Feature> _features = [
+    _V58Feature('قصص الملتقى', 'انشر صورة أو فيديو وتحكم بمدة بقائه', Icons.auto_stories_rounded, 'المجتمع', () => const V58StoriesPage()),
     _V58Feature('ريلز الملتقى', 'مقاطع عمودية، إعجابات وتعليقات', Icons.smart_display_rounded, 'المجتمع', () => const CommunityReelsPage()),
     _V58Feature('مركز المجتمع', 'الأندية والإنجازات ومحتوى الأعضاء', Icons.groups_rounded, 'المجتمع', () => const V53CommunityHubPage()),
     _V58Feature('عالم المجتمع', 'الإشعارات والفعاليات والتفاعل', Icons.public_rounded, 'المجتمع', () => const V54WorldCommunityPage()),
@@ -149,4 +154,176 @@ class _V58Feature {
   final IconData icon;
   final String category;
   final Widget Function() page;
+}
+
+
+/// Stories can expire after 24 hours or remain until their owner deletes them.
+class V58StoriesPage extends StatefulWidget {
+  const V58StoriesPage({super.key});
+  @override
+  State<V58StoriesPage> createState() => _V58StoriesPageState();
+}
+
+class _V58StoriesPageState extends State<V58StoriesPage> {
+  final _picker = ImagePicker();
+  bool _uploading = false;
+  double _progress = 0;
+  bool _expireAfterDay = true;
+  String? _error;
+
+  String get _uid => FirebaseAuth.instance.currentUser?.uid ?? '';
+
+  void _toast(String message) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _publish() async {
+    if (_uid.isEmpty || _uploading) return;
+    final kind = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const Icon(Icons.image_rounded), title: const Text('قصة بصورة'), onTap: () => Navigator.pop(ctx, 'image')),
+          ListTile(leading: const Icon(Icons.video_library_rounded), title: const Text('قصة بفيديو'), onTap: () => Navigator.pop(ctx, 'video')),
+        ]),
+      )),
+    );
+    if (kind == null) return;
+    XFile? file;
+    try {
+      file = kind == 'image'
+          ? await _picker.pickImage(source: ImageSource.gallery, imageQuality: 88)
+          : await _picker.pickVideo(source: ImageSource.gallery, maxDuration: const Duration(minutes: 2));
+      if (file == null) return;
+      setState(() { _uploading = true; _progress = 0; _error = null; });
+      final url = await uploadForumMedia(file, folder: 'stories', onProgress: (v) {
+        if (mounted) setState(() => _progress = v);
+      });
+      final user = FirebaseAuth.instance.currentUser!;
+      final expiresAt = _expireAfterDay
+          ? Timestamp.fromDate(DateTime.now().add(const Duration(hours: 24)))
+          : null;
+      await FirebaseFirestore.instance.collection('stories').add({
+        'authorId': user.uid,
+        'authorName': (user.displayName?.trim().isNotEmpty == true)
+            ? user.displayName!.trim()
+            : (user.email?.split('@').first ?? 'عضو'),
+        'mediaUrl': url,
+        'mediaType': kind,
+        'createdAt': FieldValue.serverTimestamp(),
+        'expiresAt': expiresAt,
+      });
+      _toast(_expireAfterDay ? 'نُشرت القصة وستنتهي بعد 24 ساعة.' : 'نُشرت القصة وستبقى حتى تحذفها.');
+    } catch (error) {
+      _toast('تعذر نشر القصة: $error');
+    } finally {
+      if (mounted) setState(() { _uploading = false; _progress = 0; });
+    }
+  }
+
+  Future<void> _delete(DocumentSnapshot<Map<String, dynamic>> doc) async {
+    final data = doc.data() ?? {};
+    if (data['authorId'] != _uid) return;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('حذف القصة؟'),
+        content: const Text('سيتم حذف القصة من الملتقى.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+        ],
+      ),
+    ));
+    if (ok != true) return;
+    try {
+      await doc.reference.delete();
+      final url = (data['mediaUrl'] ?? '').toString();
+      if (url.isNotEmpty) {
+        try { await deleteForumMedia(url); } catch (error) { debugPrint('Story media cleanup failed: $error'); }
+      }
+      _toast('تم حذف قصتك.');
+    } catch (error) {
+      _toast('تعذر حذف القصة: $error');
+    }
+  }
+
+  String _remaining(dynamic value) {
+    if (value is! Timestamp) return 'تبقى حتى تحذفها';
+    final diff = value.toDate().difference(DateTime.now());
+    if (diff.isNegative) return 'انتهت';
+    if (diff.inHours > 0) return 'تنتهي بعد ${diff.inHours} ساعة';
+    return 'تنتهي بعد ${diff.inMinutes.clamp(1, 59)} دقيقة';
+  }
+
+  @override
+  Widget build(BuildContext context) => Directionality(
+    textDirection: TextDirection.rtl,
+    child: Scaffold(
+      appBar: AppBar(title: const Text('قصص الملتقى')),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _uploading ? null : _publish,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('إضافة قصة'),
+      ),
+      body: Column(children: [
+        Card(
+          margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+          child: Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _expireAfterDay,
+              onChanged: _uploading ? null : (v) => setState(() => _expireAfterDay = v),
+              title: const Text('حذف تلقائي بعد 24 ساعة'),
+              subtitle: Text(_expireAfterDay ? 'القصة تنتهي بعد يوم' : 'القصة تبقى إلى أن تحذفها بنفسك'),
+            ),
+            if (_uploading) ...[
+              LinearProgressIndicator(value: _progress > 0 ? _progress : null),
+              const SizedBox(height: 6),
+              Text('جاري رفع القصة ${(_progress * 100).round()}%'),
+            ],
+          ])),
+        ),
+        Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance.collection('stories').orderBy('createdAt', descending: true).limit(100).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('تعذر تحميل القصص: ${snapshot.error}')));
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            final docs = snapshot.data!.docs.where((doc) {
+              final expires = doc.data()['expiresAt'];
+              return expires is! Timestamp || expires.toDate().isAfter(DateTime.now());
+            }).toList();
+            if (docs.isEmpty) return const Center(child: Text('ماكو قصص حالياً. انشر أول قصة للملتقى!'));
+            return ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 92),
+              itemCount: docs.length,
+              itemBuilder: (context, index) {
+                final doc = docs[index];
+                final data = doc.data();
+                final mine = data['authorId'] == _uid;
+                final image = data['mediaType'] == 'image';
+                final url = (data['mediaUrl'] ?? '').toString();
+                return Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    ListTile(
+                      leading: CircleAvatar(child: Icon(image ? Icons.image_outlined : Icons.play_arrow_rounded)),
+                      title: Text((data['authorName'] ?? 'عضو').toString()),
+                      subtitle: Text(_remaining(data['expiresAt'])),
+                      trailing: mine ? IconButton(tooltip: 'حذف قصتي', onPressed: () => _delete(doc), icon: const Icon(Icons.delete_outline_rounded)) : null,
+                    ),
+                    if (image && url.isNotEmpty)
+                      Image.network(url, height: 220, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Center(child: Text('تعذر عرض الصورة'))))
+                    else
+                      Container(height: 150, color: const Color(0xFF211B45), child: const Icon(Icons.play_circle_outline_rounded, size: 56, color: Colors.white)),
+                  ]),
+                );
+              },
+            );
+          },
+        )),
+      ]),
+    ),
+  );
 }
