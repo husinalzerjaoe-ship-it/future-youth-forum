@@ -48,7 +48,8 @@ void main() {
     await tester.tap(find.text('إضافة'));
     await tester.pumpAndSettle();
 
-    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: Text('صفحة أخرى'))));
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
     await tester.pumpWidget(const MaterialApp(home: V61DailyFocusPage()));
     await tester.pumpAndSettle();
 
