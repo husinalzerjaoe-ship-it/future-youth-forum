@@ -26,6 +26,7 @@ import 'v56_future_world.dart';
 import 'v59_vod_cinema_library.dart';
 import 'ai_assistant.dart';
 import 'v60_app_health_center.dart';
+import 'v60_link_library.dart';
 
 class V58ExperienceHubPage extends StatefulWidget {
   const V58ExperienceHubPage({super.key});
@@ -41,6 +42,7 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
   late final List<_V58Feature> _features = [
     _V58Feature('مساعد المستقبل الذكي', 'مساعد للدراسة والأفكار والمعرفة', Icons.smart_toy_rounded, 'الإبداع والمعرفة', () => const AiAssistantPage()),
     _V58Feature('مركز صحة التطبيق', 'افحص اتصال Firebase وذاكرة الصور', Icons.health_and_safety_rounded, 'الأمان', () => const V60AppHealthPage()),
+    _V58Feature('مكتبتي الشخصية للروابط', 'احفظ روابطك العامة وصنّفها وافتحها بسرعة', Icons.link_rounded, 'الإبداع والمعرفة', () => const V60LinkLibraryPage()),
     _V58Feature('قصص الملتقى', 'انشر صورة أو فيديو وتحكم بمدة بقائه', Icons.auto_stories_rounded, 'المجتمع', () => const V58StoriesPage()),
     _V58Feature('ريلز الملتقى', 'مقاطع عمودية، إعجابات وتعليقات', Icons.smart_display_rounded, 'المجتمع', () => const CommunityReelsPage()),
     _V58Feature('مركز المجتمع', 'الأندية والإنجازات ومحتوى الأعضاء', Icons.groups_rounded, 'المجتمع', () => const V53CommunityHubPage()),
