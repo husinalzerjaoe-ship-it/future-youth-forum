@@ -19,6 +19,7 @@ on:
       - feature/v60-complete-forum-upgrade
     paths:
       - 'firestore.rules'
+      - 'firestore.indexes.json'
       - 'rules-tests/**'
       - 'firebase.json'
       - '.github/workflows/test-firestore-rules.yml'
