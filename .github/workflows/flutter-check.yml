@@ -1,4 +1,4 @@
-name: V62 comprehensive quality check and Android APK
+name: V62 comprehensive quality check and Android APK — retry after Dart analyzer fix
 on:
   workflow_dispatch:
   # Feature branches are accumulated without repeated APK builds.
