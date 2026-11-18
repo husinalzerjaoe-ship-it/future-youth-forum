@@ -2046,6 +2046,27 @@ service cloud.firestore {
         allow delete: if isFounder() && accountNotBanned();
       }
     }
+    // V57 per-account IPTV library sync. Each signed-in member can only access their own items.
+    match /iptvUserLibraries/{userId} {
+      allow read, write: if false;
+      match /items/{itemId} {
+        allow read, delete: if request.auth != null
+          && request.auth.uid == userId && accountNotBanned();
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId && accountNotBanned()
+          && request.resource.data.keys().hasOnly(['name','url','group','logo','tvgId','source','sourceUrl','favorite','updatedAt'])
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 160
+          && request.resource.data.url is string && request.resource.data.url.size() > 0 && request.resource.data.url.size() <= 4096 && request.resource.data.url.matches('https?://.*')
+          && request.resource.data.group is string && request.resource.data.group.size() <= 100
+          && request.resource.data.logo is string && request.resource.data.logo.size() <= 2048
+          && request.resource.data.tvgId is string && request.resource.data.tvgId.size() <= 160
+          && request.resource.data.source is string && request.resource.data.source.size() <= 100
+          && request.resource.data.sourceUrl is string && request.resource.data.sourceUrl.size() <= 2048
+          && request.resource.data.favorite is bool
+          && request.resource.data.updatedAt == request.time;
+      }
+    }
+
     // V26 gaming guide, local game library notes and wallpaper favourites use
     // SharedPreferences. They do not create Firestore records, so no permissive
     // client-writable cloud collection is added until a synced schema is designed.
