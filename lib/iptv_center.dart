@@ -312,6 +312,7 @@ class _IptvCenterPageState extends State<IptvCenterPage> {
     final visible=_visible;
     return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
       appBar:AppBar(title:const Text('مركز التلفزيون وIPTV'),actions:[
+        IconButton(tooltip:'مكتبة الأفلام والمسلسلات والأنمي',onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>const IptvEntertainmentLibraryPage())),icon:const Icon(Icons.video_library_rounded)),
         IconButton(tooltip:'تحديث المصادر',onPressed:_busy?null:_refreshAllSources,icon:const Icon(Icons.refresh_rounded)),
         IconButton(tooltip:'دليل البرامج',onPressed:_showEpgGuide,icon:const Icon(Icons.calendar_month_rounded)),
         IconButton(tooltip:'استيراد ملف XMLTV',onPressed:_importEpg,icon:const Icon(Icons.event_available_rounded)),
@@ -501,5 +502,155 @@ class _IptvPlayerPageState extends State<IptvPlayerPage> {
         IconButton(tooltip:'إعادة الاتصال',onPressed:_initialize,icon:const Icon(Icons.refresh,color:Colors.white)),
       ])),
     ])));
+  }
+}
+
+/// V57 categorized library for user-authorized M3U sources.
+class IptvEntertainmentLibraryPage extends StatefulWidget {
+  const IptvEntertainmentLibraryPage({super.key});
+  @override State<IptvEntertainmentLibraryPage> createState() => _IptvEntertainmentLibraryPageState();
+}
+
+class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryPage> {
+  static const _key = 'fyf_v57_entertainment_items_v1';
+  static const _favoriteKey = 'fyf_v57_entertainment_favorites_v1';
+  final _url = TextEditingController();
+  final _name = TextEditingController();
+  final _search = TextEditingController();
+  final List<IptvChannel> _items = [];
+  final Set<String> _favorites = {};
+  static const _tabs = ['الكل', 'قنوات', 'أفلام', 'مسلسلات', 'أنمي', 'المفضلة'];
+  bool _loading = true, _busy = false;
+  String _tab = 'الكل', _query = '';
+  @override void initState() { super.initState(); _load(); }
+  @override void dispose() { _url.dispose(); _name.dispose(); _search.dispose(); super.dispose(); }
+
+  String _kind(IptvChannel item) {
+    final text = (item.group + ' ' + item.name).toLowerCase();
+    if (RegExp(r'أنمي|انمي|anime|cartoon').hasMatch(text)) return 'أنمي';
+    if (RegExp(r'مسلسل|مسلسلات|series|season|episode|s[0-9]{1,2}e[0-9]{1,2}|الحلقة').hasMatch(text)) return 'مسلسلات';
+    if (RegExp(r'أفلام|افلام|فيلم|movie|movies|cinema|film').hasMatch(text) || RegExp(r'\.(mp4|mkv|avi|mov)(\?|$)', caseSensitive: false).hasMatch(item.url)) return 'أفلام';
+    return 'قنوات';
+  }
+  Future<void> _load() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final raw = p.getString(_key);
+      if (raw != null) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) _items.addAll(decoded.whereType<Map>().map((e) => IptvChannel.fromJson(Map<String, dynamic>.from(e))));
+      }
+      _favorites.addAll(p.getStringList(_favoriteKey) ?? const []);
+    } catch (e) { debugPrint('V57 library restore failed: $e'); }
+    if (mounted) setState(() => _loading = false);
+  }
+  Future<void> _save() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_key, jsonEncode(_items.map((e) => e.toJson()).toList()));
+    await p.setStringList(_favoriteKey, _favorites.toList());
+  }
+  void _toast(String value) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value))); }
+
+  Future<void> _addUrl() async {
+    final uri = Uri.tryParse(_url.text.trim());
+    if (uri == null || !{'http', 'https'}.contains(uri.scheme) || uri.host.isEmpty) { _toast('أدخل رابط M3U صحيح يبدأ بـ http أو https.'); return; }
+    setState(() => _busy = true);
+    try {
+      final response = await http.get(uri, headers: const {'Accept': 'application/x-mpegURL, text/plain, */*'}).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) throw Exception('HTTP ' + response.statusCode.toString());
+      if (response.bodyBytes.length > 64 * 1024 * 1024) throw Exception('القائمة أكبر من 64 ميغابايت.');
+      final label = _name.text.trim().isEmpty ? uri.host : _name.text.trim();
+      final parsed = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes, allowMalformed: true), source: label, sourceUrl: uri.toString(), baseUri: uri);
+      if (parsed.isEmpty) throw Exception('لم نعثر على عناصر M3U صالحة.');
+      _items.removeWhere((e) => e.source == label); _items.addAll(parsed);
+      await _save(); _url.clear(); _name.clear();
+      _toast('تم استيراد ' + parsed.length.toString() + ' عنصر. راجع التصنيفات التلقائية.');
+    } catch (e) { _toast('تعذر استيراد المصدر: ' + e.toString()); }
+    finally { if (mounted) setState(() => _busy = false); }
+  }
+  Future<void> _addFile() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: const ['m3u', 'm3u8', 'txt'], withData: true);
+      if (picked == null || picked.files.isEmpty) return;
+      final file = picked.files.first; final bytes = file.bytes;
+      if (bytes == null) throw Exception('تعذر قراءة الملف.');
+      if (bytes.length > 64 * 1024 * 1024) throw Exception('الملف أكبر من 64 ميغابايت.');
+      final parsed = IptvPlaylistParser.parse(utf8.decode(bytes, allowMalformed: true), source: file.name);
+      if (parsed.isEmpty) throw Exception('الملف لا يحتوي عناصر M3U صالحة.');
+      _items.removeWhere((e) => e.source == file.name); _items.addAll(parsed); await _save();
+      _toast('تمت إضافة ' + parsed.length.toString() + ' عنصر من الملف.');
+    } catch (e) { _toast('تعذر استيراد الملف: ' + e.toString()); }
+  }
+  Future<void> _refresh(String source) async {
+    IptvChannel? match;
+    for (final item in _items) { if (item.source == source && item.sourceUrl.isNotEmpty) { match = item; break; } }
+    if (match == null) { _toast('هذا المصدر ملف محلي؛ أعد استيراد الملف بعد تحديثه.'); return; }
+    final uri = Uri.tryParse(match.sourceUrl); if (uri == null || !{'http', 'https'}.contains(uri.scheme)) return;
+    setState(() => _busy = true);
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 30));
+      if (response.statusCode != 200) throw Exception('HTTP ' + response.statusCode.toString());
+      if (response.bodyBytes.length > 64 * 1024 * 1024) throw Exception('القائمة أكبر من 64 ميغابايت.');
+      final parsed = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes, allowMalformed: true), source: source, sourceUrl: uri.toString(), baseUri: uri);
+      if (parsed.isEmpty) throw Exception('القائمة المحدثة فارغة.');
+      _items.removeWhere((e) => e.source == source); _items.addAll(parsed); await _save();
+      _toast('تم تحديث المصدر: ' + parsed.length.toString() + ' عنصر.');
+    } catch (e) { _toast('فشل تحديث المصدر: ' + e.toString()); }
+    finally { if (mounted) setState(() => _busy = false); }
+  }
+  List<IptvChannel> get _visible {
+    final q = _query.trim().toLowerCase();
+    return _items.where((item) {
+      final kind = _kind(item);
+      final tabMatch = _tab == 'الكل' || (_tab == 'المفضلة' ? _favorites.contains(item.id) : _tab == kind);
+      final queryMatch = q.isEmpty || item.name.toLowerCase().contains(q) || item.group.toLowerCase().contains(q) || item.source.toLowerCase().contains(q);
+      return tabMatch && queryMatch;
+    }).toList();
+  }
+  Future<void> _favorite(IptvChannel item) async { setState(() { if (!_favorites.add(item.id)) _favorites.remove(item.id); }); await _save(); }
+  Future<void> _remove(IptvChannel item) async { setState(() { _items.removeWhere((e) => e.id == item.id && e.source == item.source); _favorites.remove(item.id); }); await _save(); }
+  void _room(IptvChannel item) { Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(initialUrl: item.url, initialName: 'مشاهدة جماعية • ' + item.name, forceDirect: true))); }
+  Widget _sources() {
+    final sources = _items.map((e) => e.source).where((e) => e.isNotEmpty).toSet().toList()..sort();
+    return Card(child: ExpansionTile(leading: const Icon(Icons.source_outlined), title: Text('مصادري (' + sources.length.toString() + ')'), children: sources.map((source) => ListTile(title: Text(source), subtitle: Text(_items.where((e) => e.source == source).length.toString() + ' عنصر'), trailing: IconButton(onPressed: _busy ? null : () => _refresh(source), icon: const Icon(Icons.refresh_rounded))).toList()));
+  }
+  @override Widget build(BuildContext context) {
+    final visible = _visible;
+    return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
+      appBar: AppBar(title: const Text('مكتبة الترفيه V57')),
+      body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(14), children: [
+        Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF30245F), Color(0xFF17243D), Color(0xFF12424A)])), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(Icons.movie_filter_rounded, color: Colors.white, size: 34), const SizedBox(height: 8),
+          const Text('كل مكتبتك بمكان واحد', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+          Text(_items.length.toString() + ' عنصر • ' + _items.map((e) => e.source).toSet().length.toString() + ' مصدر', style: const TextStyle(color: Colors.white70)),
+          const Text('استورد قوائم M3U المصرّح لك باستخدامها وصنّف محتواها وابنِ مكتبتك الخاصة.', style: TextStyle(color: Colors.white70, height: 1.5)),
+        ])),
+        Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('إضافة مصدر جديد', style: TextStyle(fontWeight: FontWeight.w900)),
+          TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم المصدر (اختياري)', border: OutlineInputBorder())),
+          const SizedBox(height: 8),
+          TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط M3U / M3U8', hintText: 'https://…', border: OutlineInputBorder())),
+          const SizedBox(height: 8),
+          FilledButton.icon(onPressed: _busy ? null : _addUrl, icon: _busy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_link_rounded), label: Text(_busy ? 'جاري الاستيراد…' : 'استيراد القائمة')),
+          OutlinedButton.icon(onPressed: _busy ? null : _addFile, icon: const Icon(Icons.folder_open_rounded), label: const Text('استيراد ملف M3U من الجهاز')),
+        ]))),
+        _sources(),
+        TextField(controller: _search, onChanged: (v) => setState(() => _query = v), decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'ابحث بالاسم أو التصنيف أو المصدر', border: OutlineInputBorder())),
+        const SizedBox(height: 10),
+        SizedBox(height: 42, child: ListView.separated(scrollDirection: Axis.horizontal, itemCount: _tabs.length, separatorBuilder: (_, __) => const SizedBox(width: 7), itemBuilder: (_, i) => ChoiceChip(label: Text(_tabs[i]), selected: _tab == _tabs[i], onSelected: (_) => setState(() => _tab = _tabs[i])))),
+        const SizedBox(height: 10),
+        Text('النتائج (' + visible.length.toString() + ')', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        if (visible.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(22), child: Text('ماكو عناصر بهذا التصنيف. أضف رابط قائمة أو غيّر البحث.', textAlign: TextAlign.center)))
+        else ...visible.take(300).map((item) => Card(margin: const EdgeInsets.only(bottom: 7), child: ListTile(
+          leading: CircleAvatar(child: Icon(_kind(item) == 'أنمي' ? Icons.animation_rounded : _kind(item) == 'أفلام' ? Icons.movie_rounded : _kind(item) == 'مسلسلات' ? Icons.video_library_rounded : Icons.live_tv_rounded)),
+          title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text(_kind(item) + ' • ' + item.group + ' • ' + item.source, maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: PopupMenuButton<String>(onSelected: (v) { if (v == 'favorite') _favorite(item); if (v == 'room') _room(item); if (v == 'delete') _remove(item); }, itemBuilder: (_) => [PopupMenuItem(value: 'favorite', child: Text(_favorites.contains(item.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة')), const PopupMenuItem(value: 'room', child: Text('إنشاء غرفة مشاهدة')), const PopupMenuItem(value: 'delete', child: Text('حذف من مكتبتي'))]),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => IptvPlayerPage(channel: item))),
+        ))),
+        if (visible.length > 300) const Text('نعرض أول 300 نتيجة للحفاظ على سرعة الصفحة. استخدم البحث للتصفية.'),
+        const Padding(padding: EdgeInsets.only(top: 12), child: Text('الحفظ في V57 محلي على هذا الجهاز. التصنيف يعتمد على أسماء المجموعات والعناصر في القائمة وقد يحتاج تصحيحاً يدوياً إذا كانت بيانات المصدر غير واضحة. تشغيل الصيغ يعتمد على دعم الجهاز والمشغّل والمصدر.', style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5))),
+      ]),
+    ));
   }
 }
