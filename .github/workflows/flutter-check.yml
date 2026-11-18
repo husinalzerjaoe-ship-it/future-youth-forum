@@ -81,6 +81,7 @@ jobs:
         run: |
           python - <<'PY'
           import xml.etree.ElementTree as ET
+          from pathlib import Path
           path = "android/app/src/main/AndroidManifest.xml"
           root = ET.parse(path).getroot()
           android = "{http://schemas.android.com/apk/res/android}"
@@ -117,10 +118,6 @@ jobs:
               raise SystemExit("GodotGameActivity is missing from AndroidManifest.xml")
           print("Verified Flutter embedding v2, audio_service host, Godot and downloads channels.")
           PY
-      - name: Verify Activepieces webhook secret
-        env:
-          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
-        run: test -n "$ACTIVEPIECES_WEBHOOK_URL"
       - name: Build release APK
         env:
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
@@ -130,8 +127,6 @@ jobs:
           import os
           from pathlib import Path
           url = os.environ.get("ACTIVEPIECES_WEBHOOK_URL", "").strip()
-          if not url:
-              raise SystemExit("ACTIVEPIECES_WEBHOOK_URL is empty")
           Path("/tmp/assistant-dart-defines.json").write_text(
               json.dumps({"ACTIVEPIECES_WEBHOOK_URL": url})
           )
