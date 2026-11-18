@@ -70,6 +70,7 @@ import 'v53_community_hub.dart';
 import 'v54_world_community.dart';
 import 'dns_helper.dart';
 import 'v55_foreground_notifications.dart';
+import 'v56_future_world.dart';
 
 const brand = Color(0xFF6554D9);
 const darkBrand = Color(0xFF171936);
@@ -769,6 +770,9 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.more_vert),
             onSelected: (value) {
               switch (value) {
+                case 'v56Hub':
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const V56FutureWorldPage()));
+                  break;
                 case 'v54Hub':
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const V54WorldCommunityPage()));
                   break;
@@ -952,6 +956,7 @@ class _HomePageState extends State<HomePage> {
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(value: 'v56Hub', child: ListTile(leading: Icon(Icons.auto_awesome_rounded), title: Text('عالم المستقبل V56'), subtitle: Text('دفتر الأحلام والذكريات والقصص والترفيه'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v54Hub', child: ListTile(leading: Icon(Icons.public_rounded), title: Text('عالم شباب المستقبل V54'), subtitle: Text('مركز المجتمع والإشعارات والإنجازات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v53Hub', child: ListTile(leading: Icon(Icons.auto_awesome_mosaic_rounded), title: Text('عالم الملتقى V53'), subtitle: Text('بوابة المجتمع والفعاليات والإنجازات'), contentPadding: EdgeInsets.zero)),
               const PopupMenuItem(value: 'v49Videos', child: ListTile(leading: Icon(Icons.smart_display_rounded), title: Text('ريلز الملتقى – مقاطع دائمة'), subtitle: Text('فيديوهات عمودية وتعليقات وإعجابات'), contentPadding: EdgeInsets.zero)),
