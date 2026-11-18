@@ -30,6 +30,7 @@ class _VodCinemaLibraryPageState extends State<VodCinemaLibraryPage> {
   final List<_Source> _sources=[];
   final List<_Entry> _entries=[];
   final Set<String> _favorites={};
+  final List<String> _recentIds=[];
   String _tab='الكل',_active='',_error='';
   bool _busy=false;
 
@@ -38,11 +39,11 @@ class _VodCinemaLibraryPageState extends State<VodCinemaLibraryPage> {
   void _msg(String s){if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(s)));}
   Future<void> _restore()async{
     final p=await SharedPreferences.getInstance();
-    try{final raw=jsonDecode(p.getString(_vodKey)??'[]');if(raw is List)_sources.addAll(raw.whereType<Map>().map((x)=>_Source.from(Map<String,dynamic>.from(x))));_favorites.addAll(p.getStringList(_vodKey+'_fav')??const []);}catch(_){}
+    try{final raw=jsonDecode(p.getString(_vodKey)??'[]');if(raw is List)_sources.addAll(raw.whereType<Map>().map((x)=>_Source.from(Map<String,dynamic>.from(x))));_favorites.addAll(p.getStringList(_vodKey+'_fav')??const []);_recentIds.addAll(p.getStringList(_vodKey+'_recent')??const []);}catch(_){}
     if(mounted)setState((){});
     if(_sources.isNotEmpty)_load(_sources.first);
   }
-  Future<void> _save()async{final p=await SharedPreferences.getInstance();await p.setString(_vodKey,jsonEncode(_sources.map((s)=>s.json()).toList()));await p.setStringList(_vodKey+'_fav',_favorites.toList());}
+  Future<void> _save()async{final p=await SharedPreferences.getInstance();await p.setString(_vodKey,jsonEncode(_sources.map((s)=>s.json()).toList()));await p.setStringList(_vodKey+'_fav',_favorites.toList());await p.setStringList(_vodKey+'_recent',_recentIds.take(30).toList());}
   Uri _api(_Source s,String pw,String action,{String? series})=>Uri.parse(s.url.replaceFirst(RegExp(r'/+$'),'')+'/player_api.php').replace(queryParameters:{'username':s.username,'password':pw,'action':action,if(series!=null)'series_id':series});
   Future<dynamic> _get(Uri u)async{final r=await http.get(u).timeout(const Duration(seconds:30));if(r.statusCode!=200)throw Exception('HTTP '+r.statusCode.toString());return jsonDecode(utf8.decode(r.bodyBytes,allowMalformed:true));}
   Future<List<_Entry>> _xtream(_Source s,String pw)async{
@@ -116,22 +117,23 @@ class _VodCinemaLibraryPageState extends State<VodCinemaLibraryPage> {
     final pw=await _vodSecure.read(key:'v59_pw_'+sid);if(pw==null)return;setState(()=>_busy=true);
     try{final list=await _episodes(source,pw,e.seriesId);if(!mounted)return;await showModalBottomSheet<void>(context:context,isScrollControlled:true,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:SizedBox(height:MediaQuery.of(c).size.height*.75,child:ListView(children:[Padding(padding:const EdgeInsets.all(15),child:Text('حلقات '+e.title,style:const TextStyle(fontWeight:FontWeight.bold))),...list.map((x)=>ListTile(title:Text(x.title),onTap:(){Navigator.pop(c);_play(x,e.title+' — '+x.title);} ))]))));}catch(x){_msg(x.toString());}finally{if(mounted)setState(()=>_busy=false);}
   }
-  Future<void> _play(_Entry e,[String? title])async{if(e.kind=='series'||e.kind=='anime'||e.url.isEmpty){await _episodesFor(e);return;}await Navigator.push(context,MaterialPageRoute(builder:(_)=>_VodPlayer(url:e.url,title:title??e.title)));}
-  List<_Entry> get _visible{final q=_search.text.toLowerCase().trim();return _entries.where((e){final match=_tab=='الأفلام'?e.kind=='movie':_tab=='المسلسلات'?e.kind=='series':_tab=='الأنمي'?e.kind=='anime':_tab=='المفضلة'?_favorites.contains(e.id):true;return match&&(q.isEmpty|| (e.title+' '+e.category).toLowerCase().contains(q));}).toList();}
+  Future<void> _play(_Entry e,[String? title])async{if(e.kind=='series'||e.kind=='anime'||e.url.isEmpty){await _episodesFor(e);return;}setState((){_recentIds.remove(e.id);_recentIds.insert(0,e.id);});await _save();if(!mounted)return;await Navigator.push(context,MaterialPageRoute(builder:(_)=>_VodPlayer(url:e.url,title:title??e.title)));}
+  List<_Entry> get _visible{final q=_search.text.toLowerCase().trim();return _entries.where((e){final match=_tab=='الأفلام'?e.kind=='movie':_tab=='المسلسلات'?e.kind=='series':_tab=='الأنمي'?e.kind=='anime':_tab=='المفضلة'?_favorites.contains(e.id):_tab=='آخر المشاهدة'?_recentIds.contains(e.id):true;return match&&(q.isEmpty|| (e.title+' '+e.category).toLowerCase().contains(q));}).toList();}
+  Future<void> _clearRecent()async{setState(()=>_recentIds.clear());await _save();_msg('تم مسح سجل المشاهدة من هذا الجهاز.');}
   @override Widget build(BuildContext context){final list=_visible;return Directionality(textDirection:TextDirection.rtl,child:Scaffold(
-    appBar:AppBar(title:const Text('مكتبة الأفلام والمسلسلات المتزامنة'),actions:[PopupMenuButton<String>(onSelected:(v){if(v=='x')_addXtream();if(v=='u')_addUrl();if(v=='m')_manage();},itemBuilder:(_)=>const [PopupMenuItem(value:'x',child:Text('إضافة Xtream')),PopupMenuItem(value:'u',child:Text('إضافة رابط')),PopupMenuItem(value:'m',child:Text('إدارة المصادر'))])]),
+    appBar:AppBar(title:const Text('مكتبة الأفلام والمسلسلات المتزامنة'),actions:[PopupMenuButton<String>(onSelected:(v){if(v=='x')_addXtream();if(v=='u')_addUrl();if(v=='m')_manage();if(v=='c')_clearRecent();},itemBuilder:(_)=>const [PopupMenuItem(value:'x',child:Text('إضافة Xtream')),PopupMenuItem(value:'u',child:Text('إضافة رابط')),PopupMenuItem(value:'m',child:Text('إدارة المصادر')),PopupMenuItem(value:'c',child:Text('مسح سجل المشاهدة'))])]),
     body:ListView(padding:const EdgeInsets.all(14),children:[
       Container(padding:const EdgeInsets.all(18),decoration:BoxDecoration(borderRadius:BorderRadius.circular(20),gradient:const LinearGradient(colors:[Color(0xFF32245F),Color(0xFF171936),Color(0xFF12495C)])),child:const Text('أفلام • مسلسلات • أنمي • مواسم وحلقات • مشاهدة جماعية',style:TextStyle(color:Colors.white,fontSize:18,fontWeight:FontWeight.bold))),
       Row(children:[Expanded(child:OutlinedButton(onPressed:_addXtream,child:const Text('Xtream Codes'))),const SizedBox(width:8),Expanded(child:FilledButton(onPressed:_addUrl,child:const Text('إضافة رابط')))]),
       if(_sources.isNotEmpty)SizedBox(height:45,child:ListView(scrollDirection:Axis.horizontal,children:_sources.map((s)=>Padding(padding:const EdgeInsetsDirectional.only(end:6),child:ChoiceChip(label:Text(s.name),selected:_active==s.id,onSelected:(_)=>_load(s)))).toList())),
       TextField(controller:_search,onChanged:(_)=>setState((){}),decoration:const InputDecoration(prefixIcon:Icon(Icons.search),hintText:'ابحث عن عمل')),
-      Wrap(spacing:5,children:['الكل','الأفلام','المسلسلات','الأنمي','المفضلة'].map((t)=>ChoiceChip(label:Text(t),selected:_tab==t,onSelected:(_)=>setState(()=>_tab=t))).toList()),
+      Wrap(spacing:5,children:['الكل','الأفلام','المسلسلات','الأنمي','المفضلة','آخر المشاهدة'].map((t)=>ChoiceChip(label:Text(t),selected:_tab==t,onSelected:(_)=>setState(()=>_tab=t))).toList()),
       if(_busy)const Center(child:CircularProgressIndicator()),if(_error.isNotEmpty)Text(_error,style:const TextStyle(color:Colors.orange)),
-      if(list.isEmpty&&!_busy)const Padding(padding:EdgeInsets.all(25),child:Text('أضف مصدراً حتى تظهر الأعمال هنا.')),
+      if(list.isEmpty&&!_busy)Padding(padding:const EdgeInsets.all(25),child:Text(_tab=='آخر المشاهدة'?'ما عندك أعمال فتحتها مؤخراً.':'أضف مصدراً حتى تظهر الأعمال هنا.')),
       if(list.isNotEmpty)GridView.builder(shrinkWrap:true,physics:const NeverScrollableScrollPhysics(),itemCount:list.length,gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:.7,crossAxisSpacing:8,mainAxisSpacing:8),itemBuilder:(_,i){final e=list[i];return Card(clipBehavior:Clip.antiAlias,child:InkWell(onTap:()=>_play(e),child:Column(children:[Expanded(child:e.poster.startsWith('http')?Image.network(e.poster,fit:BoxFit.cover,errorBuilder:(_,__,___)=>const Icon(Icons.movie)):const Icon(Icons.movie,size:42)),Padding(padding:const EdgeInsets.all(8),child:Text(e.title,maxLines:2,overflow:TextOverflow.ellipsis)),IconButton(onPressed:(){setState(()=>_favorites.contains(e.id)?_favorites.remove(e.id):_favorites.add(e.id));_save();},icon:Icon(_favorites.contains(e.id)?Icons.favorite:Icons.favorite_border))])));})
     ])));
   }
-  Future<void> _manage()async{await showModalBottomSheet<void>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:ListView(shrinkWrap:true,children:[const ListTile(title:Text('مصادر المكتبة')),..._sources.map((s)=>ListTile(title:Text(s.name),trailing:IconButton(icon:const Icon(Icons.delete_outline),onPressed:()async{_sources.remove(s);_entries.removeWhere((e)=>e.id.startsWith(s.id+'|'));await _vodSecure.delete(key:'v59_pw_'+s.id);await _save();if(c.mounted)Navigator.pop(c);if(mounted)setState((){});}))) ])));}
+  Future<void> _manage()async{await showModalBottomSheet<void>(context:context,builder:(c)=>Directionality(textDirection:TextDirection.rtl,child:ListView(shrinkWrap:true,children:[const ListTile(title:Text('مصادر المكتبة')),..._sources.map((s)=>ListTile(title:Text(s.name),trailing:IconButton(icon:const Icon(Icons.delete_outline),onPressed:()async{_sources.remove(s);_entries.removeWhere((e)=>e.id.startsWith(s.id+'|'));_recentIds.removeWhere((id)=>id.startsWith(s.id+'|'));await _vodSecure.delete(key:'v59_pw_'+s.id);await _save();if(c.mounted)Navigator.pop(c);if(mounted)setState((){});}))) ])));}
 }
 
 class _VodPlayer extends StatefulWidget{const _VodPlayer({required this.url,required this.title});final String url,title;@override State<_VodPlayer> createState()=>_VodPlayerState();}
