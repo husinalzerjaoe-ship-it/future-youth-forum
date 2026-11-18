@@ -15,6 +15,7 @@ class V61DailyFocusPage extends StatefulWidget {
 class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
   static const _storageKey = 'v61_daily_focus_items';
   final List<_FocusItem> _items = [];
+  final TextEditingController _newItemController = TextEditingController();
   bool _loading = true;
   Future<void> _pendingSave = Future<void>.value();
 
@@ -25,6 +26,12 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _newItemController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -60,7 +67,7 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
   }
 
   Future<void> _addItem() async {
-    final controller = TextEditingController();
+    _newItemController.clear();
     final title = await showDialog<String>(
       context: context,
       builder: (dialogContext) => Directionality(
@@ -68,7 +75,7 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
         child: AlertDialog(
           title: const Text('أضف هدفاً لليوم'),
           content: TextField(
-            controller: controller,
+            controller: _newItemController,
             autofocus: true,
             maxLength: 90,
             textInputAction: TextInputAction.done,
@@ -84,14 +91,13 @@ class _V61DailyFocusPageState extends State<V61DailyFocusPage> {
               child: const Text('إلغاء'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+              onPressed: () => Navigator.pop(dialogContext, _newItemController.text.trim()),
               child: const Text('إضافة'),
             ),
           ],
         ),
       ),
     );
-    controller.dispose();
     if (!mounted || title == null || title.trim().isEmpty) return;
     setState(() => _items.insert(0, _FocusItem(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
