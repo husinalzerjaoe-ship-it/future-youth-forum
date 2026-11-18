@@ -151,7 +151,10 @@ class V54NotificationsPage extends StatelessWidget {
         body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: query.snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.hasError) return const Center(child: Text('تعذر تحميل الإشعارات. تحقق من الاتصال والصلاحيات.'));
+            if (snapshot.hasError) return Center(child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: SelectableText('تعذر تحميل الإشعارات.\nتفاصيل الخطأ: ${snapshot.error}'),
+            ));
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
             final docs = snapshot.data!.docs;
             if (docs.isEmpty) return const Center(child: Text('ما عندك إشعارات حالياً.'));
