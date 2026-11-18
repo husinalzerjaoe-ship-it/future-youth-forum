@@ -520,8 +520,10 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
   final List<IptvChannel> _items = [];
   final Set<String> _favorites = {};
   static const _tabs = ['الكل', 'قنوات', 'أفلام', 'مسلسلات', 'أنمي', 'المفضلة'];
-  bool _loading = true, _busy = false;
+  bool _loading = true, _busy = false, _cloudSyncing = false;
   String _tab = 'الكل', _query = '';
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
+  String _cloudId(IptvChannel item) => crypto.sha256.convert(utf8.encode(item.source + '|' + item.url)).toString();
   @override void initState() { super.initState(); _load(); }
   @override void dispose() { _url.dispose(); _name.dispose(); _search.dispose(); super.dispose(); }
 
@@ -543,11 +545,51 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       _favorites.addAll(p.getStringList(_favoriteKey) ?? const []);
     } catch (e) { debugPrint('V57 library restore failed: $e'); }
     if (mounted) setState(() => _loading = false);
+    await _syncFromCloud();
   }
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_key, jsonEncode(_items.map((e) => e.toJson()).toList()));
     await p.setStringList(_favoriteKey, _favorites.toList());
+  }
+  Future<void> _syncFromCloud() async {
+    final uid = _uid;
+    if (uid == null || _cloudSyncing) return;
+    _cloudSyncing = true;
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('iptvUserLibraries').doc(uid).collection('items').get().timeout(const Duration(seconds: 20));
+      final byId = <String, IptvChannel>{for (final item in _items) _cloudId(item): item};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final item = IptvChannel.fromJson(data);
+        if (item.url.isEmpty) continue;
+        byId[doc.id] = item;
+        if (data['favorite'] == true) _favorites.add(item.id);
+      }
+      _items..clear()..addAll(byId.values);
+      await _save();
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('V57 IPTV cloud restore failed: $e');
+    } finally { _cloudSyncing = false; }
+  }
+  Future<void> _syncToCloud([Iterable<IptvChannel>? selected]) async {
+    final uid = _uid;
+    if (uid == null) return;
+    final items = (selected ?? _items).toList();
+    try {
+      for (var start = 0; start < items.length; start += 350) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (final item in items.skip(start).take(350)) {
+          final ref = FirebaseFirestore.instance.collection('iptvUserLibraries').doc(uid).collection('items').doc(_cloudId(item));
+          batch.set(ref, {...item.toJson(), 'favorite': _favorites.contains(item.id), 'updatedAt': FieldValue.serverTimestamp()});
+        }
+        await batch.commit();
+      }
+    } catch (e) {
+      debugPrint('V57 IPTV cloud sync failed: $e');
+      _toast('تم الحفظ على الجهاز، لكن تعذرت المزامنة السحابية. تحقق من نشر قواعد V57 والاتصال.');
+    }
   }
   void _toast(String value) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value))); }
 
@@ -563,7 +605,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       final parsed = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes, allowMalformed: true), source: label, sourceUrl: uri.toString(), baseUri: uri);
       if (parsed.isEmpty) throw Exception('لم نعثر على عناصر M3U صالحة.');
       _items.removeWhere((e) => e.source == label); _items.addAll(parsed);
-      await _save(); _url.clear(); _name.clear();
+      await _save(); await _syncToCloud(parsed); _url.clear(); _name.clear();
       _toast('تم استيراد ' + parsed.length.toString() + ' عنصر. راجع التصنيفات التلقائية.');
     } catch (e) { _toast('تعذر استيراد المصدر: ' + e.toString()); }
     finally { if (mounted) setState(() => _busy = false); }
@@ -577,7 +619,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       if (bytes.length > 64 * 1024 * 1024) throw Exception('الملف أكبر من 64 ميغابايت.');
       final parsed = IptvPlaylistParser.parse(utf8.decode(bytes, allowMalformed: true), source: file.name);
       if (parsed.isEmpty) throw Exception('الملف لا يحتوي عناصر M3U صالحة.');
-      _items.removeWhere((e) => e.source == file.name); _items.addAll(parsed); await _save();
+      _items.removeWhere((e) => e.source == file.name); _items.addAll(parsed); await _save(); await _syncToCloud(parsed);
       _toast('تمت إضافة ' + parsed.length.toString() + ' عنصر من الملف.');
     } catch (e) { _toast('تعذر استيراد الملف: ' + e.toString()); }
   }
@@ -607,8 +649,13 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       return tabMatch && queryMatch;
     }).toList();
   }
-  Future<void> _favorite(IptvChannel item) async { setState(() { if (!_favorites.add(item.id)) _favorites.remove(item.id); }); await _save(); }
-  Future<void> _remove(IptvChannel item) async { setState(() { _items.removeWhere((e) => e.id == item.id && e.source == item.source); _favorites.remove(item.id); }); await _save(); }
+  Future<void> _favorite(IptvChannel item) async { setState(() { if (!_favorites.add(item.id)) _favorites.remove(item.id); }); await _save(); await _syncToCloud([item]); }
+  Future<void> _remove(IptvChannel item) async {
+    setState(() { _items.removeWhere((e) => e.id == item.id && e.source == item.source); _favorites.remove(item.id); });
+    await _save();
+    final uid = _uid;
+    if (uid != null) { try { await FirebaseFirestore.instance.collection('iptvUserLibraries').doc(uid).collection('items').doc(_cloudId(item)).delete(); } catch (e) { debugPrint('V57 IPTV cloud delete failed: $e'); } }
+  }
   void _room(IptvChannel item) { Navigator.push(context, MaterialPageRoute(builder: (_) => WatchPartyLobbyPage(initialUrl: item.url, initialName: 'مشاهدة جماعية • ' + item.name, forceDirect: true))); }
   Widget _sources() {
     final sources = _items.map((e) => e.source).where((e) => e.isNotEmpty).toSet().toList()..sort();
