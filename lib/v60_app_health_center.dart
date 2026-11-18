@@ -3,7 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'local_audio_handler.dart';
 
-const _assistantWebhookConfigured = String.fromEnvironment('ACTIVEPIECES_WEBHOOK_URL').isNotEmpty;
+const _assistantWebhookUrl = String.fromEnvironment('ACTIVEPIECES_WEBHOOK_URL');
+bool get _assistantWebhookConfigured => _assistantWebhookUrl.isNotEmpty;
 
 /// Local diagnostics and an authenticated Firestore connectivity probe.
 /// This page never displays tokens, passwords, or provider URLs.
