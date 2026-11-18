@@ -699,8 +699,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
                       controller: _friendUidController,
                       textDirection: TextDirection.ltr,
                       decoration: const InputDecoration(
-                        labelText: 'اسم الصديق أو معرّف حسابه UID',
-                        hintText: 'اكتب الاسم كما يظهر بالملف الشخصي',
+                        labelText: 'معرّف حساب الصديق (UID)',
+                        hintText: 'الصق UID الذي أرسله لك صديقك',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.person_search_rounded),
                       ),
