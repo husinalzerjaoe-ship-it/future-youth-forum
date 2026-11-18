@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, collection, getDoc, getDocs, query, where, or, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, deleteField
+  doc, collection, getDoc, getDocs, query, where, orderBy, or, setDoc, updateDoc, deleteDoc, runTransaction, serverTimestamp, Timestamp, deleteField
 } from 'firebase/firestore';
 
 const projectId = 'demo-futureyouth-rules';
@@ -754,6 +754,13 @@ test('notifications can be created by the actor and marked read only by the reci
   }));
   await assertSucceeds(getDoc(doc(user('bob'), 'notifications/notice-1')));
   await assertFails(getDoc(doc(user('mallory'), 'notifications/notice-1')));
+  const inbox = query(
+    collection(user('bob'), 'notifications'),
+    where('recipientId', '==', 'bob'),
+    orderBy('createdAt', 'desc'),
+  );
+  const inboxSnapshot = await assertSucceeds(getDocs(inbox));
+  assert.equal(inboxSnapshot.size, 1);
   await assertSucceeds(updateDoc(doc(user('bob'), 'notifications/notice-1'), { read: true }));
   await assertFails(updateDoc(doc(user('alice'), 'notifications/notice-1'), { read: true }));
   await assertFails(updateDoc(doc(user('bob'), 'notifications/notice-1'), {
