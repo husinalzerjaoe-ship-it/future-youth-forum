@@ -2101,9 +2101,9 @@ service cloud.firestore {
           || (request.auth.uid == resource.data.callerId
             && request.resource.data.status in ['failed', 'ended'])
         )
-        && (!request.resource.data.keys().hasAny(['acceptedAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['acceptedAt'])
           || request.resource.data.acceptedAt == request.time)
-        && (!request.resource.data.keys().hasAny(['endedAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['endedAt'])
           || request.resource.data.endedAt == request.time);
       allow delete: if false;
     }
