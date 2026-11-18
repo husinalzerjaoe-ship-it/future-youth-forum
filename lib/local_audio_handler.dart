@@ -41,29 +41,63 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   Future<void> loadLocalQueue(List<MediaItem> items, {int initialIndex = 0}) async {
-    queue.add(items);
     if (items.isEmpty) {
-      await _player.stop();
+      await stop();
       return;
     }
-    if (initialIndex < 0 || initialIndex >= items.length) throw RangeError.index(initialIndex, items);
+    if (initialIndex < 0 || initialIndex >= items.length) {
+      throw RangeError.index(initialIndex, items);
+    }
+    final sources = items.map((item) {
+      final uri = Uri.file(item.id);
+      return AudioSource.uri(uri, tag: item);
+    }).toList(growable: false);
+    await _setQueue(items, sources, initialIndex);
+  }
+
+  /// Loads a complete queue of public shared audio URLs. Keeping the queue in
+  /// AudioService makes next/previous controls work from the lock screen too.
+  Future<void> loadRemoteQueue(List<MediaItem> items, {int initialIndex = 0}) async {
+    if (items.isEmpty) {
+      await stop();
+      return;
+    }
+    if (initialIndex < 0 || initialIndex >= items.length) {
+      throw RangeError.index(initialIndex, items);
+    }
+    final sources = items.map((item) {
+      final uri = Uri.tryParse(item.id);
+      if (uri == null || !const ['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
+        throw ArgumentError('رابط إحدى الأغاني غير صالح: ${item.title}');
+      }
+      return AudioSource.uri(uri, tag: item);
+    }).toList(growable: false);
+    await _setQueue(items, sources, initialIndex);
+  }
+
+  Future<void> _setQueue(
+    List<MediaItem> items,
+    List<AudioSource> sources,
+    int initialIndex,
+  ) async {
+    queue.add(List<MediaItem>.unmodifiable(items));
     await _player.setAudioSource(
-      ConcatenatingAudioSource(children: items.map((item) => AudioSource.uri(Uri.file(item.id), tag: item)).toList()),
+      ConcatenatingAudioSource(children: sources),
       initialIndex: initialIndex,
       initialPosition: Duration.zero,
     );
+    mediaItem.add(items[initialIndex]);
   }
 
   Future<void> loadRemoteTrack(String url, String title) async {
     final uri = Uri.tryParse(url);
-    if (uri == null || !['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
+    if (uri == null || !const ['https', 'http'].contains(uri.scheme) || uri.host.isEmpty) {
       throw ArgumentError('رابط الأغنية غير صالح أو ليس رابط ملف صوتي مباشر.');
     }
-    final item = MediaItem(id: url, title: title, album: 'مكتبة المجتمع');
-    queue.add([item]);
-    mediaItem.add(item);
-    await _player.setAudioSource(AudioSource.uri(uri, tag: item));
-    await _player.play();
+    await loadRemoteQueue([
+      MediaItem(id: url, title: title, album: 'مكتبة المجتمع'),
+    ]);
+    await play();
   }
 
   @override Future<void> play() => _player.play();
@@ -76,8 +110,16 @@ class LocalAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
   @override Future<void> seek(Duration position) => _player.seek(position);
   @override Future<void> skipToQueueItem(int index) => _player.seek(Duration.zero, index: index);
-  @override Future<void> skipToNext() => _player.seekToNext();
-  @override Future<void> skipToPrevious() => _player.seekToPrevious();
+  @override Future<void> skipToNext() async {
+    if (_player.hasNext) await _player.seekToNext();
+  }
+  @override Future<void> skipToPrevious() async {
+    if (_player.hasPrevious) {
+      await _player.seekToPrevious();
+    } else if (_player.position > const Duration(seconds: 3)) {
+      await _player.seek(Duration.zero);
+    }
+  }
 }
 
 late LocalAudioHandler appAudioHandler;
@@ -90,7 +132,7 @@ Future<void> initializeLocalAudioService() async {
     builder: LocalAudioHandler.new,
     config: const AudioServiceConfig(
       androidNotificationChannelId: 'com.futureyouth.forum.local_audio',
-      androidNotificationChannelName: 'موسيقى ملتقى الأنمي',
+      androidNotificationChannelName: 'موسيقى ملتقى شباب المستقبل',
       androidNotificationOngoing: true,
     ),
   );
