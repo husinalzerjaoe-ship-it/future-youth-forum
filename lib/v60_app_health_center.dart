@@ -1,6 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'local_audio_handler.dart';
+
+const _assistantWebhookUrl = String.fromEnvironment('ACTIVEPIECES_WEBHOOK_URL');
+bool get _assistantWebhookConfigured => _assistantWebhookUrl.isNotEmpty;
 
 /// Local diagnostics and an authenticated Firestore connectivity probe.
 /// This page never displays tokens, passwords, or provider URLs.
@@ -132,6 +136,36 @@ class _V60AppHealthPageState extends State<V60AppHealthPage> {
                       : const Icon(Icons.wifi_find_rounded),
                   label: Text(_checking ? 'جاري الفحص...' : 'فحص اتصال Firestore'),
                 ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('حالة الخدمات الإضافية', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(isAudioServiceInitialized ? Icons.graphic_eq_rounded : Icons.music_off_rounded,
+                    color: isAudioServiceInitialized ? Colors.teal : Colors.orange),
+                  title: const Text('مشغّل الصوت بالخلفية'),
+                  subtitle: Text(isAudioServiceInitialized
+                    ? 'تم تهيئة AudioService داخل هذه الجلسة.'
+                    : 'لم تتم تهيئة المشغّل بعد؛ افتح قسم موسيقاي أو أعد تشغيل التطبيق.'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(_assistantWebhookConfigured ? Icons.smart_toy_rounded : Icons.smart_toy_outlined,
+                    color: _assistantWebhookConfigured ? Colors.teal : Colors.orange),
+                  title: const Text('مساعد الذكاء الاصطناعي'),
+                  subtitle: Text(_assistantWebhookConfigured
+                    ? 'رابط الخدمة مضمّن في هذا البناء؛ يلزم اختبار الاستجابة من صفحة المساعد.'
+                    : 'رابط الخدمة غير مضمّن في هذا البناء؛ المساعد لن يتصل بالـFlow.'),
+                ),
+                const Text('هذا فحص إعداد محلي، ولا يثبت أن الخادم الخارجي متاح أو أن كل ميزة تعمل.', style: TextStyle(fontSize: 12)),
               ]),
             ),
           ),

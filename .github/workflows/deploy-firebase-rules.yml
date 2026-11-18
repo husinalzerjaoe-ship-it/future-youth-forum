@@ -20,6 +20,7 @@ on:
       - feature/v59-independent-vod-cinema-library
       - feature/v60-complete-forum-upgrade
       - feature/v61-comprehensive-upgrade
+      - feature/v62-ultimate-comprehensive-upgrade
     paths:
       - 'firestore.rules'
       - 'storage.rules'

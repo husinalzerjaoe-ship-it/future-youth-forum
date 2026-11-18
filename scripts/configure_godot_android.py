@@ -3,7 +3,6 @@ import re
 import shutil
 import xml.etree.ElementTree as ET
 
-# Preserve Android namespace prefixes expected by Flutter tooling.
 ET.register_namespace("android", "http://schemas.android.com/apk/res/android")
 ET.register_namespace("tools", "http://schemas.android.com/tools")
 
@@ -25,7 +24,6 @@ if "org.godotengine:godot:4.7.2.stable" not in text:
     match = re.search(r"dependencies\s*\{", text)
     additions = "\n".join("    " + line for line in dep_lines) + "\n"
     if not match:
-        # New Flutter Kotlin DSL templates may omit a dependencies block.
         text = text.rstrip() + "\n\ndependencies {\n" + additions + "}\n"
     else:
         start_block = match.end()
@@ -38,7 +36,6 @@ if "org.godotengine:godot:4.7.2.stable" not in text:
             raise SystemExit("Unclosed Gradle dependencies block")
         text = text[:end_block - 1] + additions + text[end_block - 1:]
 
-# Preserve Godot's project metadata files inside the APK assets directory.
 assets = ANDROID / "src" / "main" / "assets"
 assets.mkdir(parents=True, exist_ok=True)
 for item in ["project.godot", "scenes", "scripts"]:
@@ -55,7 +52,6 @@ for item in ["project.godot", "scenes", "scripts"]:
     else:
         raise SystemExit(f"Missing Godot project item: {source}")
 
-# Keep Godot's project metadata and script files in the APK.
 if GRADLE.name.endswith(".kts"):
     if "androidResources {" not in text:
         android_match = re.search(r"android\s*\{", text)
@@ -72,7 +68,6 @@ else:
         text = text[:pos] + '\n    androidResources {\n        ignoreAssetsPattern "!.svn:!.git:!.gitignore:!.ds_store:!*.scc:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~"\n    }\n' + text[pos:]
 GRADLE.write_text(text, encoding="utf-8")
 
-# The audio_service plugin requires AudioServiceActivity as Flutter's host.
 manifest = ANDROID / "src" / "main" / "AndroidManifest.xml"
 tree = ET.parse(manifest)
 root = tree.getroot()
@@ -81,31 +76,30 @@ app = root.find("application")
 if app is None:
     raise SystemExit("Android application element not found")
 
-# Keep the host app explicitly on Flutter Android embedding v2. Some generated
-# manifest variants omit this marker, which makes recent Flutter tooling reject
-# the project as a removed v1-embedding application.
 embedding_meta = next(
     (node for node in app.findall("meta-data")
      if node.get(ns + "name") == "flutterEmbedding"),
     None,
 )
 if embedding_meta is None:
-    ET.SubElement(app, "meta-data", {
-        ns + "name": "flutterEmbedding",
-        ns + "value": "2",
-    })
+    ET.SubElement(app, "meta-data", {ns + "name": "flutterEmbedding", ns + "value": "2"})
 else:
     embedding_meta.set(ns + "value", "2")
+
+main_activity = None
 for activity in app.findall("activity"):
-    if activity.get(ns + "name") == "com.ryanheise.audioservice.AudioServiceActivity":
+    name = activity.get(ns + "name", "")
+    if name in (".MainActivity", "com.futureyouth.forum.MainActivity",
+                "com.ryanheise.audioservice.AudioServiceActivity"):
         activity.set(ns + "name", ".MainActivity")
         activity.set(ns + "configChanges",
             "orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode")
         activity.set(ns + "hardwareAccelerated", "true")
         activity.set(ns + "windowSoftInputMode", "adjustResize")
+        main_activity = activity
         break
-else:
-    raise SystemExit("AudioServiceActivity host declaration not found")
+if main_activity is None:
+    raise SystemExit("Flutter .MainActivity declaration not found in generated AndroidManifest.xml")
 
 if not any(a.get(ns + "name") == ".GodotGameActivity" for a in app.findall("activity")):
     ET.SubElement(app, "activity", {
@@ -118,13 +112,11 @@ if not any(a.get(ns + "name") == ".GodotGameActivity" for a in app.findall("acti
 ET.indent(tree, space="    ")
 tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
-# Verify the namespace-qualified marker Flutter reads before invoking Gradle.
 written_root = ET.parse(manifest).getroot()
 written_app = written_root.find("application")
 written_embedding = next(
     (node for node in written_app.findall("meta-data")
-     if node.get(ns + "name") == "flutterEmbedding"),
-    None,
+     if node.get(ns + "name") == "flutterEmbedding"), None
 ) if written_app is not None else None
 if written_embedding is None or written_embedding.get(ns + "value") != "2":
     raise SystemExit("Android manifest does not expose Flutter embedding v2 correctly")
@@ -133,7 +125,11 @@ kotlin_dir = ANDROID / "src" / "main" / "kotlin" / "com" / "futureyouth" / "foru
 kotlin_dir.mkdir(parents=True, exist_ok=True)
 (kotlin_dir / "MainActivity.kt").write_text("""package com.futureyouth.forum
 
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Environment
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -141,6 +137,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "future_youth/godot")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -151,6 +148,30 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.futureyouth.forum/downloads")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "downloadFile") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                try {
+                    val url = call.argument<String>("url") ?: throw IllegalArgumentException("Missing URL")
+                    val fileName = (call.argument<String>("fileName") ?: "forum-download")
+                        .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                    val request = DownloadManager.Request(Uri.parse(url))
+                        .setTitle(fileName)
+                        .setDescription("تنزيل من ملتقى شباب المستقبل")
+                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                        .setAllowedOverMetered(true)
+                        .setAllowedOverRoaming(false)
+                    val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    result.success(manager.enqueue(request))
+                } catch (error: Exception) {
+                    result.error("DOWNLOAD_FAILED", error.message, null)
+                }
+            }
     }
 }
 """, encoding="utf-8")
@@ -158,8 +179,8 @@ class MainActivity : AudioServiceActivity() {
 
 import org.godotengine.godot.GodotActivity
 
-/** Native Godot 4.7.2 runtime screen bundled inside Future Youth Forum. */
+/** Native Godot runtime screen bundled inside Future Youth Forum. */
 class GodotGameActivity : GodotActivity()
 """, encoding="utf-8")
 
-print("Configured Godot 4.7.2 Android runtime, bundled project assets and Flutter launch channel.")
+print("Configured Flutter MainActivity with audio_service, Godot launch and native downloads channels.")
