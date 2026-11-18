@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 import 'media_upload_service.dart';
 import 'advanced_features.dart';
 import 'community_events.dart';
@@ -316,7 +317,7 @@ class _V58StoriesPageState extends State<V58StoriesPage> {
                     if (image && url.isNotEmpty)
                       Image.network(url, height: 220, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(height: 120, child: Center(child: Text('تعذر عرض الصورة'))))
                     else
-                      Container(height: 150, color: const Color(0xFF211B45), child: const Icon(Icons.play_circle_outline_rounded, size: 56, color: Colors.white)),
+                      _V58StoryVideo(url: url),
                   ]),
                 );
               },
@@ -326,4 +327,71 @@ class _V58StoriesPageState extends State<V58StoriesPage> {
       ]),
     ),
   );
+}
+
+class _V58StoryVideo extends StatefulWidget {
+  const _V58StoryVideo({required this.url});
+  final String url;
+  @override
+  State<_V58StoryVideo> createState() => _V58StoryVideoState();
+}
+
+class _V58StoryVideoState extends State<_V58StoryVideo> {
+  VideoPlayerController? _controller;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    try {
+      final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+      _controller = controller;
+      await controller.initialize();
+      await controller.setLooping(true);
+      if (mounted) setState(() {});
+    } catch (error) {
+      debugPrint('Story video initialization failed: $error');
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (_failed) return const SizedBox(height: 130, child: Center(child: Text('تعذر تشغيل الفيديو')));
+    if (controller == null || !controller.value.isInitialized) {
+      return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+    }
+    return GestureDetector(
+      onTap: () {
+        if (controller.value.isPlaying) {
+          controller.pause();
+        } else {
+          controller.play();
+        }
+        setState(() {});
+      },
+      child: AspectRatio(
+        aspectRatio: controller.value.aspectRatio > 0 ? controller.value.aspectRatio : 16 / 9,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            VideoPlayer(controller),
+            if (!controller.value.isPlaying)
+              const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 58),
+          ],
+        ),
+      ),
+    );
+  }
 }
