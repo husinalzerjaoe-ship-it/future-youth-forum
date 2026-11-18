@@ -16,6 +16,7 @@ on:
       - feature/v53-community-universe
       - feature/v54-world-community
       - feature/v55-music-notifications-repair
+      - feature/v58-experience-hub-full-upgrade
     paths:
       - 'firestore.rules'
       - 'storage.rules'
