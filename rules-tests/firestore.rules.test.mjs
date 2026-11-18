@@ -1085,3 +1085,103 @@ test('V54 notification center keeps notifications private and recipient-only for
     recipientId: 'mallory',
   }));
 });
+
+
+test('V58 stories support 24-hour expiry or manual deletion without ownership bypass', async () => {
+  const owner = user('story-owner');
+  const storyRef = doc(owner, 'stories/v58-expiring');
+  await assertSucceeds(setDoc(storyRef, {
+    authorId: 'story-owner',
+    authorName: 'Story Owner',
+    mediaUrl: 'https://media.example.test/v58/story.mp4',
+    mediaType: 'video',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 23 * 60 * 60 * 1000)),
+  }));
+  await assertSucceeds(getDoc(doc(user('member'), 'stories/v58-expiring')));
+  await assertFails(deleteDoc(doc(user('member'), 'stories/v58-expiring')));
+  await assertSucceeds(deleteDoc(storyRef));
+
+  await assertSucceeds(setDoc(doc(owner, 'stories/v58-manual'), {
+    authorId: 'story-owner',
+    authorName: 'Story Owner',
+    mediaUrl: 'https://media.example.test/v58/story.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: null,
+  }));
+  await assertFails(setDoc(doc(owner, 'stories/v58-too-long'), {
+    authorId: 'story-owner',
+    authorName: 'Story Owner',
+    mediaUrl: 'https://media.example.test/v58/story.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: Timestamp.fromDate(new Date(Date.now() + 25 * 60 * 60 * 1000)),
+  }));
+  await assertFails(setDoc(doc(user('impostor'), 'stories/v58-forged'), {
+    authorId: 'story-owner',
+    authorName: 'Story Owner',
+    mediaUrl: 'https://media.example.test/v58/story.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: null,
+  }));
+  await assertFails(setDoc(doc(owner, 'stories/v58-http'), {
+    authorId: 'story-owner',
+    authorName: 'Story Owner',
+    mediaUrl: 'http://media.example.test/v58/story.jpg',
+    mediaType: 'image',
+    createdAt: serverTimestamp(),
+    expiresAt: null,
+  }));
+});
+
+test('V57/V58 IPTV personal cloud library is private and owner-bound', async () => {
+  const aliceItem = doc(user('alice'), 'iptvUserLibraries/alice/items/item-1');
+  await assertSucceeds(setDoc(aliceItem, {
+    name: 'قناة تجريبية',
+    url: 'https://stream.example.test/live.m3u8',
+    group: 'رياضة',
+    logo: '',
+    tvgId: '',
+    source: 'قائمتي',
+    sourceUrl: '',
+    favorite: false,
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(getDoc(aliceItem));
+  await assertFails(getDoc(doc(user('bob'), 'iptvUserLibraries/alice/items/item-1')));
+  await assertFails(setDoc(doc(user('bob'), 'iptvUserLibraries/alice/items/forged'), {
+    name: 'قناة مزورة',
+    url: 'https://stream.example.test/other.m3u8',
+    group: 'عام',
+    logo: '',
+    tvgId: '',
+    source: 'قائمتي',
+    sourceUrl: '',
+    favorite: false,
+    updatedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(aliceItem, {
+    favorite: true,
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(aliceItem, {
+    favorite: true,
+    ownerUid: 'bob',
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('alice'), 'iptvUserLibraries/alice/items/bad-url'), {
+    name: 'رابط غير صالح',
+    url: 'javascript:alert(1)',
+    group: 'عام',
+    logo: '',
+    tvgId: '',
+    source: 'قائمتي',
+    sourceUrl: '',
+    favorite: false,
+    updatedAt: serverTimestamp(),
+  }));
+  await assertFails(getDoc(doc(user('alice'), 'iptvUserLibraries/alice')));
+  await assertSucceeds(deleteDoc(aliceItem));
+});
