@@ -527,7 +527,7 @@ class _LocalMusicPageState extends State<LocalMusicPage> {
       leading:const CircleAvatar(child:Icon(Icons.audiotrack)),
       title:Text(x['title'] as String? ?? 'مقطع صوتي',maxLines:1,overflow:TextOverflow.ellipsis),
       subtitle:Text('من مكتبة المجتمع • '+(x['size']??0).toString()+' بايت'),
-      trailing:Wrap(mainAxisSize:MainAxisSize.min,children:[
+      trailing:Row(mainAxisSize:MainAxisSize.min,children:[
        IconButton(tooltip:favorite?'إزالة من المفضلة':'إضافة للمفضلة',icon:Icon(favorite?Icons.favorite:Icons.favorite_border,color:favorite?Colors.pink:null),onPressed:()=>_toggleSharedFavorite(d.id)),
        IconButton(tooltip:'تشغيل',icon:const Icon(Icons.play_circle_fill),onPressed:()=>playShared(x['fileUrl'] as String,x['title'] as String? ?? 'مقطع صوتي')),
       ]),
