@@ -27,6 +27,7 @@ import 'v59_vod_cinema_library.dart';
 import 'ai_assistant.dart';
 import 'v60_app_health_center.dart';
 import 'v60_link_library.dart';
+import 'v61_daily_focus.dart';
 
 class V58ExperienceHubPage extends StatefulWidget {
   const V58ExperienceHubPage({super.key});
@@ -40,6 +41,7 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
   String _category = 'الكل';
 
   late final List<_V58Feature> _features = [
+    _V58Feature('تركيزي اليومي', 'أهداف ومهام خاصة محفوظة على جهازك مع متابعة الإنجاز', Icons.track_changes_rounded, 'الإنتاجية', () => const V61DailyFocusPage()),
     _V58Feature('مساعد المستقبل الذكي', 'مساعد للدراسة والأفكار والمعرفة', Icons.smart_toy_rounded, 'الإبداع والمعرفة', () => const AiAssistantPage()),
     _V58Feature('مركز صحة التطبيق', 'افحص اتصال Firebase وذاكرة الصور', Icons.health_and_safety_rounded, 'الأمان', () => const V60AppHealthPage()),
     _V58Feature('مكتبتي الشخصية للروابط', 'احفظ روابطك العامة وصنّفها وافتحها بسرعة', Icons.link_rounded, 'الإبداع والمعرفة', () => const V60LinkLibraryPage()),
@@ -66,7 +68,7 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
     _V58Feature('مكتبة الثقافة', 'الشعر والاقتباسات والثقافة', Icons.menu_book_rounded, 'الإبداع والمعرفة', () => const FutureCultureHubPage()),
   ];
 
-  static const _categories = ['الكل', 'المجتمع', 'التواصل', 'الألعاب', 'الترفيه', 'الإبداع والمعرفة', 'الأمان'];
+  static const _categories = ['الكل', 'المجتمع', 'التواصل', 'الألعاب', 'الترفيه', 'الإبداع والمعرفة', 'الإنتاجية', 'الأمان'];
 
   @override
   void dispose() { _search.dispose(); super.dispose(); }
@@ -88,7 +90,7 @@ class _V58ExperienceHubPageState extends State<V58ExperienceHubPage> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('مركز تجربة الملتقى V60'),
+          title: const Text('مركز تجربة الملتقى V61'),
           actions: [IconButton(tooltip: 'مسح البحث', onPressed: () { _search.clear(); setState(() {}); }, icon: const Icon(Icons.refresh_rounded))],
         ),
         body: ListView(

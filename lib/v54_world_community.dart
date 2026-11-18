@@ -164,44 +164,67 @@ class V54NotificationsPage extends StatelessWidget {
                 return bDate.compareTo(aDate);
               });
             if (docs.isEmpty) return const Center(child: Text('ما عندك إشعارات حالياً.'));
-            return ListView.separated(
+            final unreadDocs = docs.where((doc) => doc.data()['read'] != true).toList();
+            return ListView(
               padding: const EdgeInsets.all(12),
-              itemCount: docs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 6),
-              itemBuilder: (context, index) {
-                final doc = docs[index];
-                final data = doc.data();
-                final read = data['read'] == true;
-                final type = (data['type'] ?? '').toString();
-                final icon = switch (type) {
-                  'like' => Icons.favorite_rounded,
-                  'comment' => Icons.mode_comment_rounded,
-                  'mention' => Icons.alternate_email_rounded,
-                  'follow' => Icons.person_add_alt_1_rounded,
-                  'message' => Icons.mail_rounded,
-                  _ => Icons.notifications_rounded,
-                };
-                return Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: read ? Colors.white10 : const Color(0xFF6554D9).withOpacity(.25),
-                      child: Icon(icon, color: read ? Colors.white54 : const Color(0xFFB9AEFF)),
-                    ),
-                    title: Text((data['actorName'] ?? 'الملتقى').toString(), style: TextStyle(fontWeight: read ? FontWeight.normal : FontWeight.bold)),
-                    subtitle: Text((data['text'] ?? 'إشعار جديد').toString()),
-                    trailing: read ? const Icon(Icons.done, color: Colors.white38) : const Icon(Icons.circle, size: 9, color: Color(0xFF8D7BFF)),
-                    onTap: read ? null : () async {
-                      try {
-                        await doc.reference.update({'read': true});
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث حالة الإشعار.')));
+              children: [
+                if (unreadDocs.isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () async {
+                        try {
+                          final batch = FirebaseFirestore.instance.batch();
+                          for (final notification in unreadDocs) {
+                            batch.update(notification.reference, {'read': true});
+                          }
+                          await batch.commit();
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('تعذر تحديد الإشعارات المعروضة كمقروءة.')),
+                            );
+                          }
                         }
-                      }
-                    },
+                      },
+                      icon: const Icon(Icons.done_all_rounded),
+                      label: Text('قراءة الكل المعروض (${unreadDocs.length})'),
+                    ),
                   ),
-                );
-              },
+                ...docs.map((doc) {
+                  final data = doc.data();
+                  final read = data['read'] == true;
+                  final type = (data['type'] ?? '').toString();
+                  final icon = switch (type) {
+                    'like' => Icons.favorite_rounded,
+                    'comment' => Icons.mode_comment_rounded,
+                    'mention' => Icons.alternate_email_rounded,
+                    'follow' => Icons.person_add_alt_1_rounded,
+                    'message' => Icons.mail_rounded,
+                    _ => Icons.notifications_rounded,
+                  };
+                  return Card(
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: read ? Colors.white10 : const Color(0xFF6554D9).withOpacity(.25),
+                        child: Icon(icon, color: read ? Colors.white54 : const Color(0xFFB9AEFF)),
+                      ),
+                      title: Text((data['actorName'] ?? 'الملتقى').toString(), style: TextStyle(fontWeight: read ? FontWeight.normal : FontWeight.bold)),
+                      subtitle: Text((data['text'] ?? 'إشعار جديد').toString()),
+                      trailing: read ? const Icon(Icons.done, color: Colors.white38) : const Icon(Icons.circle, size: 9, color: Color(0xFF8D7BFF)),
+                      onTap: read ? null : () async {
+                        try {
+                          await doc.reference.update({'read': true});
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تحديث حالة الإشعار.')));
+                          }
+                        }
+                      },
+                    ),
+                  );
+                }),
+              ],
             );
           },
         ),

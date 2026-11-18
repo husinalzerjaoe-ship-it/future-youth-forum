@@ -4,7 +4,7 @@ on:
   # Feature branches are accumulated without repeated APK builds.
   # Run the complete validation/build manually when the user requests the final package.
   push:
-    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade]
+    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade, feature/v61-comprehensive-upgrade]
   pull_request:
     branches: [main]
 
@@ -92,7 +92,18 @@ jobs:
                          if item.get(android + "name") == "flutterEmbedding"), None)
           if marker is None or marker.get(android + "value") != "2":
               raise SystemExit("Flutter embedding v2 marker is missing or unreadable")
-          print("Verified Flutter Android embedding v2 in the generated manifest.")
+          activity = next((item for item in app.findall("activity")
+                           if item.get(android + "name") == ".MainActivity"), None)
+          if activity is None:
+              raise SystemExit("MainActivity must remain the declared app activity")
+          service = next((item for item in app.findall("service")
+                          if item.get(android + "name") == "com.ryanheise.audioservice.AudioService"), None)
+          if service is None:
+              raise SystemExit("AudioService is missing from AndroidManifest.xml")
+          source = Path("android/app/src/main/kotlin/com/futureyouth/forum/MainActivity.kt")
+          if not source.exists() or "class MainActivity : AudioServiceActivity()" not in source.read_text():
+              raise SystemExit("MainActivity must extend AudioServiceActivity to provide the correct FlutterEngine")
+          print("Verified Flutter embedding v2, app MainActivity, and audio_service activity integration.")
           PY
       - name: Verify Activepieces webhook secret
         env:
