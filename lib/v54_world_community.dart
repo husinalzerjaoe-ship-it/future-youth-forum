@@ -142,7 +142,6 @@ class V54NotificationsPage extends StatelessWidget {
     }
     final query = FirebaseFirestore.instance.collection('notifications')
         .where('recipientId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .limit(60);
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -156,7 +155,14 @@ class V54NotificationsPage extends StatelessWidget {
               child: SelectableText('تعذر تحميل الإشعارات.\nتفاصيل الخطأ: ${snapshot.error}'),
             ));
             if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            final docs = snapshot.data!.docs;
+            final docs = snapshot.data!.docs.toList()
+              ..sort((a, b) {
+                final aTime = a.data()['createdAt'];
+                final bTime = b.data()['createdAt'];
+                final aDate = aTime is Timestamp ? aTime : Timestamp(0, 0);
+                final bDate = bTime is Timestamp ? bTime : Timestamp(0, 0);
+                return bDate.compareTo(aDate);
+              });
             if (docs.isEmpty) return const Center(child: Text('ما عندك إشعارات حالياً.'));
             return ListView.separated(
               padding: const EdgeInsets.all(12),
