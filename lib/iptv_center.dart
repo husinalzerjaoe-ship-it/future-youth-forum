@@ -635,8 +635,8 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
       if (response.bodyBytes.length > 64 * 1024 * 1024) throw Exception('القائمة أكبر من 64 ميغابايت.');
       final parsed = IptvPlaylistParser.parse(utf8.decode(response.bodyBytes, allowMalformed: true), source: source, sourceUrl: uri.toString(), baseUri: uri);
       if (parsed.isEmpty) throw Exception('القائمة المحدثة فارغة.');
-      _items.removeWhere((e) => e.source == source); _items.addAll(parsed); await _save();
-      _toast('تم تحديث المصدر: ' + parsed.length.toString() + ' عنصر.');
+      _items.removeWhere((e) => e.source == source); _items.addAll(parsed); await _save(); await _syncToCloud(parsed);
+      _toast('تم تحديث المصدر: + parsed.length.toString() + ' عنصر.');
     } catch (e) { _toast('فشل تحديث المصدر: ' + e.toString()); }
     finally { if (mounted) setState(() => _busy = false); }
   }
@@ -664,7 +664,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
   @override Widget build(BuildContext context) {
     final visible = _visible;
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
-      appBar: AppBar(title: const Text('مكتبة الترفيه V57')),
+      appBar: AppBar(title: const Text('مكتبة الترفيه V57'), actions: [IconButton(tooltip: 'مزامنة مكتبتي', onPressed: _cloudSyncing ? null : _syncFromCloud, icon: const Icon(Icons.cloud_sync_rounded))]),
       body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(padding: const EdgeInsets.all(14), children: [
         Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(borderRadius: BorderRadius.circular(22), gradient: const LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: [Color(0xFF30245F), Color(0xFF17243D), Color(0xFF12424A)])), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Icon(Icons.movie_filter_rounded, color: Colors.white, size: 34), const SizedBox(height: 8),
@@ -674,6 +674,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
         ])),
         Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('إضافة مصدر جديد', style: TextStyle(fontWeight: FontWeight.w900)),
+          const Text('تُزامَن روابط القوائم مع حسابك الخاص. لا تستخدم رابطاً يحتوي كلمة مرور أو رمز دخول لا تريد حفظه سحابياً.', style: TextStyle(fontSize: 12, color: Colors.orangeAccent)),
           TextField(controller: _name, decoration: const InputDecoration(labelText: 'اسم المصدر (اختياري)', border: OutlineInputBorder())),
           const SizedBox(height: 8),
           TextField(controller: _url, keyboardType: TextInputType.url, decoration: const InputDecoration(labelText: 'رابط M3U / M3U8', hintText: 'https://…', border: OutlineInputBorder())),
@@ -696,7 +697,7 @@ class _IptvEntertainmentLibraryPageState extends State<IptvEntertainmentLibraryP
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => IptvPlayerPage(channel: item))),
         ))),
         if (visible.length > 300) const Text('نعرض أول 300 نتيجة للحفاظ على سرعة الصفحة. استخدم البحث للتصفية.'),
-        const Padding(padding: EdgeInsets.only(top: 12), child: Text('الحفظ في V57 محلي على هذا الجهاز. التصنيف يعتمد على أسماء المجموعات والعناصر في القائمة وقد يحتاج تصحيحاً يدوياً إذا كانت بيانات المصدر غير واضحة. تشغيل الصيغ يعتمد على دعم الجهاز والمشغّل والمصدر.', style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5))),
+        const Padding(padding: EdgeInsets.only(top: 12), child: Text('تُحفظ المكتبة محلياً وتُزامَن مع حسابك بعد نشر قواعد V57. التصنيف يعتمد على أسماء المجموعات والعناصر في القائمة وقد يحتاج تصحيحاً إذا كانت بيانات المصدر غير واضحة. تشغيل الصيغ يعتمد على دعم الجهاز والمشغّل والمصدر.', style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5))),
       ]),
     ));
   }
