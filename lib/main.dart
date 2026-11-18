@@ -1182,36 +1182,113 @@ class PostsPage extends StatelessWidget {
     final text = TextEditingController();
     final video = TextEditingController();
     final user = FirebaseAuth.instance.currentUser!;
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => Directionality(
-      textDirection: TextDirection.rtl,
-      child: AlertDialog(title: const Text('منشور جديد'),
-        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: text, maxLines: 4, maxLength: 1000,
-            decoration: const InputDecoration(labelText: 'اكتب منشورك', border: OutlineInputBorder())),
-          const SizedBox(height: 12),
-          TextField(controller: video, keyboardType: TextInputType.url,
-            decoration: const InputDecoration(labelText: 'رابط فيديو (اختياري)', hintText: 'https://', border: OutlineInputBorder())),
-        ])),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('نشر'))],
-      )));
-    if (ok == true && (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
-      final profile = await db.collection('publicProfiles').doc(user.uid).get();
-      final authorName = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
-      final post = await db.collection('posts').add({
-        'text': text.text.trim(), 'videoUrl': video.text.trim(), 'authorId': user.uid,
-        'authorName': authorName,
-        'authorPhoto': profile.data()?['photoUrl'] ?? '',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      await _notifyContentMentions(
-        text: text.text.trim(), targetType: 'post', targetId: post.id,
-        actorUid: user.uid, actorName: authorName,
-      );
+    final prefs = await SharedPreferences.getInstance();
+    final draftKey = 'v61_post_draft_${user.uid}';
+    text.text = prefs.getString('${draftKey}_text') ?? '';
+    video.text = prefs.getString('${draftKey}_video') ?? '';
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          title: const Text('منشور جديد'),
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                controller: text,
+                maxLines: 4,
+                maxLength: 1000,
+                decoration: const InputDecoration(
+                  labelText: 'اكتب منشورك',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: video,
+                keyboardType: TextInputType.url,
+                decoration: const InputDecoration(
+                  labelText: 'رابط فيديو (اختياري)',
+                  hintText: 'https://',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('إغلاق'),
+            ),
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, 'draft'),
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('حفظ مسودة'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'publish'),
+              child: const Text('نشر'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      if (action == 'draft') {
+        if (text.text.trim().isEmpty && video.text.trim().isEmpty) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('اكتب شيئاً قبل حفظ المسودة.')),
+            );
+          }
+        } else {
+          await prefs.setString('${draftKey}_text', text.text.trim());
+          await prefs.setString('${draftKey}_video', video.text.trim());
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('انحفظت المسودة على جهازك.')),
+            );
+          }
+        }
+      } else if (action == 'publish' &&
+          (text.text.trim().isNotEmpty || video.text.trim().isNotEmpty)) {
+        final profile = await db.collection('publicProfiles').doc(user.uid).get();
+        final authorName = (profile.data()?['name'] ?? user.displayName ?? 'عضو').toString();
+        final post = await db.collection('posts').add({
+          'text': text.text.trim(),
+          'videoUrl': video.text.trim(),
+          'authorId': user.uid,
+          'authorName': authorName,
+          'authorPhoto': profile.data()?['photoUrl'] ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        await _notifyContentMentions(
+          text: text.text.trim(),
+          targetType: 'post',
+          targetId: post.id,
+          actorUid: user.uid,
+          actorName: authorName,
+        );
+        await prefs.remove('${draftKey}_text');
+        await prefs.remove('${draftKey}_video');
+      }
+    } catch (e) {
+      // Keep the content locally so a temporary network failure does not lose it.
+      await prefs.setString('${draftKey}_text', text.text.trim());
+      await prefs.setString('${draftKey}_video', video.text.trim());
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر النشر؛ حفظت النص كمسودة. التفاصيل: $e')),
+        );
+      }
+    } finally {
+      text.dispose();
+      video.dispose();
     }
-    text.dispose();
-    video.dispose();
   }
+
   Future<void> addPhotoPost(BuildContext context) async {
     final picker = ImagePicker();
     final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 88);
