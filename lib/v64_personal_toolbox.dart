@@ -174,7 +174,7 @@ class _V64PersonalToolboxPageState extends State<V64PersonalToolboxPage> {
     final h = value.inHours.toString().padLeft(2, '0');
     final m = (value.inMinutes % 60).toString().padLeft(2, '0');
     final s = (value.inSeconds % 60).toString().padLeft(2, '0');
-    final fraction = tenths ? '.\${value.inMilliseconds % 1000 ~/ 100}' : '';
+    final fraction = tenths ? '.${value.inMilliseconds % 1000 ~/ 100}' : '';
     return '$h:$m:$s$fraction';
   }
 
@@ -234,7 +234,7 @@ class _V64PersonalToolboxPageState extends State<V64PersonalToolboxPage> {
                 decoration: const InputDecoration(labelText: 'اكتب أو الصق النص', border: OutlineInputBorder())),
               const SizedBox(height: 8),
               Align(alignment: Alignment.centerRight,
-                child: Text('الكلمات: $words • الحروف: \${text.length} • الأسطر: \${text.isEmpty ? 0 : text.split('\n').length}')),
+                child: Text('الكلمات: $words • الحروف: ${text.length} • الأسطر: ${text.isEmpty ? 0 : text.split('\n').length}')),
               Wrap(spacing: 6, runSpacing: 6, children: [
                 OutlinedButton(onPressed: () => refresh(() {
                   output = text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().join('\n');
@@ -347,7 +347,7 @@ class _V64PersonalToolboxPageState extends State<V64PersonalToolboxPage> {
   String _dateLabel(String raw) {
     final date = DateTime.tryParse(raw)?.toLocal();
     if (date == null) return 'تاريخ غير معروف';
-    return '\${date.day}/\${date.month}/\${date.year} • \${date.hour.toString().padLeft(2, '0')}:\${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day}/${date.month}/${date.year} • ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 }
 
