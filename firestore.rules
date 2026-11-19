@@ -1,3 +1,16 @@
+// Future Youth Forum — comprehensive Firestore security rules (V63).
+// This is the deployable rules file referenced by firebase.json.
+// Coverage includes: accounts/profiles/follows/ratings; posts/comments/likes;
+// public, regional, private and room chats; presence/typing/read receipts;
+// moderation/sanctions/reports/admin logs; memberships/points/contests;
+// stories/clips/media links; poems/quotes; polls/events/announcements;
+// games/invites/rooms/tournaments/clubs/community discussions;
+// shared files/watch parties; IPTV shared playlists and private libraries;
+// coin wallets/top-up requests; developer links/chat controls; and V63 call signaling.
+// Local-only preferences, cached lists, and on-device game data do not need Firestore rules.
+// Firestore denies every unmatched path by default; no blanket authenticated write rule is used.
+// Storage rules and Supabase RLS are separate systems and are NOT controlled by this file.
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
