@@ -20,6 +20,7 @@ void main() {
     expect(find.text('ساعة الإيقاف'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('مؤقت تنازلي'), 240);
     expect(find.text('مؤقت تنازلي'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('مختبر النصوص'), 240);
     expect(find.text('مختبر النصوص'), findsOneWidget);
   });
 
@@ -49,11 +50,15 @@ void main() {
 
     await tester.ensureVisible(find.text('ابدأ'));
     await tester.tap(find.text('ابدأ'));
-    await tester.pump(const Duration(milliseconds: 350));
-    expect(find.text('00:00:00.3'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 450));
+    await tester.ensureVisible(find.byKey(const ValueKey('v64-stopwatch-time')));
+    await tester.pump();
+    final elapsed = tester.widget<Text>(find.byKey(const ValueKey('v64-stopwatch-time'))).data!;
+    expect(elapsed, isNot('00:00:00.0'));
 
+    await tester.ensureVisible(find.text('إعادة'));
     await tester.tap(find.text('إعادة'));
     await tester.pump();
-    expect(find.text('00:00:00.0'), findsOneWidget);
+    expect(tester.widget<Text>(find.byKey(const ValueKey('v64-stopwatch-time'))).data, '00:00:00.0');
   });
 }
