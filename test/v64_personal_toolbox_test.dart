@@ -18,6 +18,7 @@ void main() {
     expect(find.text('صندوق أدوات V64'), findsOneWidget);
     expect(find.text('يومياتي الخاصة'), findsOneWidget);
     expect(find.text('ساعة الإيقاف'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('مؤقت تنازلي'), 240);
     expect(find.text('مؤقت تنازلي'), findsOneWidget);
     expect(find.text('مختبر النصوص'), findsOneWidget);
   });
@@ -46,6 +47,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: V64PersonalToolboxPage()));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('ابدأ'));
     await tester.tap(find.text('ابدأ'));
     await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('00:00:00.3'), findsOneWidget);
