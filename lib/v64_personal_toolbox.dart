@@ -230,7 +230,7 @@ class _V64PersonalToolboxPageState extends State<V64PersonalToolboxPage> {
             title: const Text('مختبر النصوص'),
             content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(controller: controller, minLines: 4, maxLines: 8,
-                onChanged: (_) => refresh(),
+                onChanged: (_) => refresh(() {}),
                 decoration: const InputDecoration(labelText: 'اكتب أو الصق النص', border: OutlineInputBorder())),
               const SizedBox(height: 8),
               Align(alignment: Alignment.centerRight,
