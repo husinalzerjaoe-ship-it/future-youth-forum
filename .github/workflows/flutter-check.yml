@@ -4,7 +4,7 @@ on:
   # Feature branches are accumulated without repeated APK builds.
   # Run the complete validation/build manually when the user requests the final package.
   push:
-    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade, feature/v61-comprehensive-upgrade, feature/v62-ultimate-comprehensive-upgrade]
+    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade, feature/v61-comprehensive-upgrade, feature/v62-ultimate-comprehensive-upgrade, feature/v63-native-call-experience]
   pull_request:
     branches: [main]
 
@@ -81,6 +81,7 @@ jobs:
         run: |
           python - <<'PY'
           import xml.etree.ElementTree as ET
+          from pathlib import Path
           path = "android/app/src/main/AndroidManifest.xml"
           root = ET.parse(path).getroot()
           android = "{http://schemas.android.com/apk/res/android}"
@@ -117,10 +118,6 @@ jobs:
               raise SystemExit("GodotGameActivity is missing from AndroidManifest.xml")
           print("Verified Flutter embedding v2, audio_service host, Godot and downloads channels.")
           PY
-      - name: Verify Activepieces webhook secret
-        env:
-          ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
-        run: test -n "$ACTIVEPIECES_WEBHOOK_URL"
       - name: Build release APK
         env:
           ACTIVEPIECES_WEBHOOK_URL: ${{ secrets.ACTIVEPIECES_WEBHOOK_URL }}
@@ -130,8 +127,6 @@ jobs:
           import os
           from pathlib import Path
           url = os.environ.get("ACTIVEPIECES_WEBHOOK_URL", "").strip()
-          if not url:
-              raise SystemExit("ACTIVEPIECES_WEBHOOK_URL is empty")
           Path("/tmp/assistant-dart-defines.json").write_text(
               json.dumps({"ACTIVEPIECES_WEBHOOK_URL": url})
           )

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'livekit_calls.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -159,8 +160,17 @@ class _JitsiBackupCallsPageState extends State<JitsiBackupCallsPage> {
               value: _videoEnabled,
               onChanged: (value) => setState(() => _videoEnabled = value),
             ),
+
             const SizedBox(height: 12),
             FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LiveKitCallsPage()),
+              ),
+              icon: const Icon(Icons.call_rounded),
+              label: const Text('الاتصال الداخلي الجديد • صوت وفيديو'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
               onPressed: _joining ? null : _joinRoom,
               icon: _joining
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))

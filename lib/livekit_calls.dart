@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -32,12 +34,17 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   String? _error;
   String? _endpoint;
   OverlayEntry? _miniCallOverlay;
+  final _friendUidController = TextEditingController();
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _incomingCalls;
+  String? _activeCallId;
+  bool _showIncomingDialog = false;
 
   @override
   void initState() {
     super.initState();
     _roomController.text = widget.initialRoom ?? '';
     _loadEndpoint();
+    _listenForIncomingCalls();
   }
 
   Future<void> _loadEndpoint() async {
@@ -91,6 +98,140 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
       _endpoint = saved.replaceFirst(RegExp(r'/+$'), '');
       _error = null;
     });
+  }
+
+
+  void _listenForIncomingCalls() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _incomingCalls = FirebaseFirestore.instance
+        .collection('callSessions')
+        .where('calleeId', isEqualTo: user.uid)
+        .where('status', isEqualTo: 'ringing')
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted || _showIncomingDialog || _room != null || snapshot.docs.isEmpty) return;
+      final call = snapshot.docs.first;
+      final data = call.data();
+      if (data['callerId'] == user.uid) return;
+      _showIncomingDialog = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        final callerName = (data['callerName'] ?? 'عضو من الملتقى').toString();
+        final video = data['videoEnabled'] == true;
+        final accepted = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              title: Text(video ? 'مكالمة فيديو واردة' : 'مكالمة صوتية واردة'),
+              content: Text('$callerName يتصل بك الآن'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('رفض'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  icon: const Icon(Icons.call_rounded),
+                  label: const Text('قبول'),
+                ),
+              ],
+            ),
+          ),
+        );
+        _showIncomingDialog = false;
+        if (!mounted) return;
+        if (accepted == true) {
+          try {
+            await call.reference.update({
+              'status': 'accepted',
+              'acceptedAt': FieldValue.serverTimestamp(),
+            });
+            _activeCallId = call.id;
+            _roomController.text = (data['roomName'] ?? '').toString();
+            _videoEnabled = video;
+            if (mounted) setState(() {});
+            await _joinRoom();
+          } catch (error) {
+            if (mounted) setState(() => _error = 'تعذر قبول المكالمة: $error');
+          }
+        } else {
+          await call.reference.update({
+            'status': 'rejected',
+            'endedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      });
+    }, onError: (Object error) {
+      if (mounted) setState(() => _error = 'تعذر استقبال المكالمات داخل التطبيق: $error');
+    });
+  }
+
+  Future<void> _startDirectCall() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final friendUid = _friendUidController.text.trim();
+    if (user == null) {
+      setState(() => _error = 'سجّل الدخول أولاً.');
+      return;
+    }
+    if (!RegExp(r'^[A-Za-z0-9:_-]{10,128}$').hasMatch(friendUid) || friendUid == user.uid) {
+      setState(() => _error = 'أدخل معرّف Firebase الصحيح لصديقك.');
+      return;
+    }
+    try {
+      final callRef = FirebaseFirestore.instance.collection('callSessions').doc();
+      final roomName = 'fyf-call-${callRef.id}';
+      await callRef.set({
+        'callerId': user.uid,
+        'callerName': user.displayName ?? 'عضو',
+        'calleeId': friendUid,
+        'roomName': roomName,
+        'videoEnabled': _videoEnabled,
+        'status': 'ringing',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _activeCallId = callRef.id;
+      _roomController.text = roomName;
+      await _joinRoom();
+      if (_room == null) {
+        await callRef.update({
+          'status': 'failed',
+          'endedAt': FieldValue.serverTimestamp(),
+        });
+        _activeCallId = null;
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'تعذر بدء الاتصال: $error');
+    }
+  }
+
+  Future<void> _copyMyUid() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      if (mounted) setState(() => _error = 'سجّل الدخول أولاً.');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: uid));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم نسخ معرّف حسابك؛ أرسله لصديقك حتى يتصل بك.')),
+      );
+    }
+  }
+
+  Future<void> _finishCallSignal() async {
+    final id = _activeCallId;
+    _activeCallId = null;
+    if (id == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('callSessions').doc(id).update({
+        'status': 'ended',
+        'endedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
   }
 
   Future<void> _joinRoom() async {
@@ -283,6 +424,7 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
   Future<void> _leaveRoom() async {
     final room = _room;
     final listener = _listener;
+    await _finishCallSignal();
     _removeMiniCallOverlay();
     setState(() {
       _room = null;
@@ -385,6 +527,8 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
     _room?.disconnect();
     _room?.dispose();
     _listener?.dispose();
+    _incomingCalls?.cancel();
+    _friendUidController.dispose();
     _roomController.dispose();
     _endpointController.dispose();
     super.dispose();
@@ -545,6 +689,40 @@ class _LiveKitCallsPageState extends State<LiveKitCallsPage> {
                       onPressed: _configureEndpoint,
                       icon: const Icon(Icons.settings_outlined),
                       label: const Text('إعداد رابط خادم المكالمات المجاني'),
+                    ),
+
+                    const SizedBox(height: 18),
+                    const Divider(),
+                    const Text('اتصال مباشر بصديق', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _friendUidController,
+                      textDirection: TextDirection.ltr,
+                      decoration: const InputDecoration(
+                        labelText: 'معرّف حساب الصديق (UID)',
+                        hintText: 'الصق UID الذي أرسله لك صديقك',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.person_search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _copyMyUid,
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                        label: const Text('نسخ معرّف حسابي لمشاركته مع الأصدقاء'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.icon(
+                      onPressed: _connecting ? null : _startDirectCall,
+                      icon: const Icon(Icons.call_rounded),
+                      label: Text(_videoEnabled ? 'اتصال فيديو مباشر' : 'اتصال صوتي مباشر'),
+                    ),
+                    const Text(
+                      'الاتصال المباشر يرسل طلباً لحساب الصديق ويعرض نافذة قبول أو رفض عندما يكون فاتحاً شاشة المكالمات داخل التطبيق. استقبال الاتصال والتطبيق مغلق يحتاج إشعارات دفع مهيأة على Firebase.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),

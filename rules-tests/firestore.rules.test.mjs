@@ -1191,3 +1191,35 @@ test('V57/V58 IPTV personal cloud library is private and owner-bound', async () 
   await assertFails(getDoc(doc(user('alice'), 'iptvUserLibraries/alice')));
   await assertSucceeds(deleteDoc(aliceItem));
 });
+
+
+test('V63 direct call sessions are limited to caller and invited callee', async () => {
+  const call = {
+    callerId: 'alice',
+    callerName: 'Alice',
+    calleeId: 'bob',
+    roomName: 'fyf-call-AbCd123456',
+    videoEnabled: true,
+    status: 'ringing',
+    createdAt: serverTimestamp(),
+  };
+  await assertSucceeds(setDoc(doc(user('alice'), 'callSessions/call-1'), call));
+  await assertSucceeds(getDoc(doc(user('alice'), 'callSessions/call-1')));
+  await assertSucceeds(getDoc(doc(user('bob'), 'callSessions/call-1')));
+  await assertFails(getDoc(doc(user('mallory'), 'callSessions/call-1')));
+  await assertSucceeds(updateDoc(doc(user('bob'), 'callSessions/call-1'), {
+    status: 'accepted',
+    acceptedAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(user('alice'), 'callSessions/call-1'), {
+    status: 'accepted',
+    acceptedAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(doc(user('alice'), 'callSessions/call-1'), {
+    status: 'ended',
+    endedAt: serverTimestamp(),
+  }));
+  await assertFails(setDoc(doc(user('mallory'), 'callSessions/forged'), {
+    ...call, callerId: 'alice',
+  }));
+});
