@@ -45,10 +45,15 @@ void main() {
   });
 
   testWidgets('stopwatch starts and can be reset', (tester) async {
+    await tester.view.setPhysicalSize(const Size(900, 1200));
+    await tester.view.setDevicePixelRatio(1);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const MaterialApp(home: V64PersonalToolboxPage()));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('ابدأ'));
+    await tester.scrollUntilVisible(find.text('ابدأ'), 180);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('ابدأ'));
     await tester.pump(const Duration(milliseconds: 450));
     await tester.ensureVisible(find.byKey(const ValueKey('v64-stopwatch-time')));
