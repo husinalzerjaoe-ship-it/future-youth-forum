@@ -12,8 +12,8 @@ void main() {
   });
 
   testWidgets('V65 creates and persists an offline post draft', (tester) async {
-    await tester.view.setPhysicalSize(const Size(900, 1000));
-    await tester.view.setDevicePixelRatio(1);
+    tester.view.physicalSize = const Size(900, 1000);
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
