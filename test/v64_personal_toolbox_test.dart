@@ -45,8 +45,8 @@ void main() {
   });
 
   testWidgets('stopwatch starts and can be reset', (tester) async {
-    await tester.view.setPhysicalSize(const Size(900, 1200));
-    await tester.view.setDevicePixelRatio(1);
+    tester.view.physicalSize = const Size(900, 1200);
+    tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const MaterialApp(home: V64PersonalToolboxPage()));
