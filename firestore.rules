@@ -1,3 +1,16 @@
+// Future Youth Forum — comprehensive Firestore security rules (V63).
+// This is the deployable rules file referenced by firebase.json.
+// Coverage includes: accounts/profiles/follows/ratings; posts/comments/likes;
+// public, regional, private and room chats; presence/typing/read receipts;
+// moderation/sanctions/reports/admin logs; memberships/points/contests;
+// stories/clips/media links; poems/quotes; polls/events/announcements;
+// games/invites/rooms/tournaments/clubs/community discussions;
+// shared files/watch parties; IPTV shared playlists and private libraries;
+// coin wallets/top-up requests; developer links/chat controls; and V63 call signaling.
+// Local-only preferences, cached lists, and on-device game data do not need Firestore rules.
+// Firestore denies every unmatched path by default; no blanket authenticated write rule is used.
+// Storage rules and Supabase RLS are separate systems and are NOT controlled by this file.
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -2065,6 +2078,47 @@ service cloud.firestore {
           && request.resource.data.favorite is bool
           && request.resource.data.updatedAt == request.time;
       }
+    }
+
+
+    // V63 direct call signaling. Only the caller and invited callee can read a
+    // session; the callee can accept/reject and either participant can end it.
+    match /callSessions/{callId} {
+      allow create: if request.auth != null && accountNotBanned()
+        && request.resource.data.keys().hasOnly([
+          'callerId', 'callerName', 'calleeId', 'roomName',
+          'videoEnabled', 'status', 'createdAt'
+        ])
+        && request.resource.data.callerId == request.auth.uid
+        && request.resource.data.calleeId is string
+        && request.resource.data.calleeId.size() > 0
+        && request.resource.data.calleeId != request.auth.uid
+        && request.resource.data.callerName is string
+        && request.resource.data.callerName.size() <= 80
+        && request.resource.data.roomName is string
+        && request.resource.data.roomName.matches('fyf-call-[A-Za-z0-9]+')
+        && request.resource.data.videoEnabled is bool
+        && request.resource.data.status == 'ringing'
+        && request.resource.data.createdAt == request.time;
+      allow read: if request.auth != null && accountNotBanned()
+        && (resource.data.callerId == request.auth.uid
+          || resource.data.calleeId == request.auth.uid);
+      allow update: if request.auth != null && accountNotBanned()
+        && (resource.data.callerId == request.auth.uid
+          || resource.data.calleeId == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['status', 'acceptedAt', 'endedAt'])
+        && (
+          (request.auth.uid == resource.data.calleeId
+            && request.resource.data.status in ['accepted', 'rejected', 'ended'])
+          || (request.auth.uid == resource.data.callerId
+            && request.resource.data.status in ['failed', 'ended'])
+        )
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['acceptedAt'])
+          || request.resource.data.acceptedAt == request.time)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['endedAt'])
+          || request.resource.data.endedAt == request.time);
+      allow delete: if false;
     }
 
     // V26 gaming guide, local game library notes and wallpaper favourites use

@@ -21,6 +21,7 @@ on:
       - feature/v60-complete-forum-upgrade
       - feature/v61-comprehensive-upgrade
       - feature/v62-ultimate-comprehensive-upgrade
+      - feature/v63-native-call-experience
     paths:
       - 'firestore.rules'
       - 'storage.rules'
