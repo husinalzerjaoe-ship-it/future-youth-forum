@@ -118,6 +118,9 @@ class _V65PostDraftsPageState extends State<V65PostDraftsPage> {
         ),
       ),
     );
+    // showDialog completes as the route is popped; its reverse transition can
+    // still paint TextFields for a short moment. Dispose after that transition.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
     titleController.dispose();
     bodyController.dispose();
     if (!mounted || result == null) return;
@@ -158,6 +161,21 @@ class _V65PostDraftsPageState extends State<V65PostDraftsPage> {
     if (confirmed != true) return;
     setState(() => _drafts.removeWhere((item) => item.id == draft.id));
     await _persist();
+  }
+
+  Future<void> _duplicateDraft(_V65Draft draft) async {
+    final copy = _V65Draft(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      title: 'نسخة من ${draft.title}',
+      body: draft.body,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    setState(() => _drafts.insert(0, copy));
+    await _persist();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم إنشاء نسخة مستقلة من المسودة')),
+    );
   }
 
   Future<void> _copyDraft(_V65Draft draft) async {
@@ -323,6 +341,11 @@ class _V65PostDraftsPageState extends State<V65PostDraftsPage> {
                                     onPressed: () => _editDraft(draft),
                                     icon: const Icon(Icons.edit_outlined),
                                     label: const Text('تعديل'),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => _duplicateDraft(draft),
+                                    icon: const Icon(Icons.copy_all_outlined),
+                                    label: const Text('نسخ كمسودة'),
                                   ),
                                   TextButton.icon(
                                     onPressed: () => _copyDraft(draft),
