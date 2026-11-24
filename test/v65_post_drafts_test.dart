@@ -39,6 +39,20 @@ void main() {
     expect(find.text('هذا نص تجريبي للمسودة'), findsOneWidget);
   });
 
+  testWidgets('V65 duplicates a draft without changing the original', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      'v65_offline_post_drafts': '[{"id":"1","title":"رحلة","body":"السفر إلى البصرة","updatedAt":"2026-11-20T10:00:00"}]',
+    });
+    await tester.pumpWidget(const MaterialApp(home: V65PostDraftsPage()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('نسخ كمسودة'));
+    await tester.pumpAndSettle();
+    expect(find.text('رحلة'), findsOneWidget);
+    expect(find.text('نسخة من رحلة'), findsOneWidget);
+    expect(find.text('المسودات المحفوظة: 2'), findsOneWidget);
+  });
+
   testWidgets('V65 filters drafts by their content', (tester) async {
     SharedPreferences.setMockInitialValues({
       'v65_offline_post_drafts': '[{"id":"1","title":"رحلة","body":"السفر إلى البصرة","updatedAt":"2026-11-20T10:00:00"}]',
