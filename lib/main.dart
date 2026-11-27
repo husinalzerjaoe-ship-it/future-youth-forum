@@ -233,7 +233,7 @@ class _FutureYouthBootstrapState extends State<FutureYouthBootstrap> {
                   const Icon(Icons.groups_rounded, size: 64, color: Color(0xFFB9AEFF)),
                   const SizedBox(height: 18),
                   const Text(
-                    'ملتقى شباب المستقبل',
+                    'عالم الفريدو وفاطمة',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -332,7 +332,7 @@ class _FutureYouthAppState extends State<FutureYouthApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    title: 'ملتقى شباب المستقبل',
+    title: 'عالم الفريدو وفاطمة',
     themeMode: ThemeMode.dark,
     theme: ThemeData(
       useMaterial3: true,
@@ -420,7 +420,7 @@ class _AnimatedIntroScreen extends StatelessWidget {
               child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFFE4DEFF), size: 54),
             ),
             const SizedBox(height: 22),
-            const Text('ملتقى شباب المستقبل',
+            const Text('عالم الفريدو وفاطمة',
               style: TextStyle(color: Colors.white, fontSize: 23, fontWeight: FontWeight.w900)),
             const SizedBox(height: 8),
             const Text('مساحة تجمع الأصدقاء والإبداع',
@@ -569,7 +569,7 @@ class _AuthPageState extends State<AuthPage> {
                   child: const Icon(Icons.groups_rounded, color: Colors.white, size: 54),
                 ),
                 const SizedBox(height: 18),
-                const Text('ملتقى شباب المستقبل', textAlign: TextAlign.center,
+                const Text('عالم الفريدو وفاطمة', textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 27, fontWeight: FontWeight.w900, letterSpacing: .2)),
                 const SizedBox(height: 7),
                 Text('مساحتك • أصدقاؤك • اهتماماتك', textAlign: TextAlign.center,
@@ -758,7 +758,7 @@ class _HomePageState extends State<HomePage> {
     return Directionality(textDirection: TextDirection.rtl, child: Scaffold(
       appBar: AppBar(
         backgroundColor: darkBrand, foregroundColor: Colors.white,
-        title: const Text('ملتقى شباب المستقبل'),
+        title: const Text('عالم الفريدو وفاطمة'),
         actions: [
           IconButton(tooltip: 'موسيقى الخلفية', icon: const Icon(Icons.music_note),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExtraCommunityFeaturesPage()))),
@@ -1131,7 +1131,7 @@ class _MiniNowPlayingBarState extends State<MiniNowPlayingBar> {
                       children: [
                         Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text(item.artist ?? item.album ?? 'ملتقى شباب المستقبل',
+                        Text(item.artist ?? item.album ?? 'عالم الفريدو وفاطمة',
                           maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: const TextStyle(color: Colors.white70, fontSize: 11)),
                       ],

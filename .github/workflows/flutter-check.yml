@@ -4,7 +4,7 @@ on:
   # Feature branches are accumulated without repeated APK builds.
   # Run the complete validation/build manually when the user requests the final package.
   push:
-    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade, feature/v61-comprehensive-upgrade, feature/v62-ultimate-comprehensive-upgrade, feature/v63-native-call-experience]
+    branches: [main, release/combined-mainline, feature/v38-ultimate-all-in-one, feature/v40-full-community-release, feature/v43-ultimate-full-upgrade, feature/v44-future-lab-full-upgrade, feature/v47-shared-iptv-library, feature/v48-community-evolution, feature/v49-complete-community-upgrade, feature/v50-dns-helper, feature/v51-iptv-channel-controls, feature/v52-community-reels-stories, feature/v53-community-universe, feature/v54-world-community, feature/v55-music-notifications-repair, feature/v56-dreams-stories-entertainment, feature/v57-iptv-entertainment-community-upgrade, feature/v58-experience-hub-full-upgrade, feature/v59-independent-vod-cinema-library, feature/v60-complete-forum-upgrade, feature/v61-comprehensive-upgrade, feature/v62-ultimate-comprehensive-upgrade, feature/v63-native-call-experience, feature/fatima-alfredo-rebrand-v66]
   pull_request:
     branches: [main]
 
@@ -74,7 +74,7 @@ jobs:
       - name: Configure embedded Godot Android runtime
         run: python scripts/configure_godot_android.py
       - name: Set Android app display name
-        run: sed -i 's/android:label="forum"/android:label="ملتقى شباب المستقبل"/' android/app/src/main/AndroidManifest.xml
+        run: sed -i 's/android:label="forum"/android:label="عالم الفريدو وفاطمة"/' android/app/src/main/AndroidManifest.xml
       - name: Configure Future Youth Forum launcher icon
         run: python scripts/configure_android_branding.py
       - name: Verify Android Flutter embedding v2 manifest
